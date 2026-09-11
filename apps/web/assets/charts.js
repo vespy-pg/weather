@@ -374,9 +374,15 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
   };
   cloudCover.forEach((value, index) => {
     if (value === null || value < 4) {
+      if (cloudSegment.length && value !== null) {
+        cloudSegment.push({x: padding.left + (index + .5) * columnWidth, y: weatherLineY, value: 0});
+      }
       paintCloudSegment(cloudSegment);
       cloudSegment = [];
       return;
+    }
+    if (!cloudSegment.length && index > 0 && cloudCover[index - 1] !== null) {
+      cloudSegment.push({x: padding.left + (index - .5) * columnWidth, y: weatherLineY, value: 0});
     }
     cloudSegment.push({
       x: padding.left + (index + .5) * columnWidth,

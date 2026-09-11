@@ -2,6 +2,7 @@ import {drawForecastSky, drawWeatherChart, drawWindFlow} from './charts.js';
 import {createWeatherDemo} from './weather-demo.js';
 import {escapeHtml, formatForecastDate, formatTime, measurement, numericValue, temperature} from './components.js';
 import {setLanguage, t} from './i18n.js';
+import {replacingLocation, sameLocation, withLocation} from './location-state.js';
 
 const SETTINGS_KEY = 'weather.settings.v1';
 const ZOOM_LEVELS = [.5, .75, 1, 1.25, 1.5, 2];
@@ -78,23 +79,8 @@ let weather = null;
 let weatherRequest = 0;
 let zoomIndex = Math.max(0, ZOOM_LEVELS.indexOf(Number(settings.zoom)));
 
-function locationKey(item) {
-  if (item?.id !== undefined && item?.id !== null) return String(item.id);
-  return `${Number(item?.latitude).toFixed(4)}:${Number(item?.longitude).toFixed(4)}`;
-}
-
-function sameLocation(first, second) {
-  return locationKey(first) === locationKey(second);
-}
-
 function locationLabel(item) {
   return `${item.name}${item.country ? `, ${item.country}` : ''}`;
-}
-
-function withLocation(collection, item) {
-  const index = collection.findIndex(location => sameLocation(location, item));
-  if (index < 0) return [...collection, item];
-  return collection.map((location, locationIndex) => locationIndex === index ? item : location);
 }
 
 function loadSettings() {
@@ -482,7 +468,7 @@ document.getElementById('useDeviceLocation').addEventListener('click', () => {
   if (!navigator.geolocation) return document.getElementById('settingsError').textContent = t('error.geolocation');
   document.getElementById('settingsError').textContent = t('status.waitingLocation');
   navigator.geolocation.getCurrentPosition(position => {
-    pendingLocation = {
+    const deviceLocation = {
       id: `device-${position.coords.latitude.toFixed(4)}-${position.coords.longitude.toFixed(4)}`,
       name: t('location.current'),
       country: '',
@@ -490,7 +476,8 @@ document.getElementById('useDeviceLocation').addEventListener('click', () => {
       longitude: Number(position.coords.longitude.toFixed(5)),
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'auto'
     };
-    pendingLocations = withLocation(pendingLocations, pendingLocation);
+    pendingLocations = replacingLocation(pendingLocations, pendingLocation, deviceLocation);
+    pendingLocation = deviceLocation;
     document.getElementById('locationQuery').value = locationLabel(pendingLocation);
     renderPendingLocations();
     updateEmbedPreview();
@@ -579,7 +566,10 @@ async function initialize() {
   await loadWeather();
 
   const position = await requestedPosition;
-  if (position) activateLocation(locationFromPosition(position));
+  if (position) {
+    const deviceLocation = locationFromPosition(position);
+    activateLocation(deviceLocation, replacingLocation(settings.locations, settings.location, deviceLocation));
+  }
 }
 
 initialize();
