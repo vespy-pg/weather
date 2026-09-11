@@ -834,7 +834,7 @@ export function drawWeatherChart(canvas, points, days = [], options = {}) {
     });
   }
 
-  installChartTooltip(canvas, relativeX => {
+  if (options.interactive !== false) installChartTooltip(canvas, relativeX => {
     if (relativeX < padding.left || relativeX > width - padding.right) return null;
     const index = Math.max(0, Math.min(points.length - 1, Math.floor((relativeX - padding.left) / columnWidth)));
     const point = points[index];

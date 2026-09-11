@@ -43,6 +43,17 @@ const LEGEND_WIND_POINTS = LEGEND_WIND_SPEEDS.map((windSpeed, index) => ({
   windGusts: windSpeed + 3 + index % 4,
   windDirection: 225 + Math.sin(index * .65) * 55
 }));
+const LEGEND_TEMPERATURES = [-16, -13, -9, -4, -.2, 0, 5, 11, 17, 18, 23, 27, 30, 32, 36, 40];
+const LEGEND_TEMPERATURE_POINTS = LEGEND_TEMPERATURES.map((value, index) => ({
+  timestamp: `2026-06-01T${String(index).padStart(2, '0')}:00`,
+  temperature: value,
+  apparentTemperature: value,
+  cloudCover: 0,
+  precipitation: 0,
+  precipitationProbability: 0,
+  windSpeed: 0,
+  weatherCode: 0
+}));
 
 let settings = loadSettings();
 let pendingLocation = settings.location;
@@ -202,6 +213,7 @@ function renderWind(hourly) {
 }
 
 function drawLegendPreviews() {
+  drawWeatherChart(document.getElementById('legendTemperatureCanvas'), LEGEND_TEMPERATURE_POINTS, [], {timeline: true, showApparentTemperature: false, interactive: false});
   drawForecastSky(document.getElementById('legendSkyCanvas'), LEGEND_SKY_POINTS, LEGEND_SKY_DAYS, {showHourlyTemperatures: false});
   drawWindFlow(document.getElementById('legendWindCanvas'), LEGEND_WIND_POINTS);
 }
