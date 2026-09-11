@@ -123,6 +123,17 @@ npm test
 
 GitHub Pages deploys `apps/web` automatically after every push to `main`.
 
+## Run with Docker
+
+Build and run the complete web application and live API:
+
+```bash
+docker build -t weather .
+docker run --rm -p 127.0.0.1:8080:8080 weather
+```
+
+The application uses relative API URLs, so the same image can be reverse-proxied from a domain root or a path such as `/pogoda/`.
+
 ## Akacjowa integration
 
 Akacjowa will eventually consume `/api/weather` from this service instead of maintaining its own provider integration. Its existing forecast remains intact until the standalone service has a stable live API URL.

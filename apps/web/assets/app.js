@@ -9,6 +9,7 @@ const QUERY = new URLSearchParams(location.search);
 const IS_GITHUB_PAGES = location.hostname.endsWith('.github.io');
 const IS_DEMO = QUERY.get('demo') === '1' || IS_GITHUB_PAGES;
 const IS_EMBEDDED = QUERY.get('embed') === '1';
+const API_ROOT = new URL('./api/', location.href);
 const DEFAULT_SETTINGS = {
   location: {name: 'Aurora Vale', country: 'Northland', latitude: 46.81, longitude: 9.84, timezone: 'Europe/Zurich'},
   configured: false,
@@ -281,7 +282,7 @@ async function loadWeather() {
         timezone: settings.location.timezone || 'auto',
         name: settings.location.name
       });
-      const response = await fetch(`/api/weather?${parameters}`);
+      const response = await fetch(new URL(`weather?${parameters}`, API_ROOT));
       if (!response.ok) throw new Error((await response.json()).error || 'Forecast request failed.');
       weather = await response.json();
       document.getElementById('forecastRangeLabel').textContent = t('forecast.next');
@@ -317,7 +318,7 @@ async function searchLocations() {
   document.getElementById('settingsError').textContent = '';
   try {
     if (IS_GITHUB_PAGES) throw new Error(t('error.locationApi'));
-    const response = await fetch(`/api/locations?q=${encodeURIComponent(query)}`);
+    const response = await fetch(new URL(`locations?q=${encodeURIComponent(query)}`, API_ROOT));
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error);
     resultsElement.innerHTML = payload.results.length ? payload.results.map((item, index) => `<button type="button" class="location-result" data-location-index="${index}"><strong>${escapeHtml(item.name)}</strong> - ${escapeHtml([item.admin1, item.country].filter(Boolean).join(', '))}</button>`).join('') : `<p class="muted">${t('error.noLocations')}</p>`;
