@@ -386,14 +386,14 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
     if (probability === null || probability <= 0) return;
     const code = numericValue(point.weatherCode);
     const precipitationAmount = Math.sqrt(Math.max(0, amount ?? 0));
-    const rainSize = 3.5 + Math.min(7.5, precipitationAmount * 3.7);
+    const rainSize = 4.2 + Math.min(9.2, precipitationAmount * 4.4);
     const opacity = (isLightTheme() ? .3 : .2) + Math.min(100, probability) / 100 * (isLightTheme() ? .7 : .8);
     const center = padding.left + (index + .5) * columnWidth;
     if ([71, 73, 75, 77, 85, 86].includes(code)) {
       const snowfall = numericValue(point.snowfall);
       drawSnowflake(context, center, 84, (3 + Math.min(6, Math.sqrt(Math.max(0, snowfall ?? 0)) * 3)) * visualScale, opacity);
     } else if ([96, 99].includes(code)) {
-      const hailSize = 2.2 + Math.min(3.4, precipitationAmount * 1.5);
+      const hailSize = 2.1 + Math.min(2.7, precipitationAmount * 1.25);
       drawHailstone(context, center, 83, hailSize * visualScale, opacity);
     } else {
       drawRainDrop(context, center, 84, rainSize * visualScale, opacity);
@@ -517,12 +517,12 @@ export function drawWindFlow(canvas, points, options = {}) {
     const lanePosition = .5 - lineIndex / (liftFactors.length - 1);
     const directionLift = (Math.sin(directions[index] + lineIndex * .43) + 1) / 2
       * strength[index] * (1 + lineIndex % 3 * .65) * visualScale;
-    const strengthLift = liftFactors[lineIndex] * strength[index] * height * .2;
+    const strengthLift = liftFactors[lineIndex] * strength[index] * height * .15;
     const baseSeparation = lanePosition * 9 * visualScale;
-    const strengthTwist = Math.sin(index * (.18 + lineIndex * .025) + lineIndex * .9)
-      * Math.pow(strength[index], 1.15) * (1.5 + lineIndex % 4 * .8) * visualScale;
-    const turbulence = Math.sin(index * (.13 + lineIndex * .009) + lineIndex * 1.17)
-      * gustiness[index] * Math.pow(strength[index], .65) * (2.5 + lineIndex % 4 * 1.45) * visualScale;
+    const strengthTwist = Math.sin(index * (.48 + lineIndex * .035) + lineIndex * 1.06)
+      * Math.pow(strength[index], 1.05) * (5 + lineIndex % 5 * 1.45) * visualScale;
+    const turbulence = Math.sin(index * (.48 + lineIndex * .018) + lineIndex * 1.17)
+      * gustiness[index] * Math.pow(strength[index], .65) * (3.2 + lineIndex % 4 * 1.6) * visualScale;
     return Math.max(3 * visualScale, Math.min(height - 3 * visualScale, flowCenterY(index) + baseSeparation - strengthLift - directionLift + strengthTwist + turbulence));
   };
 
@@ -590,10 +590,10 @@ export function drawWindFlow(canvas, points, options = {}) {
       context.save();
       traceSegment();
       context.strokeStyle = windColor;
-      context.globalAlpha = (.035 + averageStrength * .2) * (.6 + strandWeight * .4);
-      context.lineWidth = (4 + averageStrength * 8) * (.72 + strandWeight * .28) * visualScale;
+      context.globalAlpha = (.025 + averageStrength * .13) * (.6 + strandWeight * .4);
+      context.lineWidth = (4 + averageStrength * 5) * (.72 + strandWeight * .28) * visualScale;
       context.shadowColor = windColor;
-      context.shadowBlur = (3 + averageStrength * 11) * visualScale;
+      context.shadowBlur = (3 + averageStrength * 7) * visualScale;
       context.stroke();
       context.restore();
 
@@ -601,7 +601,7 @@ export function drawWindFlow(canvas, points, options = {}) {
       traceSegment();
       context.strokeStyle = windColor;
       context.globalAlpha = (.24 + Math.pow(averageStrength, .75) * .76) * (.65 + strandWeight * .35);
-      context.lineWidth = (.9 + averageStrength * 2.1) * (.82 + strandWeight * .18) * visualScale;
+      context.lineWidth = (.9 + averageStrength * 1.35) * (.82 + strandWeight * .18) * visualScale;
       context.lineCap = 'round';
       context.stroke();
       context.restore();
