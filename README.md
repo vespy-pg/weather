@@ -85,7 +85,7 @@ cd weather
 npm start
 ```
 
-Open `http://127.0.0.1:8080/`. On the first visit, search for a location or use the browser's location permission. Open `http://127.0.0.1:8080/?demo=1` to inspect the fictional extreme-weather dataset without contacting a weather provider.
+Open `http://127.0.0.1:8080/`. On the first visit, the application selects the capital of the visitor's country and requests browser location permission. When permission is granted, it uses OpenStreetMap Nominatim to resolve the coordinates to the nearest named locality and replaces the capital. Open `http://127.0.0.1:8080/?demo=1` to inspect the fictional extreme-weather dataset without contacting a weather provider.
 
 Settings are stored only in the browser. No account is required. The API caches upstream responses in memory for ten minutes by default.
 
@@ -110,6 +110,7 @@ The server exposes:
 
 - `GET /api/health`
 - `GET /api/locations?q=...`
+- `GET /api/reverse-location?latitude=...&longitude=...&timezone=...&language=...`
 - `GET /api/weather?latitude=...&longitude=...&timezone=...&name=...`
 
 The API contract is available in [`packages/weather-contract/openapi.yaml`](packages/weather-contract/openapi.yaml).

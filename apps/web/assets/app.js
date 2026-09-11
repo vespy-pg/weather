@@ -467,15 +467,8 @@ document.getElementById('locationQuery').addEventListener('keydown', event => {
 document.getElementById('useDeviceLocation').addEventListener('click', () => {
   if (!navigator.geolocation) return document.getElementById('settingsError').textContent = t('error.geolocation');
   document.getElementById('settingsError').textContent = t('status.waitingLocation');
-  navigator.geolocation.getCurrentPosition(position => {
-    const deviceLocation = {
-      id: `device-${position.coords.latitude.toFixed(4)}-${position.coords.longitude.toFixed(4)}`,
-      name: t('location.current'),
-      country: '',
-      latitude: Number(position.coords.latitude.toFixed(5)),
-      longitude: Number(position.coords.longitude.toFixed(5)),
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'auto'
-    };
+  navigator.geolocation.getCurrentPosition(async position => {
+    const deviceLocation = await locationFromPosition(position);
     pendingLocations = replacingLocation(pendingLocations, pendingLocation, deviceLocation);
     pendingLocation = deviceLocation;
     document.getElementById('locationQuery').value = locationLabel(pendingLocation);
@@ -538,8 +531,8 @@ function devicePosition() {
   });
 }
 
-function locationFromPosition(position) {
-  return {
+async function locationFromPosition(position) {
+  const fallback = {
     id: `device-${position.coords.latitude.toFixed(4)}-${position.coords.longitude.toFixed(4)}`,
     name: t('location.current'),
     country: '',
@@ -547,10 +540,38 @@ function locationFromPosition(position) {
     longitude: Number(position.coords.longitude.toFixed(5)),
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'auto'
   };
+  return resolveDeviceLocation(fallback);
+}
+
+async function resolveDeviceLocation(fallback) {
+  try {
+    const parameters = new URLSearchParams({
+      latitude: fallback.latitude,
+      longitude: fallback.longitude,
+      timezone: fallback.timezone,
+      language: settings.language
+    });
+    const response = await fetch(new URL(`reverse-location?${parameters}`, API_ROOT));
+    const payload = await response.json();
+    return response.ok && payload.location ? payload.location : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 async function initialize() {
-  if (settings.configured || IS_DEMO || IS_EMBEDDED) return loadWeather();
+  if (settings.configured || IS_DEMO || IS_EMBEDDED) {
+    const unresolvedDeviceLocation = String(settings.location.id || '').startsWith('device-')
+      && ['Current location', 'Bieżąca lokalizacja'].includes(settings.location.name);
+    if (unresolvedDeviceLocation && !IS_DEMO && !IS_EMBEDDED) {
+      const resolvedLocation = await resolveDeviceLocation(settings.location);
+      settings.locations = replacingLocation(settings.locations, settings.location, resolvedLocation);
+      settings.location = resolvedLocation;
+      saveSettings();
+      renderLocationMenu();
+    }
+    return loadWeather();
+  }
   const requestedPosition = devicePosition();
   try {
     const response = await fetch(new URL('bootstrap-location', API_ROOT));
@@ -567,7 +588,7 @@ async function initialize() {
 
   const position = await requestedPosition;
   if (position) {
-    const deviceLocation = locationFromPosition(position);
+    const deviceLocation = await locationFromPosition(position);
     activateLocation(deviceLocation, replacingLocation(settings.locations, settings.location, deviceLocation));
   }
 }

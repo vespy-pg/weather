@@ -4,6 +4,7 @@ const MESSAGES = {
   en: {
     'app.weather': 'WEATHER',
     'app.waiting': 'Waiting for forecast',
+    'app.dataSources': 'Data sources:',
     'action.settings': 'Settings',
     'action.editLocations': 'Edit locations and settings',
     'action.removeLocation': 'Remove location',
@@ -105,6 +106,7 @@ const MESSAGES = {
   pl: {
     'app.weather': 'POGODA',
     'app.waiting': 'Oczekiwanie na prognozę',
+    'app.dataSources': 'Źródła danych:',
     'action.settings': 'Ustawienia',
     'action.editLocations': 'Edytuj miejscowości i ustawienia',
     'action.removeLocation': 'Usuń miejscowość',

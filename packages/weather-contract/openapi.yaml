@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Weather API
-  version: 0.1.0
+  version: 0.2.0
 paths:
   /api/health:
     get:
@@ -22,6 +22,44 @@ paths:
       responses:
         '200':
           description: Matching locations
+  /api/bootstrap-location:
+    get:
+      operationId: getBootstrapLocation
+      responses:
+        '200':
+          description: Capital location selected from the country code supplied by the trusted reverse proxy
+  /api/reverse-location:
+    get:
+      operationId: reverseLocation
+      parameters:
+        - in: query
+          name: latitude
+          required: true
+          schema:
+            type: number
+            minimum: -90
+            maximum: 90
+        - in: query
+          name: longitude
+          required: true
+          schema:
+            type: number
+            minimum: -180
+            maximum: 180
+        - in: query
+          name: timezone
+          schema:
+            type: string
+        - in: query
+          name: language
+          schema:
+            type: string
+            enum: [en, pl]
+      responses:
+        '200':
+          description: Nearest named locality for coordinates supplied after browser permission
+        '400':
+          description: Invalid coordinates
   /api/weather:
     get:
       operationId: getWeather
@@ -47,4 +85,3 @@ paths:
       responses:
         '200':
           description: Normalized current, hourly, and daily forecast
-

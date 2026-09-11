@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {forecastUrl, normalizeForecast, selectCapitalResult} from './server.js';
+import {forecastUrl, normalizeForecast, normalizeReverseLocation, selectCapitalResult} from './server.js';
 
 test('forecastUrl requests the fields shared by web and Android clients', () => {
   const url = new URL(forecastUrl({latitude: 50.67, longitude: 19.12, timezone: 'Europe/Warsaw'}));
@@ -61,4 +61,24 @@ test('selectCapitalResult prefers the matching national capital', () => {
   ];
   assert.equal(selectCapitalResult(results, 'gb'), results[1]);
   assert.equal(selectCapitalResult(results, 'US'), null);
+});
+
+test('normalizeReverseLocation uses the nearest named locality and country', () => {
+  const fallback = {
+    id: 'device-50.6724-19.1824',
+    name: 'Current location',
+    country: '',
+    latitude: 50.67244,
+    longitude: 19.18239,
+    timezone: 'Europe/Warsaw'
+  };
+  assert.deepEqual(normalizeReverseLocation({
+    addresstype: 'hamlet',
+    name: 'Jastrząb Rozparcelowany',
+    address: {hamlet: 'Jastrząb Rozparcelowany', village: 'Jastrząb', country: 'Poland'}
+  }, fallback), {
+    ...fallback,
+    name: 'Jastrząb Rozparcelowany',
+    country: 'Poland'
+  });
 });

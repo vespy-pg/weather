@@ -30,7 +30,7 @@ function json(response, status, body) {
 async function cachedFetch(url) {
   const cached = cache.get(url);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
-  const response = await fetch(url, {headers: {'User-Agent': 'weather/0.1'}});
+  const response = await fetch(url, {headers: {'User-Agent': 'weather/0.1 (https://vespy.pl/pogoda/)'}});
   if (!response.ok) throw new Error(`Upstream returned ${response.status}`);
   const value = await response.json();
   cache.set(url, {expiresAt: Date.now() + CACHE_TTL_MS, value});
@@ -162,6 +162,52 @@ async function bootstrapLocation(request, response) {
   }});
 }
 
+export function normalizeReverseLocation(source, fallback) {
+  const address = source?.address || {};
+  const namedPlace = ['city', 'town', 'village', 'hamlet', 'suburb'].includes(source?.addresstype) ? source.name : null;
+  const name = namedPlace
+    || address.city
+    || address.town
+    || address.village
+    || address.hamlet
+    || address.municipality
+    || address.suburb
+    || source?.name
+    || fallback.name;
+  return {
+    ...fallback,
+    name,
+    country: address.country || fallback.country || ''
+  };
+}
+
+async function reverseLocation(requestUrl, response) {
+  const latitude = Number(requestUrl.searchParams.get('latitude'));
+  const longitude = Number(requestUrl.searchParams.get('longitude'));
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+    return json(response, 400, {error: 'Valid latitude and longitude are required.'});
+  }
+  const language = requestUrl.searchParams.get('language') === 'pl' ? 'pl' : 'en';
+  const fallback = {
+    id: `device-${latitude.toFixed(4)}-${longitude.toFixed(4)}`,
+    name: 'Current location',
+    country: '',
+    latitude: Number(latitude.toFixed(5)),
+    longitude: Number(longitude.toFixed(5)),
+    timezone: requestUrl.searchParams.get('timezone') || 'auto'
+  };
+  const parameters = new URLSearchParams({
+    format: 'jsonv2',
+    lat: latitude.toFixed(5),
+    lon: longitude.toFixed(5),
+    zoom: '14',
+    addressdetails: '1',
+    'accept-language': language
+  });
+  const source = await cachedFetch(`https://nominatim.openstreetmap.org/reverse?${parameters}`);
+  return json(response, 200, {location: normalizeReverseLocation(source, fallback)});
+}
+
 async function weather(requestUrl, response) {
   const latitude = Number(requestUrl.searchParams.get('latitude'));
   const longitude = Number(requestUrl.searchParams.get('longitude'));
@@ -202,6 +248,7 @@ export function createServer() {
       if (requestUrl.pathname === '/api/health') return json(response, 200, {status: 'ok'});
       if (requestUrl.pathname === '/api/bootstrap-location') return await bootstrapLocation(request, response);
       if (requestUrl.pathname === '/api/locations') return await locations(requestUrl, response);
+      if (requestUrl.pathname === '/api/reverse-location') return await reverseLocation(requestUrl, response);
       if (requestUrl.pathname === '/api/weather') return await weather(requestUrl, response);
       return await staticFile(requestUrl, response);
     } catch (error) {
