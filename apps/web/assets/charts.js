@@ -385,16 +385,18 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
     const amount = numericValue(point.precipitation);
     if (probability === null || probability <= 0) return;
     const code = numericValue(point.weatherCode);
-    const dropSize = 3 + Math.min(7, Math.sqrt(Math.max(0, amount ?? 0)) * 3.5);
+    const precipitationAmount = Math.sqrt(Math.max(0, amount ?? 0));
+    const rainSize = 3.5 + Math.min(7.5, precipitationAmount * 3.7);
     const opacity = (isLightTheme() ? .3 : .2) + Math.min(100, probability) / 100 * (isLightTheme() ? .7 : .8);
     const center = padding.left + (index + .5) * columnWidth;
     if ([71, 73, 75, 77, 85, 86].includes(code)) {
       const snowfall = numericValue(point.snowfall);
       drawSnowflake(context, center, 84, (3 + Math.min(6, Math.sqrt(Math.max(0, snowfall ?? 0)) * 3)) * visualScale, opacity);
     } else if ([96, 99].includes(code)) {
-      drawHailstone(context, center, 83, Math.min(8, dropSize * .7) * visualScale, opacity);
+      const hailSize = 2.2 + Math.min(3.4, precipitationAmount * 1.5);
+      drawHailstone(context, center, 83, hailSize * visualScale, opacity);
     } else {
-      drawRainDrop(context, center, 84, dropSize * visualScale, opacity);
+      drawRainDrop(context, center, 84, rainSize * visualScale, opacity);
     }
   });
 
@@ -471,28 +473,6 @@ function drawCalculatedDayNightBands(context, start, end, x, padding, plotWidth,
   paintDayNightBands(context, nightSegments, padding, plotWidth, plotHeight);
 }
 
-function windFlowColor(speed) {
-  const value = Math.max(0, numericValue(speed) ?? 0);
-  const stops = isLightTheme() ? [
-    {speed: 0, color: '#526176'},
-    {speed: 5, color: '#668c9a'},
-    {speed: 10, color: '#1ca160'},
-    {speed: 18, color: '#d49a1f'},
-    {speed: 30, color: '#e52f47'}
-  ] : [
-    {speed: 0, color: '#8d98aa'},
-    {speed: 5, color: '#7ba8b4'},
-    {speed: 10, color: '#4bd48b'},
-    {speed: 18, color: '#f2bd55'},
-    {speed: 30, color: '#ff4d5f'}
-  ];
-  const upperIndex = stops.findIndex(stop => value <= stop.speed);
-  const upper = stops[upperIndex < 0 ? stops.length - 1 : upperIndex];
-  const lower = stops[Math.max(0, (upperIndex < 0 ? stops.length - 1 : upperIndex) - 1)];
-  const progress = upper.speed === lower.speed ? 0 : Math.min(1, (value - lower.speed) / (upper.speed - lower.speed));
-  return interpolateHexColor(lower.color, upper.color, progress);
-}
-
 export function drawWindFlow(canvas, points, options = {}) {
   const rect = canvas.getBoundingClientRect();
   if (!points.length || rect.width < 1 || rect.height < 1) return;
@@ -529,6 +509,7 @@ export function drawWindFlow(canvas, points, options = {}) {
   const strength = speeds.map(speed => Math.min(1, speed / 30));
   const liftFactors = [.03, .1, .18, .27, .37, .48, .6, .73, .87, 1];
   const strandWeights = [.42, .58, .72, .86, 1, .95, .82, .7, .55, .4];
+  const windColor = chartColor('--chart-wind-flow', '#9bc7d7');
   const flowCenterY = index => height * .61
     + Math.sin(index * .12 + directions[index] * .2) * (.25 + strength[index] * 4.2) * visualScale
     + Math.sin(index * .055 + directions[index] * .7) * (.15 + strength[index] * 2.8) * visualScale;
@@ -538,9 +519,11 @@ export function drawWindFlow(canvas, points, options = {}) {
       * strength[index] * (1 + lineIndex % 3 * .65) * visualScale;
     const strengthLift = liftFactors[lineIndex] * strength[index] * height * .2;
     const baseSeparation = lanePosition * 9 * visualScale;
+    const strengthTwist = Math.sin(index * (.18 + lineIndex * .025) + lineIndex * .9)
+      * Math.pow(strength[index], 1.15) * (1.5 + lineIndex % 4 * .8) * visualScale;
     const turbulence = Math.sin(index * (.13 + lineIndex * .009) + lineIndex * 1.17)
       * gustiness[index] * Math.pow(strength[index], .65) * (2.5 + lineIndex % 4 * 1.45) * visualScale;
-    return Math.max(3 * visualScale, Math.min(height - 3 * visualScale, flowCenterY(index) + baseSeparation - strengthLift - directionLift + turbulence));
+    return Math.max(3 * visualScale, Math.min(height - 3 * visualScale, flowCenterY(index) + baseSeparation - strengthLift - directionLift + strengthTwist + turbulence));
   };
 
   context.clearRect(0, 0, width, height);
@@ -569,9 +552,6 @@ export function drawWindFlow(canvas, points, options = {}) {
     const endTop = Math.min(...endLines);
     const endBottom = Math.max(...endLines);
     const averageStrength = (strength[index] + strength[index + 1]) / 2;
-    const gradient = context.createLinearGradient(startX, 0, endX, 0);
-    gradient.addColorStop(0, windFlowColor(speeds[index]));
-    gradient.addColorStop(1, windFlowColor(speeds[index + 1]));
     context.save();
     context.beginPath();
     context.moveTo(startX, startTop);
@@ -579,7 +559,7 @@ export function drawWindFlow(canvas, points, options = {}) {
     context.lineTo(endX, endBottom);
     context.bezierCurveTo(endX - columnWidth * .42, endBottom, startX + columnWidth * .42, startBottom, startX, startBottom);
     context.closePath();
-    context.fillStyle = gradient;
+    context.fillStyle = windColor;
     context.globalAlpha = .025 + averageStrength * .12;
     context.filter = `blur(${(1.5 + averageStrength * 4.5) * visualScale}px)`;
     context.fill();
@@ -594,9 +574,6 @@ export function drawWindFlow(canvas, points, options = {}) {
       const startY = lineY(index, lineIndex);
       const endY = lineY(index + 1, lineIndex);
       const averageStrength = (strength[index] + strength[index + 1]) / 2;
-      const gradient = context.createLinearGradient(startX, 0, endX, 0);
-      gradient.addColorStop(0, windFlowColor(speeds[index]));
-      gradient.addColorStop(1, windFlowColor(speeds[index + 1]));
       const traceSegment = () => {
         context.beginPath();
         context.moveTo(startX, startY);
@@ -612,17 +589,17 @@ export function drawWindFlow(canvas, points, options = {}) {
 
       context.save();
       traceSegment();
-      context.strokeStyle = gradient;
+      context.strokeStyle = windColor;
       context.globalAlpha = (.035 + averageStrength * .2) * (.6 + strandWeight * .4);
       context.lineWidth = (4 + averageStrength * 8) * (.72 + strandWeight * .28) * visualScale;
-      context.shadowColor = windFlowColor((speeds[index] + speeds[index + 1]) / 2);
+      context.shadowColor = windColor;
       context.shadowBlur = (3 + averageStrength * 11) * visualScale;
       context.stroke();
       context.restore();
 
       context.save();
       traceSegment();
-      context.strokeStyle = gradient;
+      context.strokeStyle = windColor;
       context.globalAlpha = (.24 + Math.pow(averageStrength, .75) * .76) * (.65 + strandWeight * .35);
       context.lineWidth = (.9 + averageStrength * 2.1) * (.82 + strandWeight * .18) * visualScale;
       context.lineCap = 'round';

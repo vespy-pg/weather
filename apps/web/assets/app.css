@@ -17,6 +17,7 @@
   --chart-day-separator: rgba(154, 164, 178, .48);
   --chart-axis-background: rgba(13, 17, 24, .86);
   --chart-wind: #0f151e;
+  --chart-wind-flow: #9bc7d7;
   --line: #2c3748;
   --text: #e7edf7;
   --muted: #8d98aa;
@@ -50,6 +51,7 @@
   --chart-day-separator: rgba(70, 91, 120, .34);
   --chart-axis-background: rgba(247, 250, 255, .9);
   --chart-wind: #eef4fa;
+  --chart-wind-flow: #486d80;
 }
 
 * { box-sizing: border-box; }
@@ -108,7 +110,7 @@ h2 { margin-bottom: 2px; font-size: 18px; }
 .forecast-track-marker { width: 22px; height: 4px; flex: 0 0 auto; border-radius: 99px; }
 .forecast-track-marker.sky { background: linear-gradient(90deg, #9aa4b2 0 42%, #f0b72d 58% 100%); box-shadow: 0 2px 7px rgba(240, 183, 45, .42); }
 .forecast-track-marker.temperature { background: linear-gradient(90deg, #2358c7, #45cf88 48%, #f28e3e 72%, #ff263f); }
-.forecast-track-marker.wind { background: linear-gradient(90deg, #7ba8b4, #4bd48b 40%, #f2bd55 68%, #ff4d5f); box-shadow: 0 0 7px rgba(75, 212, 139, .35); }
+.forecast-track-marker.wind { background: var(--chart-wind-flow); box-shadow: 0 0 7px color-mix(in srgb, var(--chart-wind-flow) 45%, transparent); }
 .forecast-weather-canvas { display: block; width: 100%; height: 100px; border-bottom: 1px solid var(--chart-grid); background: var(--chart-surface); touch-action: pan-x pan-y; }
 #forecastChart { display: block; width: 100%; height: 270px; background: var(--chart-surface); touch-action: pan-x pan-y; }
 .forecast-wind-visual { position: relative; height: var(--forecast-wind-height, 46px); overflow: hidden; border-top: 1px solid var(--chart-grid); background: var(--chart-wind); }
