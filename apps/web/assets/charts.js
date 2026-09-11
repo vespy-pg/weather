@@ -205,25 +205,36 @@ function drawLightning(context, x, y, opacity, scale = 1) {
   context.restore();
 }
 
-function traceWindCurl(context, centerX, centerY, radiusX, radiusY, direction) {
+function traceWindGust(context, startX, endX, centerY, amplitude, radiusX, radiusY, direction, phase) {
+  const curlCenterX = endX - radiusX;
+  const approachX = curlCenterX - radiusX;
+  const span = Math.max(radiusX * 1.5, approachX - startX);
   context.beginPath();
-  context.moveTo(centerX - radiusX * 2.4, centerY + radiusY * .15 * direction);
+  context.moveTo(startX, centerY);
   context.bezierCurveTo(
-    centerX - radiusX * 1.75,
-    centerY + radiusY * .05 * direction,
-    centerX - radiusX * 1.3,
-    centerY,
-    centerX - radiusX,
+    startX + span * .2,
+    centerY + amplitude * direction,
+    startX + span * .42,
+    centerY - amplitude * direction,
+    startX + span * .58,
+    centerY + Math.sin(phase) * amplitude * .3
+  );
+  context.bezierCurveTo(
+    startX + span * .72,
+    centerY + amplitude * direction,
+    approachX - span * .08,
+    centerY - amplitude * .65 * direction,
+    approachX,
     centerY
   );
-  const turns = Math.PI * 2.35;
-  const steps = 36;
+  const turns = Math.PI * 2.18;
+  const steps = 34;
   for (let step = 0; step <= steps; step += 1) {
     const progress = step / steps;
     const angle = Math.PI + turns * progress * direction;
-    const taper = 1 - progress * .32;
+    const taper = 1 - progress * .38;
     context.lineTo(
-      centerX + Math.cos(angle) * radiusX * taper,
+      curlCenterX + Math.cos(angle) * radiusX * taper,
       centerY + Math.sin(angle) * radiusY * taper
     );
   }
@@ -607,7 +618,7 @@ export function drawWindFlow(canvas, points, options = {}) {
     context.bezierCurveTo(endX - columnWidth * .42, endBottom, startX + columnWidth * .42, startBottom, startX, startBottom);
     context.closePath();
     context.fillStyle = windColor;
-    context.globalAlpha = .025 + averageStrength * .12;
+    context.globalAlpha = .006 + averageStrength * .075;
     context.filter = `blur(${(1.5 + averageStrength * 4.5) * visualScale}px)`;
     context.fill();
     context.restore();
@@ -637,7 +648,7 @@ export function drawWindFlow(canvas, points, options = {}) {
       context.save();
       traceSegment();
       context.strokeStyle = windColor;
-      context.globalAlpha = (.025 + averageStrength * .13) * (.6 + strandWeight * .4);
+      context.globalAlpha = (.008 + averageStrength * .085) * (.6 + strandWeight * .4);
       context.lineWidth = (4 + averageStrength * 5) * (.72 + strandWeight * .28) * visualScale;
       context.shadowColor = windColor;
       context.shadowBlur = (3 + averageStrength * 7) * visualScale;
@@ -647,8 +658,8 @@ export function drawWindFlow(canvas, points, options = {}) {
       context.save();
       traceSegment();
       context.strokeStyle = windColor;
-      context.globalAlpha = (.24 + Math.pow(averageStrength, .75) * .76) * (.65 + strandWeight * .35);
-      context.lineWidth = (.9 + averageStrength * 1.35) * (.82 + strandWeight * .18) * visualScale;
+      context.globalAlpha = (.035 + Math.pow(averageStrength, .82) * .92) * (.65 + strandWeight * .35);
+      context.lineWidth = (.7 + averageStrength * 1.3) * (.82 + strandWeight * .18) * visualScale;
       context.lineCap = 'round';
       context.stroke();
       context.restore();
@@ -658,7 +669,7 @@ export function drawWindFlow(canvas, points, options = {}) {
   const tornadoIndexes = new Set(points.map((point, index) => point.tornado === true ? index : -1).filter(index => index >= 0));
   const curlIndexes = [];
   for (let index = 2; index < points.length - 2; index += 1) {
-    if (strength[index] < .36 || tornadoIndexes.has(index)) continue;
+    if (strength[index] < .4 || tornadoIndexes.has(index)) continue;
     const localMaximum = Math.max(...strength.slice(index - 2, index + 3));
     if (strength[index] < localMaximum || index - (curlIndexes.at(-1) ?? -10) < 7) continue;
     curlIndexes.push(index);
@@ -669,16 +680,20 @@ export function drawWindFlow(canvas, points, options = {}) {
   context.clip();
   curlIndexes.forEach((index, curlGroup) => {
     const currentStrength = strength[index];
-    const curlCount = currentStrength >= .82 ? 3 : currentStrength >= .58 ? 2 : 1;
-    const radiusX = Math.max(7, Math.min(16, columnWidth * 2.8)) * (.78 + currentStrength * .32) * visualScale;
-    const radiusY = (3.4 + currentStrength * 5.5) * visualScale;
+    const curlCount = currentStrength >= .55 ? 3 : 2;
+    const gustWidth = Math.max(38, Math.min(72, columnWidth * 9)) * (.8 + currentStrength * .25) * visualScale;
+    const radiusX = (6 + currentStrength * 8) * visualScale;
+    const radiusY = (3 + currentStrength * 4.6) * visualScale;
     const x = (index + .5) * columnWidth;
-    const y = flowCenterY(index) - radiusY * 1.05 - currentStrength * height * .04;
+    const y = flowCenterY(index) - currentStrength * height * .1;
     for (let curl = 0; curl < curlCount; curl += 1) {
-      traceWindCurl(context, x + curl * radiusX * .42, y + (curl - (curlCount - 1) / 2) * radiusY * .72, radiusX, radiusY, (curl + curlGroup) % 2 ? -1 : 1);
+      const direction = (curl + curlGroup) % 2 ? -1 : 1;
+      const lineY = y + (curl - (curlCount - 1) / 2) * radiusY * 1.05;
+      const endX = x + gustWidth * (.25 + curl * .1);
+      traceWindGust(context, x - gustWidth * .72, endX, lineY, radiusY * (.35 + curl * .08), radiusX * (1 - curl * .08), radiusY, direction, index * .4 + curl);
       context.strokeStyle = windColor;
-      context.globalAlpha = .42 + currentStrength * .5;
-      context.lineWidth = (1 + currentStrength * .75) * visualScale;
+      context.globalAlpha = .32 + currentStrength * .64;
+      context.lineWidth = (.95 + currentStrength * .7) * visualScale;
       context.lineCap = 'round';
       context.lineJoin = 'round';
       context.shadowColor = windColor;
