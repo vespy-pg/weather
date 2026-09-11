@@ -192,7 +192,7 @@ function applyZoom(nextIndex, preserveCenter = true) {
   const zoom = ZOOM_LEVELS[zoomIndex];
   const visualScale = zoomVisualScale(zoom);
   timeline.style.setProperty('--forecast-hour-width', `${forecastBaseHourWidth() * zoom}px`);
-  timeline.style.setProperty('--forecast-wind-height', `${68 * visualScale}px`);
+  timeline.style.setProperty('--forecast-wind-height', `${46 * visualScale}px`);
   timeline.style.setProperty('--forecast-wind-arrow-row', `${24 * visualScale}px`);
   timeline.style.setProperty('--forecast-wind-speed-row', `${11 * visualScale}px`);
   timeline.style.setProperty('--forecast-wind-arrow-size', `${19 * visualScale}px`);
@@ -226,7 +226,7 @@ function renderWind(hourly) {
 
 function drawLegendPreviews() {
   drawWeatherChart(document.getElementById('legendTemperatureCanvas'), LEGEND_TEMPERATURE_POINTS, [], {timeline: true, showApparentTemperature: false, interactive: false});
-  drawWeatherChart(document.getElementById('legendFeelsCanvas'), LEGEND_FEELS_POINTS, [], {timeline: true, showApparentTemperature: true, interactive: false});
+  drawWeatherChart(document.getElementById('legendFeelsCanvas'), LEGEND_FEELS_POINTS, [], {timeline: true, showApparentTemperature: true, apparentAreaOpacity: .46, interactive: false});
   drawForecastSky(document.getElementById('legendSkyCanvas'), LEGEND_SKY_POINTS, LEGEND_SKY_DAYS, {showHourlyTemperatures: false});
   drawWindFlow(document.getElementById('legendWindCanvas'), LEGEND_WIND_POINTS);
 }

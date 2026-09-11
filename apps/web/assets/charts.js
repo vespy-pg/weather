@@ -647,6 +647,8 @@ export function drawWeatherChart(canvas, points, days = [], options = {}) {
   const plotHeight = height - padding.top - padding.bottom;
   const columnWidth = plotWidth / points.length;
   const visualScale = Math.max(.7, Math.min(1.6, Number(options.visualScale) || 1));
+  const configuredAreaOpacity = Number(options.apparentAreaOpacity);
+  const apparentAreaOpacity = Number.isFinite(configuredAreaOpacity) ? Math.max(0, Math.min(1, configuredAreaOpacity)) : .18;
   const precipitationValues = points.map(point => numericValue(point.precipitation)).filter(value => value !== null);
   const forecastMaximum = Math.max(0, ...(precipitationValues.length ? precipitationValues : [0]));
   const maxPrecipitation = Math.max(10, Math.ceil(forecastMaximum / 5) * 5);
@@ -772,7 +774,9 @@ export function drawWeatherChart(canvas, points, days = [], options = {}) {
       const startX = padding.left + (index + .5) * columnWidth;
       const endX = padding.left + (index + 1.5) * columnWidth;
       const averageDifference = (apparentStart + apparentEnd - actualStart - actualEnd) / 2;
-      context.fillStyle = averageDifference >= 0 ? 'rgba(242, 142, 62, .18)' : 'rgba(59, 142, 229, .18)';
+      context.fillStyle = averageDifference >= 0
+        ? `rgba(242, 142, 62, ${apparentAreaOpacity})`
+        : `rgba(59, 142, 229, ${apparentAreaOpacity})`;
       context.beginPath();
       context.moveTo(startX, temperatureY(actualStart));
       context.lineTo(endX, temperatureY(actualEnd));
