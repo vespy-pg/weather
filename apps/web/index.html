@@ -10,7 +10,9 @@
   <script>
     try {
       const saved = JSON.parse(localStorage.getItem('weather.settings.v1') || '{}');
-      document.documentElement.dataset.theme = new URLSearchParams(location.search).get('theme') || saved.theme || 'dark';
+      const query = new URLSearchParams(location.search);
+      document.documentElement.dataset.theme = query.get('theme') || saved.theme || 'dark';
+      document.documentElement.lang = query.get('lang') || saved.language || 'en';
     } catch { document.documentElement.dataset.theme = 'dark'; }
   </script>
   <link rel="stylesheet" href="assets/app.css">
@@ -19,16 +21,20 @@
   <main class="shell">
     <header class="topbar">
       <div>
-        <p class="eyebrow">WEATHER</p>
-        <h1 id="locationTitle">Kamienica Polska</h1>
-        <p class="muted" id="updatedAt">Waiting for forecast</p>
+        <p class="eyebrow" data-i18n="app.weather">WEATHER</p>
+        <h1 id="locationTitle">Aurora Vale</h1>
+        <p class="muted" id="updatedAt" data-i18n="app.waiting">Waiting for forecast</p>
       </div>
       <div class="topbar-actions">
+        <label class="language-control" aria-label="Language">
+          <span aria-hidden="true">文</span>
+          <select id="languageSelect"><option value="en">EN</option><option value="pl">PL</option></select>
+        </label>
         <button class="theme-button" type="button" id="themeToggle" aria-label="Switch to light mode" title="Switch to light mode">
           <span id="themeIcon" aria-hidden="true">☀</span><span id="themeLabel">Light</span>
         </button>
         <button class="settings-button" type="button" id="openSettings" aria-label="Open weather settings">
-          <span aria-hidden="true">⚙</span> Settings
+          <span aria-hidden="true">⚙</span> <span data-i18n="action.settings">Settings</span>
         </button>
       </div>
     </header>
@@ -38,11 +44,11 @@
     <section class="panel forecast-panel">
       <div class="section-heading">
         <div>
-          <p class="eyebrow" id="forecastRangeLabel">NEXT 10 DAYS</p>
-          <h2>Temperature, clouds and precipitation</h2>
+          <p class="eyebrow" id="forecastRangeLabel" data-i18n="forecast.next">NEXT 10 DAYS</p>
+          <h2 data-i18n="forecast.title">Temperature, clouds and precipitation</h2>
         </div>
         <div class="forecast-heading-tools">
-          <span class="muted">Temperature from -20°C to +40°C</span>
+          <span class="muted" data-i18n="forecast.range">Temperature from -20°C to +40°C</span>
           <div class="forecast-zoom-controls" aria-label="Timeline zoom">
             <button type="button" id="forecastZoomOut" aria-label="Zoom out timeline">-</button>
             <button type="button" id="forecastZoomReset" aria-label="Reset timeline zoom">100%</button>
@@ -61,9 +67,9 @@
         <div class="forecast-timeline" id="forecastTimeline">
           <canvas class="forecast-weather-canvas" id="forecastWeatherCanvas" height="100" aria-label="Hourly temperature and continuous weather conditions"></canvas>
           <div class="forecast-chart-legend" aria-hidden="true">
-            <span class="precipitation">precip.</span>
-            <span class="apparent-temperature">feels</span>
-            <span class="legend-label">temp.:</span>
+            <span class="precipitation" data-i18n="forecast.precipitationShort">precip.</span>
+            <span class="apparent-temperature" data-i18n="forecast.feelsShort">feels</span>
+            <span class="legend-label" data-i18n="forecast.temperatureShort">temp.:</span>
             <span class="forecast-temperature-scale">
               <i aria-hidden="true"></i>
               <span class="forecast-temperature-ticks">
@@ -82,40 +88,40 @@
     </section>
 
     <section class="panel forecast-guide" aria-labelledby="forecastGuideTitle">
-      <p class="eyebrow">FORECAST LEGEND</p>
-      <h2 id="forecastGuideTitle">How to read this forecast</h2>
+      <p class="eyebrow" data-i18n="legend.eyebrow">FORECAST LEGEND</p>
+      <h2 id="forecastGuideTitle" data-i18n="legend.title">How to read this forecast</h2>
       <div class="legend-grid">
         <article class="legend-card legend-temperature">
-          <strong>Temperature line</strong>
+          <strong data-i18n="legend.temperatureTitle">Temperature line</strong>
           <span class="legend-temperature-bar" aria-hidden="true"></span>
-          <p>White: deep frost at -12°C or below. Gray: frost below 0°C. Blue: cold from 0°C to 18°C. Green: comfortable from 18°C to 27°C. Orange: hot from 27°C to 32°C. Red: extreme heat above 32°C.</p>
+          <p data-i18n="legend.temperatureText">White: deep frost at -12°C or below. Gray: frost below 0°C. Blue: cold from 0°C to 18°C. Green: comfortable from 18°C to 27°C. Orange: hot from 27°C to 32°C. Red: extreme heat above 32°C.</p>
         </article>
         <article class="legend-card">
-          <strong><span class="legend-swatch feels" aria-hidden="true"></span>Feels-like area</strong>
-          <p>The shaded area between the lines shows the difference from measured temperature. Blue means it feels colder, orange means it feels warmer.</p>
+          <strong><span class="legend-swatch feels" aria-hidden="true"></span><span data-i18n="legend.feelsTitle">Feels-like area</span></strong>
+          <p data-i18n="legend.feelsText">The shaded area between the lines shows the difference from measured temperature. Blue means it feels colder, orange means it feels warmer.</p>
         </article>
         <article class="legend-card">
-          <strong><span class="legend-swatch sky" aria-hidden="true"></span>Sun, clouds and night</strong>
-          <p>Yellow glow is exposed sunlight and fades as cloud cover grows. The gray band becomes larger with more cloud. A moon marks nighttime.</p>
+          <strong><span class="legend-swatch sky" aria-hidden="true"></span><span data-i18n="legend.skyTitle">Sun, clouds and night</span></strong>
+          <p data-i18n="legend.skyText">Yellow glow is exposed sunlight and fades as cloud cover grows. The gray band becomes larger with more cloud. A moon marks nighttime.</p>
         </article>
         <article class="legend-card legend-symbols">
-          <strong>Precipitation - one symbol per hour</strong>
-          <p><span aria-hidden="true">💧</span> rain, <span aria-hidden="true">❄</span> snow, <span class="hail-symbol" aria-hidden="true">◆</span> hail. Symbol size shows the amount. Opacity shows probability.</p>
+          <strong data-i18n="legend.precipitationTitle">Precipitation - one symbol per hour</strong>
+          <p><span class="legend-weather-icon" aria-hidden="true">💧</span> <b data-i18n="legend.rain">rain</b>, <span class="legend-weather-icon" aria-hidden="true">❄</span> <b data-i18n="legend.snow">snow</b>, <span class="legend-weather-icon hail-symbol" aria-hidden="true">◆</span> <b data-i18n="legend.hail">hail</b>. <span data-i18n="legend.precipitationText">Symbol size shows the amount. Opacity shows probability.</span></p>
         </article>
         <article class="legend-card">
-          <strong><span class="lightning-symbol" aria-hidden="true">⚡</span>Thunderstorm</strong>
-          <p>Lightning appears on the temperature chart. A larger, brighter bolt means a more probable and stronger storm.</p>
+          <strong><span class="lightning-symbol" aria-hidden="true">⚡</span><span data-i18n="legend.stormTitle">Thunderstorm</span></strong>
+          <p data-i18n="legend.stormText">Lightning appears on the temperature chart. A larger, brighter bolt means a more probable and stronger storm.</p>
         </article>
         <article class="legend-card">
-          <strong><span class="wind-symbol" aria-hidden="true">↑</span>Wind</strong>
-          <p>The arrow points in the wind direction. Faded gray means calm, then green means light, yellow means strong, and red means 30 km/h or more. The number is speed in km/h.</p>
+          <strong><span class="wind-symbol" aria-hidden="true">↑</span><span data-i18n="legend.windTitle">Wind</span></strong>
+          <p data-i18n="legend.windText">The arrow points in the wind direction. Faded gray means calm, then green means light, yellow means strong, and red means 30 km/h or more. The number is speed in km/h.</p>
         </article>
       </div>
     </section>
 
     <section class="panel daily-panel">
-      <p class="eyebrow">DAILY OUTLOOK - 10 DAYS</p>
-      <h2>Daily forecast</h2>
+      <p class="eyebrow" data-i18n="daily.eyebrow">DAILY OUTLOOK - 10 DAYS</p>
+      <h2 data-i18n="daily.title">Daily forecast</h2>
       <div class="daily-grid" id="dailyForecast"></div>
     </section>
   </main>
@@ -123,49 +129,52 @@
   <dialog class="settings-dialog" id="settingsDialog">
     <form method="dialog" class="settings-content" id="settingsForm">
       <div class="dialog-heading">
-        <div><p class="eyebrow">PERSONALIZATION</p><h2>Weather settings</h2></div>
+        <div><p class="eyebrow" data-i18n="settings.eyebrow">PERSONALIZATION</p><h2 data-i18n="settings.title">Weather settings</h2></div>
         <button class="icon-button" value="cancel" aria-label="Close settings">×</button>
       </div>
 
       <fieldset>
-        <legend>Location</legend>
+        <legend data-i18n="settings.location">Location</legend>
         <p class="selected-location" id="selectedLocation"></p>
         <div class="location-search-row">
-          <input id="locationQuery" type="search" minlength="2" autocomplete="off" placeholder="Search city or place">
-          <button type="button" id="searchLocation">Search</button>
-          <button type="button" id="useDeviceLocation">Use device</button>
+          <input id="locationQuery" type="search" minlength="2" autocomplete="off" placeholder="Search city or place" data-i18n-placeholder="settings.searchPlaceholder">
+          <button type="button" id="searchLocation" data-i18n="action.search">Search</button>
+          <button type="button" id="useDeviceLocation" data-i18n="action.useDevice">Use device</button>
         </div>
         <div class="location-results" id="locationResults" aria-live="polite"></div>
       </fieldset>
 
       <fieldset>
-        <legend>Forecast display</legend>
-        <label class="setting-row"><span>Color theme</span>
-          <select id="colorTheme"><option value="dark">Dark</option><option value="light">Light</option></select>
+        <legend data-i18n="settings.display">Forecast display</legend>
+        <label class="setting-row"><span data-i18n="settings.language">Language</span>
+          <select id="languageSetting"><option value="en">English</option><option value="pl">Polski</option></select>
         </label>
-        <label class="setting-row"><span>Default timeline zoom</span>
+        <label class="setting-row"><span data-i18n="settings.theme">Color theme</span>
+          <select id="colorTheme"><option value="dark" data-i18n="action.dark">Dark</option><option value="light" data-i18n="action.light">Light</option></select>
+        </label>
+        <label class="setting-row"><span data-i18n="settings.zoom">Default timeline zoom</span>
           <select id="defaultZoom"><option value="0.5">50%</option><option value="0.75">75%</option><option value="1">100%</option><option value="1.25">125%</option><option value="1.5">150%</option><option value="2">200%</option></select>
         </label>
-        <label class="setting-row"><span>Hourly temperature values</span><input id="showHourlyTemperatures" type="checkbox"></label>
-        <label class="setting-row"><span>Apparent temperature area</span><input id="showApparentTemperature" type="checkbox"></label>
-        <label class="setting-row"><span>Precipitation symbols</span><input id="showPrecipitation" type="checkbox"></label>
-        <label class="setting-row"><span>Wind timeline</span><input id="showWind" type="checkbox"></label>
+        <label class="setting-row"><span data-i18n="settings.hourlyTemperature">Hourly temperature values</span><input id="showHourlyTemperatures" type="checkbox"></label>
+        <label class="setting-row"><span data-i18n="settings.apparent">Apparent temperature area</span><input id="showApparentTemperature" type="checkbox"></label>
+        <label class="setting-row"><span data-i18n="settings.precipitation">Precipitation symbols</span><input id="showPrecipitation" type="checkbox"></label>
+        <label class="setting-row"><span data-i18n="settings.wind">Wind timeline</span><input id="showWind" type="checkbox"></label>
       </fieldset>
 
       <fieldset>
-        <legend>Embed on a website</legend>
-        <p class="settings-help">Paste this iframe into any HTML page. It uses the selected location and theme.</p>
+        <legend data-i18n="settings.embed">Embed on a website</legend>
+        <p class="settings-help" data-i18n="settings.embedHelp">Paste this iframe into any HTML page. It uses the selected location, language, and theme.</p>
         <div class="embed-code-row">
           <textarea id="embedCode" rows="4" readonly aria-label="Embed code"></textarea>
-          <button type="button" class="secondary-button" id="copyEmbedCode">Copy code</button>
+          <button type="button" class="secondary-button" id="copyEmbedCode" data-i18n="action.copy">Copy code</button>
         </div>
         <p class="copy-status" id="copyStatus" aria-live="polite"></p>
       </fieldset>
 
       <p class="settings-error" id="settingsError" role="alert"></p>
       <div class="dialog-actions">
-        <button class="secondary-button" value="cancel">Cancel</button>
-        <button class="primary-button" id="saveSettings" value="default">Save settings</button>
+        <button class="secondary-button" value="cancel" data-i18n="action.cancel">Cancel</button>
+        <button class="primary-button" id="saveSettings" value="default" data-i18n="action.save">Save settings</button>
       </div>
     </form>
   </dialog>

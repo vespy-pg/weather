@@ -1,6 +1,7 @@
 import {drawForecastSky, drawWeatherChart} from './charts.js';
 import {createWeatherDemo} from './weather-demo.js';
 import {escapeHtml, formatForecastDate, formatTime, measurement, numericValue, temperature} from './components.js';
+import {setLanguage, t} from './i18n.js';
 
 const SETTINGS_KEY = 'weather.settings.v1';
 const ZOOM_LEVELS = [.5, .75, 1, 1.25, 1.5, 2];
@@ -9,10 +10,11 @@ const IS_GITHUB_PAGES = location.hostname.endsWith('.github.io');
 const IS_DEMO = QUERY.get('demo') === '1' || IS_GITHUB_PAGES;
 const IS_EMBEDDED = QUERY.get('embed') === '1';
 const DEFAULT_SETTINGS = {
-  location: {name: 'Kamienica Polska', country: 'Poland', latitude: 50.6709, longitude: 19.12265, timezone: 'Europe/Warsaw'},
+  location: {name: 'Aurora Vale', country: 'Northland', latitude: 46.81, longitude: 9.84, timezone: 'Europe/Zurich'},
   configured: false,
   zoom: 1,
   theme: 'dark',
+  language: 'en',
   showHourlyTemperatures: true,
   showApparentTemperature: true,
   showPrecipitation: true,
@@ -27,6 +29,7 @@ let zoomIndex = Math.max(0, ZOOM_LEVELS.indexOf(Number(settings.zoom)));
 function loadSettings() {
   try {
     const stored = {...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')};
+    if (stored.location?.name === 'Kamienica Polska') stored.location = {...DEFAULT_SETTINGS.location};
     const latitude = Number(QUERY.get('lat'));
     const longitude = Number(QUERY.get('lon'));
     if (QUERY.has('lat') && QUERY.has('lon') && Number.isFinite(latitude) && Number.isFinite(longitude)) {
@@ -40,6 +43,7 @@ function loadSettings() {
       stored.configured = true;
     }
     if (['dark', 'light'].includes(QUERY.get('theme'))) stored.theme = QUERY.get('theme');
+    if (['en', 'pl'].includes(QUERY.get('lang'))) stored.language = QUERY.get('lang');
     return stored;
   } catch {
     return {...DEFAULT_SETTINGS};
@@ -55,14 +59,15 @@ function applyTheme(theme, persist = false) {
   document.documentElement.dataset.theme = settings.theme;
   const lightMode = settings.theme === 'light';
   document.getElementById('themeIcon').textContent = lightMode ? '☾' : '☀';
-  document.getElementById('themeLabel').textContent = lightMode ? 'Dark' : 'Light';
-  document.getElementById('themeToggle').setAttribute('aria-label', `Switch to ${lightMode ? 'dark' : 'light'} mode`);
-  document.getElementById('themeToggle').title = `Switch to ${lightMode ? 'dark' : 'light'} mode`;
+  document.getElementById('themeLabel').textContent = t(lightMode ? 'action.dark' : 'action.light');
+  const modeName = t(lightMode ? 'action.dark' : 'action.light').toLowerCase();
+  document.getElementById('themeToggle').setAttribute('aria-label', modeName);
+  document.getElementById('themeToggle').title = modeName;
   document.querySelector('meta[name="theme-color"]').content = lightMode ? '#edf3f9' : '#0a0e14';
   if (persist) saveSettings();
 }
 
-function embedCode(locationOverride = settings.location, theme = settings.theme) {
+function embedCode(locationOverride = settings.location, theme = settings.theme, languageOverride = settings.language) {
   const url = new URL(location.href);
   url.search = '';
   url.hash = '';
@@ -72,24 +77,25 @@ function embedCode(locationOverride = settings.location, theme = settings.theme)
   url.searchParams.set('name', locationOverride.name);
   url.searchParams.set('timezone', locationOverride.timezone || 'auto');
   url.searchParams.set('theme', theme);
+  url.searchParams.set('lang', languageOverride);
   if (IS_DEMO) url.searchParams.set('demo', '1');
-  return `<iframe src="${url}" title="10-day weather forecast" width="100%" height="680" loading="lazy" style="border:0;border-radius:12px" allow="geolocation"></iframe>`;
+  return `<iframe src="${url}" title="${t('embed.title')}" width="100%" height="680" loading="lazy" style="border:0;border-radius:12px" allow="geolocation"></iframe>`;
 }
 
 function weatherPresentation(code) {
   const value = numericValue(code);
-  if (value === 0) return ['☀️', 'Clear'];
-  if ([1, 2].includes(value)) return ['🌤️', 'Partly cloudy'];
-  if (value === 3) return ['☁️', 'Overcast'];
-  if ([45, 48].includes(value)) return ['🌫️', 'Fog'];
-  if ([51, 53, 55].includes(value)) return ['🌦️', 'Drizzle'];
-  if ([56, 57].includes(value)) return ['🌧️', 'Freezing drizzle'];
-  if ([61, 63, 65, 80, 81, 82].includes(value)) return ['🌧️', 'Rain'];
-  if ([66, 67].includes(value)) return ['🌧️', 'Freezing rain'];
-  if ([71, 73, 75, 77, 85, 86].includes(value)) return ['🌨️', 'Snow'];
-  if ([96, 99].includes(value)) return ['⛈️', 'Thunderstorm with hail'];
-  if (value === 95) return ['⛈️', 'Thunderstorm'];
-  return ['❔', 'Unavailable'];
+  if (value === 0) return ['☀️', t('condition.clear')];
+  if ([1, 2].includes(value)) return ['🌤️', t('condition.partlyCloudy')];
+  if (value === 3) return ['☁️', t('condition.overcast')];
+  if ([45, 48].includes(value)) return ['🌫️', t('condition.fog')];
+  if ([51, 53, 55].includes(value)) return ['🌦️', t('condition.drizzle')];
+  if ([56, 57].includes(value)) return ['🌧️', t('condition.freezingDrizzle')];
+  if ([61, 63, 65, 80, 81, 82].includes(value)) return ['🌧️', t('condition.rain')];
+  if ([66, 67].includes(value)) return ['🌧️', t('condition.freezingRain')];
+  if ([71, 73, 75, 77, 85, 86].includes(value)) return ['🌨️', t('condition.snow')];
+  if ([96, 99].includes(value)) return ['⛈️', t('condition.stormHail')];
+  if (value === 95) return ['⛈️', t('condition.storm')];
+  return ['❔', t('condition.unknown')];
 }
 
 function windDirection(degrees) {
@@ -146,7 +152,7 @@ function renderWind(hourly) {
     const visual = windVisual(speed);
     const date = String(hour.timestamp || '').slice(0, 10);
     const previousDate = String(hourly[index - 1]?.timestamp || '').slice(0, 10);
-    const description = `Wind ${measurement(speed, ' km/h')}${direction === null ? '' : ` ${windDirection(direction)}`}`;
+    const description = `${t('metric.wind')} ${measurement(speed, ' km/h')}${direction === null ? '' : ` ${windDirection(direction)}`}`;
     return `<div class="forecast-wind-hour ${date !== previousDate ? 'new-day' : ''}" title="${escapeHtml(description)}">
       <span class="forecast-wind-arrow" style="color:${visual.color};opacity:${visual.opacity};transform:rotate(${direction ?? 0}deg)" aria-hidden="true">↑</span>
       <span class="forecast-wind-speed">${speed === null ? '-' : Math.round(speed)}</span>
@@ -166,15 +172,16 @@ function renderForecast() {
   const current = weather?.current;
   if (!weather?.available || !current) return;
   const condition = weatherPresentation(current.weatherCode);
+  document.getElementById('forecastRangeLabel').textContent = t(IS_DEMO ? 'forecast.demo' : 'forecast.next');
   document.getElementById('locationTitle').textContent = weather.location?.name || settings.location.name;
-  document.getElementById('updatedAt').textContent = `Updated ${formatTime(current.timestamp)}`;
+  document.getElementById('updatedAt').textContent = t('status.updated', {time: formatTime(current.timestamp)});
   document.getElementById('currentWeather').innerHTML = [
-    ['Weather', `${condition[0]} ${temperature(current.temperature)}`, condition[1]],
-    ['Feels like', temperature(current.apparentTemperature), 'Apparent temperature'],
-    ['Humidity', measurement(current.relativeHumidity, '%'), 'Relative humidity'],
-    ['Cloud cover', measurement(current.cloudCover, '%'), 'Sky coverage'],
-    ['Wind', measurement(current.windSpeed, ' km/h'), `${windDirection(current.windDirection)}, gusts ${measurement(current.windGusts, ' km/h')}`],
-    ['Pressure', measurement(current.surfacePressure, ' hPa'), 'Surface pressure']
+    [t('metric.weather'), `${condition[0]} ${temperature(current.temperature)}`, condition[1]],
+    [t('metric.feels'), temperature(current.apparentTemperature), t('metric.apparent')],
+    [t('metric.humidity'), measurement(current.relativeHumidity, '%'), t('metric.relativeHumidity')],
+    [t('metric.clouds'), measurement(current.cloudCover, '%'), t('metric.skyCoverage')],
+    [t('metric.wind'), measurement(current.windSpeed, ' km/h'), t('metric.gusts', {direction: windDirection(current.windDirection), value: measurement(current.windGusts, ' km/h')})],
+    [t('metric.pressure'), measurement(current.surfacePressure, ' hPa'), t('metric.surfacePressure')]
   ].map(([label, value, detail]) => `<article class="metric-card"><div class="metric-label">${escapeHtml(label)}</div><div class="metric-value">${value}</div><div class="metric-detail">${escapeHtml(detail)}</div></article>`).join('');
 
   const hourly = weather.hourly.slice(0, 240);
@@ -187,24 +194,24 @@ function renderForecast() {
     return `<article class="forecast-day">
       <div class="forecast-day-heading"><strong>${escapeHtml(formatForecastDate(day.date, {weekday: 'short', day: 'numeric', month: 'short'}))}</strong><span class="forecast-day-symbol">${dayCondition[0]}</span></div>
       <div class="forecast-day-temperature">${temperature(day.temperatureMinimum)} / ${temperature(day.temperatureMaximum)}</div>
-      <div class="forecast-day-detail">${escapeHtml(dayCondition[1])}<br>Precipitation: ${measurement(day.precipitation, ' mm', 1)} (${measurement(day.precipitationProbability, '%')})<br>Wind: ${measurement(day.windSpeedMaximum, ' km/h')}</div>
+      <div class="forecast-day-detail">${escapeHtml(dayCondition[1])}<br>${t('metric.precipitation')}: ${measurement(day.precipitation, ' mm', 1)} (${measurement(day.precipitationProbability, '%')})<br>${t('metric.wind')}: ${measurement(day.windSpeedMaximum, ' km/h')}</div>
     </article>`;
   }).join('');
   drawForecast();
 }
 
 function renderError(message) {
-  document.getElementById('currentWeather').innerHTML = `<article class="metric-card error-card"><div class="metric-label">Forecast</div><div class="metric-value">Unavailable</div><div class="metric-detail">${escapeHtml(message)}</div></article>`;
-  document.getElementById('updatedAt').textContent = 'Could not update forecast';
+  document.getElementById('currentWeather').innerHTML = `<article class="metric-card error-card"><div class="metric-label">${t('error.forecast')}</div><div class="metric-value">${t('error.unavailable')}</div><div class="metric-detail">${escapeHtml(message)}</div></article>`;
+  document.getElementById('updatedAt').textContent = t('error.update');
 }
 
 async function loadWeather() {
-  document.getElementById('updatedAt').textContent = 'Loading forecast...';
+  document.getElementById('updatedAt').textContent = t('status.loading');
   try {
     if (IS_DEMO) {
       weather = createWeatherDemo();
       weather.location = {...settings.location, name: `${settings.location.name} - demo`};
-      document.getElementById('forecastRangeLabel').textContent = 'DEMO DATA - 10 DAYS';
+      document.getElementById('forecastRangeLabel').textContent = t('forecast.demo');
     } else {
       const parameters = new URLSearchParams({
         latitude: settings.location.latitude,
@@ -215,7 +222,7 @@ async function loadWeather() {
       const response = await fetch(`/api/weather?${parameters}`);
       if (!response.ok) throw new Error((await response.json()).error || 'Forecast request failed.');
       weather = await response.json();
-      document.getElementById('forecastRangeLabel').textContent = 'NEXT 10 DAYS';
+      document.getElementById('forecastRangeLabel').textContent = t('forecast.next');
     }
     renderForecast();
   } catch (error) {
@@ -228,6 +235,7 @@ function fillSettingsForm() {
   document.getElementById('selectedLocation').textContent = `${pendingLocation.name}${pendingLocation.country ? `, ${pendingLocation.country}` : ''}`;
   document.getElementById('defaultZoom').value = String(settings.zoom);
   document.getElementById('colorTheme').value = settings.theme;
+  document.getElementById('languageSetting').value = settings.language;
   document.getElementById('showHourlyTemperatures').checked = settings.showHourlyTemperatures;
   document.getElementById('showApparentTemperature').checked = settings.showApparentTemperature;
   document.getElementById('showPrecipitation').checked = settings.showPrecipitation;
@@ -235,25 +243,25 @@ function fillSettingsForm() {
   document.getElementById('locationResults').innerHTML = '';
   document.getElementById('settingsError').textContent = '';
   document.getElementById('copyStatus').textContent = '';
-  document.getElementById('embedCode').value = embedCode(pendingLocation, settings.theme);
+  document.getElementById('embedCode').value = embedCode(pendingLocation, settings.theme, settings.language);
 }
 
 async function searchLocations() {
   const query = document.getElementById('locationQuery').value.trim();
   const resultsElement = document.getElementById('locationResults');
-  if (query.length < 2) return document.getElementById('settingsError').textContent = 'Enter at least two characters.';
-  resultsElement.textContent = 'Searching...';
+  if (query.length < 2) return document.getElementById('settingsError').textContent = t('error.shortQuery');
+  resultsElement.textContent = t('status.searching');
   document.getElementById('settingsError').textContent = '';
   try {
-    if (IS_GITHUB_PAGES) throw new Error('Location search needs the API. Run the app locally or deploy the API to use live locations.');
+    if (IS_GITHUB_PAGES) throw new Error(t('error.locationApi'));
     const response = await fetch(`/api/locations?q=${encodeURIComponent(query)}`);
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error);
-    resultsElement.innerHTML = payload.results.length ? payload.results.map((item, index) => `<button type="button" class="location-result" data-location-index="${index}"><strong>${escapeHtml(item.name)}</strong> - ${escapeHtml([item.admin1, item.country].filter(Boolean).join(', '))}</button>`).join('') : '<p class="muted">No locations found.</p>';
+    resultsElement.innerHTML = payload.results.length ? payload.results.map((item, index) => `<button type="button" class="location-result" data-location-index="${index}"><strong>${escapeHtml(item.name)}</strong> - ${escapeHtml([item.admin1, item.country].filter(Boolean).join(', '))}</button>`).join('') : `<p class="muted">${t('error.noLocations')}</p>`;
     resultsElement.querySelectorAll('[data-location-index]').forEach(button => button.addEventListener('click', () => {
       pendingLocation = payload.results[Number(button.dataset.locationIndex)];
       document.getElementById('selectedLocation').textContent = `${pendingLocation.name}, ${pendingLocation.country}`;
-      document.getElementById('embedCode').value = embedCode(pendingLocation, document.getElementById('colorTheme').value);
+      document.getElementById('embedCode').value = embedCode(pendingLocation, document.getElementById('colorTheme').value, document.getElementById('languageSetting').value);
     }));
   } catch (error) {
     resultsElement.innerHTML = '';
@@ -269,16 +277,25 @@ document.getElementById('themeToggle').addEventListener('click', () => {
   applyTheme(settings.theme === 'dark' ? 'light' : 'dark', true);
   drawForecast();
 });
+document.getElementById('languageSelect').addEventListener('change', event => {
+  settings.language = setLanguage(event.target.value);
+  saveSettings();
+  applyTheme(settings.theme);
+  renderForecast();
+});
 document.getElementById('colorTheme').addEventListener('change', event => {
-  document.getElementById('embedCode').value = embedCode(pendingLocation, event.target.value);
+  document.getElementById('embedCode').value = embedCode(pendingLocation, event.target.value, document.getElementById('languageSetting').value);
+});
+document.getElementById('languageSetting').addEventListener('change', event => {
+  document.getElementById('embedCode').value = embedCode(pendingLocation, document.getElementById('colorTheme').value, event.target.value);
 });
 document.getElementById('copyEmbedCode').addEventListener('click', async () => {
   try {
     await navigator.clipboard.writeText(document.getElementById('embedCode').value);
-    document.getElementById('copyStatus').textContent = 'Embed code copied.';
+    document.getElementById('copyStatus').textContent = t('status.copied');
   } catch {
     document.getElementById('embedCode').select();
-    document.getElementById('copyStatus').textContent = 'Select and copy the code manually.';
+    document.getElementById('copyStatus').textContent = t('status.copyManual');
   }
 });
 document.getElementById('searchLocation').addEventListener('click', searchLocations);
@@ -286,18 +303,18 @@ document.getElementById('locationQuery').addEventListener('keydown', event => {
   if (event.key === 'Enter') { event.preventDefault(); searchLocations(); }
 });
 document.getElementById('useDeviceLocation').addEventListener('click', () => {
-  if (!navigator.geolocation) return document.getElementById('settingsError').textContent = 'Geolocation is not available in this browser.';
-  document.getElementById('settingsError').textContent = 'Waiting for device location...';
+  if (!navigator.geolocation) return document.getElementById('settingsError').textContent = t('error.geolocation');
+  document.getElementById('settingsError').textContent = t('status.waitingLocation');
   navigator.geolocation.getCurrentPosition(position => {
     pendingLocation = {
-      name: 'Current location',
+      name: t('location.current'),
       country: '',
       latitude: Number(position.coords.latitude.toFixed(5)),
       longitude: Number(position.coords.longitude.toFixed(5)),
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'auto'
     };
     document.getElementById('selectedLocation').textContent = `${pendingLocation.name} (${pendingLocation.latitude}, ${pendingLocation.longitude})`;
-    document.getElementById('embedCode').value = embedCode(pendingLocation, document.getElementById('colorTheme').value);
+    document.getElementById('embedCode').value = embedCode(pendingLocation, document.getElementById('colorTheme').value, document.getElementById('languageSetting').value);
     document.getElementById('settingsError').textContent = '';
   }, error => { document.getElementById('settingsError').textContent = error.message; }, {enableHighAccuracy: false, timeout: 10000});
 });
@@ -309,12 +326,15 @@ document.getElementById('settingsForm').addEventListener('submit', event => {
     configured: true,
     zoom: Number(document.getElementById('defaultZoom').value),
     theme: document.getElementById('colorTheme').value,
+    language: document.getElementById('languageSetting').value,
     showHourlyTemperatures: document.getElementById('showHourlyTemperatures').checked,
     showApparentTemperature: document.getElementById('showApparentTemperature').checked,
     showPrecipitation: document.getElementById('showPrecipitation').checked,
     showWind: document.getElementById('showWind').checked
   };
   saveSettings();
+  settings.language = setLanguage(settings.language);
+  document.getElementById('languageSelect').value = settings.language;
   applyTheme(settings.theme);
   zoomIndex = ZOOM_LEVELS.indexOf(settings.zoom);
   document.getElementById('settingsDialog').close();
@@ -337,6 +357,8 @@ window.addEventListener('resize', () => {
 });
 
 document.body.classList.toggle('embedded', IS_EMBEDDED);
+settings.language = setLanguage(settings.language);
+document.getElementById('languageSelect').value = settings.language;
 applyTheme(settings.theme);
 applyZoom(zoomIndex, false);
 loadWeather();

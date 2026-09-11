@@ -1,5 +1,7 @@
 'use strict';
 
+import {locale, t} from './i18n.js';
+
 export function escapeHtml(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -17,24 +19,24 @@ export function numericValue(value) {
 
 export function temperature(value) {
   const parsed = numericValue(value);
-  return parsed === null ? 'Unavailable' : `${parsed.toFixed(1)}°C`;
+  return parsed === null ? t('error.unavailable') : `${parsed.toFixed(1)}°C`;
 }
 
 export function measurement(value, suffix, digits = 0) {
   const parsed = numericValue(value);
-  return parsed === null ? 'Unavailable' : `${parsed.toFixed(digits)}${suffix}`;
+  return parsed === null ? t('error.unavailable') : `${parsed.toFixed(digits)}${suffix}`;
 }
 
 export function formatTime(value) {
-  if (!value) return 'No current measurement';
-  return new Intl.DateTimeFormat('en-GB', {dateStyle: 'medium', timeStyle: 'short'}).format(new Date(value));
+  if (!value) return t('error.unavailable');
+  return new Intl.DateTimeFormat(locale(), {dateStyle: 'medium', timeStyle: 'short'}).format(new Date(value));
 }
 
 export function formatForecastDate(value, options) {
-  if (!value) return 'Unavailable';
+  if (!value) return t('error.unavailable');
   const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) return 'Unavailable';
-  return new Intl.DateTimeFormat('en-GB', options).format(date);
+  if (!Number.isFinite(date.getTime())) return t('error.unavailable');
+  return new Intl.DateTimeFormat(locale(), options).format(date);
 }
 
 function chartTooltipMarkup(title, rows) {

@@ -15,6 +15,7 @@ The public demo uses fictional data so every weather phenomenon can be inspected
 - Wind direction and speed with smoothly changing color and opacity.
 - Ten daily forecast cards, starting today.
 - Dark and light themes saved for the next visit.
+- English and Polish interfaces, also available to embedded widgets.
 - A clear built-in legend explaining every symbol and color.
 
 ## Install it like an app
@@ -65,6 +66,7 @@ Supported URL parameters:
 |---|---|---|
 | `embed` | Enable the compact widget layout | `embed=1` |
 | `theme` | Select a dark or light appearance | `theme=light` |
+| `lang` | Select an English or Polish interface | `lang=pl` |
 | `lat` and `lon` | Select coordinates for a live deployment | `lat=50.67&lon=19.12` |
 | `name` | Set the displayed location name | `name=Katowice` |
 | `timezone` | Set the forecast time zone | `timezone=Europe/Warsaw` |

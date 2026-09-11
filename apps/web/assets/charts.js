@@ -7,9 +7,10 @@ import {
   numericValue,
   temperature
 } from './components.js';
+import {t} from './i18n.js';
 
-const HOME_LATITUDE = 50.6709;
-const HOME_LONGITUDE = 19.12265;
+const HOME_LATITUDE = 46.81;
+const HOME_LONGITUDE = 9.84;
 
 const TEMPERATURE_COLOR_STOPS = [
   {temperature: -20, color: '#ffffff'},
@@ -17,14 +18,16 @@ const TEMPERATURE_COLOR_STOPS = [
   {temperature: -10, color: '#7f8996'},
   {temperature: -.001, color: '#7f8996'},
   {temperature: 0, color: '#2358c7'},
-  {temperature: 17.999, color: '#3b9ee5'},
+  {temperature: 12, color: '#3b9ee5'},
   {temperature: 18, color: '#45cf88'},
   {temperature: 27, color: '#45cf88'},
-  {temperature: 27.001, color: '#e0a13b'},
   {temperature: 32, color: '#f28e3e'},
-  {temperature: 32.001, color: '#ff654f'},
   {temperature: 40, color: '#ff263f'}
 ];
+
+function chartColor(property, fallback) {
+  return getComputedStyle(document.documentElement).getPropertyValue(property).trim() || fallback;
+}
 
 function interpolateHexColor(start, end, progress) {
   const channel = (color, offset) => Number.parseInt(color.slice(offset, offset + 2), 16);
@@ -46,13 +49,13 @@ function temperatureColor(value) {
 
 function paintDayNightBands(context, nightSegments, padding, plotWidth, plotHeight) {
   if (!nightSegments.length) return;
-  context.fillStyle = 'rgba(88, 166, 255, .07)';
+  context.fillStyle = chartColor('--chart-day-band', 'rgba(88, 166, 255, .07)');
   context.fillRect(padding.left, padding.top, plotWidth, plotHeight);
 
-  context.fillStyle = 'rgba(0, 0, 0, .72)';
+  context.fillStyle = chartColor('--chart-night-band', 'rgba(0, 0, 0, .72)');
   nightSegments.forEach(segment => {
     context.fillRect(segment.start, padding.top, segment.end - segment.start, plotHeight);
-    context.strokeStyle = 'rgba(154, 164, 178, .24)';
+    context.strokeStyle = chartColor('--chart-day-separator', 'rgba(154, 164, 178, .24)');
     context.beginPath();
     context.moveTo(segment.start, padding.top);
     context.lineTo(segment.start, padding.top + plotHeight);
@@ -219,9 +222,11 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
   context.clearRect(0, 0, width, height);
   points.forEach((point, index) => {
     const x = padding.left + index * columnWidth;
-    context.fillStyle = daylight[index] ? 'rgba(88, 166, 255, .10)' : 'rgba(0, 0, 0, .68)';
+    context.fillStyle = daylight[index]
+      ? chartColor('--chart-day-band', 'rgba(88, 166, 255, .10)')
+      : chartColor('--chart-night-band', 'rgba(0, 0, 0, .68)');
     context.fillRect(x, 0, columnWidth, height);
-    context.strokeStyle = 'rgba(154, 164, 178, .10)';
+    context.strokeStyle = chartColor('--chart-hour-grid', 'rgba(154, 164, 178, .10)');
     context.beginPath();
     context.moveTo(x + columnWidth, 0);
     context.lineTo(x + columnWidth, height);
@@ -307,7 +312,7 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
     context.arc(center, 64, 7, 0, Math.PI * 2);
     context.fill();
     context.shadowBlur = 0;
-    context.fillStyle = '#080c12';
+    context.fillStyle = chartColor('--chart-night-cutout', '#080c12');
     context.beginPath();
     context.arc(center + 3, 61, 7, 0, Math.PI * 2);
     context.fill();
@@ -388,7 +393,7 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
   context.textAlign = 'center';
   points.forEach((point, index) => {
     const x = padding.left + (index + .5) * columnWidth;
-    context.fillStyle = '#8d98aa';
+    context.fillStyle = chartColor('--chart-muted', '#8d98aa');
     context.fillText(String(point.timestamp).slice(11, 13), x, 24);
     const numericTemperature = numericValue(point.temperature);
     if (options.showHourlyTemperatures !== false && numericTemperature !== null) {
@@ -400,12 +405,12 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
     const date = String(point.timestamp).slice(0, 10);
     const previousDate = String(points[index - 1]?.timestamp || '').slice(0, 10);
     if (date === previousDate) return;
-    context.strokeStyle = 'rgba(154, 164, 178, .48)';
+    context.strokeStyle = chartColor('--chart-day-separator', 'rgba(154, 164, 178, .48)');
     context.beginPath();
     context.moveTo(padding.left + index * columnWidth, 0);
     context.lineTo(padding.left + index * columnWidth, height);
     context.stroke();
-    context.fillStyle = '#e7edf7';
+    context.fillStyle = chartColor('--chart-text', '#e7edf7');
     context.textAlign = 'left';
     context.fillText(formatForecastDate(point.timestamp, {weekday: 'short', day: 'numeric', month: 'short'}).toUpperCase(), padding.left + index * columnWidth + 4, 10);
     context.textAlign = 'center';
@@ -480,10 +485,10 @@ export function drawWeatherChart(canvas, points, days = [], options = {}) {
   context.font = '9px ui-monospace, monospace';
   [0, .5, 1].forEach(ratioValue => {
     const lineY = padding.top + (1 - ratioValue) * plotHeight;
-    context.strokeStyle = '#293141';
+    context.strokeStyle = chartColor('--chart-grid', '#293141');
     context.beginPath(); context.moveTo(padding.left, lineY); context.lineTo(width - padding.right, lineY); context.stroke();
     if (!options.timeline) {
-      context.fillStyle = '#8d98aa';
+      context.fillStyle = chartColor('--chart-muted', '#8d98aa');
       context.fillText(`${(maxPrecipitation * ratioValue).toFixed(0)} mm`, 2, lineY + 3);
     }
   });
@@ -610,6 +615,11 @@ export function drawWeatherChart(canvas, points, days = [], options = {}) {
     context.rect(padding.left, clipTop, plotWidth, clipHeight);
     context.clip();
     traceLine(displayedTemperatures, temperatureY, true);
+    if (document.documentElement.dataset.theme === 'light') {
+      context.strokeStyle = 'rgba(31, 48, 70, .32)';
+      context.lineWidth = 4;
+      context.stroke();
+    }
     context.strokeStyle = color;
     context.lineWidth = 2;
     context.stroke();
@@ -646,7 +656,7 @@ export function drawWeatherChart(canvas, points, days = [], options = {}) {
     points.forEach((point, index) => {
       if (index % labelStep !== 0) return;
       const label = String(point.timestamp).slice(11, 16);
-      context.fillStyle = '#8d98aa';
+      context.fillStyle = chartColor('--chart-muted', '#8d98aa');
       context.fillText(label, padding.left + index * columnWidth, height - 6);
     });
   }
@@ -658,12 +668,12 @@ export function drawWeatherChart(canvas, points, days = [], options = {}) {
     return {
       title: formatForecastDate(point.timestamp, {weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'}),
       rows: [
-        {color: options.timeline ? temperatureColor(point.temperature) : '#f28e55', label: 'Temperature', value: temperature(point.temperature)},
-        {color: '#a78bfa', label: 'Feels like', value: temperature(point.apparentTemperature)},
-        {color: '#9aa4b2', label: 'Cloud cover', value: measurement(point.cloudCover, '%')},
-        {color: '#56d7e5', label: 'Precipitation', value: measurement(point.precipitation, ' mm', 1)},
-        {color: '#58a6ff', label: 'Precipitation chance', value: measurement(point.precipitationProbability, '%')},
-        {color: '#7fcfff', label: 'Wind', value: measurement(point.windSpeed, ' km/h')}
+        {color: options.timeline ? temperatureColor(point.temperature) : '#f28e55', label: t('metric.temperature'), value: temperature(point.temperature)},
+        {color: '#a78bfa', label: t('metric.feels'), value: temperature(point.apparentTemperature)},
+        {color: '#9aa4b2', label: t('metric.clouds'), value: measurement(point.cloudCover, '%')},
+        {color: '#56d7e5', label: t('metric.precipitation'), value: measurement(point.precipitation, ' mm', 1)},
+        {color: '#58a6ff', label: t('metric.precipitationChance'), value: measurement(point.precipitationProbability, '%')},
+        {color: '#7fcfff', label: t('metric.wind'), value: measurement(point.windSpeed, ' km/h')}
       ]
     };
   });
