@@ -139,6 +139,26 @@ function weatherForHour(dayIndex, hour) {
   return weatherScenario(2, 45);
 }
 
+function windEvent(index, start, duration, peak, sharpness = 1) {
+  if (index < start || index > start + duration) return 0;
+  const progress = (index - start) / duration;
+  return Math.pow(Math.sin(Math.PI * progress), sharpness) * peak;
+}
+
+function windForHour(index, tornado) {
+  const calm = 1.2 + (Math.sin(index * .31) + 1) * .65;
+  const longWind = windEvent(index, 10, 24, 29, .82);
+  const shortWind = windEvent(index, 82, 12, 36, 1.7);
+  const tornadoWind = tornado ? 40 : 0;
+  const speed = Math.max(calm, longWind, shortWind, tornadoWind);
+  const eventStrength = Math.max(longWind / 29, shortWind / 36, tornadoWind / 40);
+  return {
+    speed: Number(speed.toFixed(1)),
+    gusts: Number((speed + 2 + eventStrength * 16).toFixed(1)),
+    direction: Number((235 + Math.sin(index / 13) * 22 + Math.sin(index / 31) * 12).toFixed(0))
+  };
+}
+
 function apparentTemperatureFor({temperature, humidity, windSpeed, cloudCover, precipitation, hour}) {
   let apparentTemperature = temperature;
   if (temperature <= 10 && windSpeed >= 4.8) {
@@ -169,10 +189,8 @@ export function createWeatherDemo() {
     const temperature = temperatureRange ? temperatureForRange(date, start, dayIndex, temperatureRange) : naturalTemperature;
     const scenario = weatherForHour(dayIndex, date.getHours());
     const humidity = Math.min(100, 45 + scenario.cloudCover * .48);
-    const isThunderstorm = [95, 96, 99].includes(scenario.code);
-    const windSpeed = isThunderstorm
-      ? 8 + scenario.probability * .18
-      : scenario.precipitation > 0 ? 5 + scenario.probability * .05 : 2 + index % 5;
+    const wind = windForHour(index, scenario.tornado === true);
+    const windSpeed = wind.speed;
     const apparentTemperature = apparentTemperatureFor({
       temperature,
       humidity,
@@ -193,8 +211,8 @@ export function createWeatherDemo() {
       rain: [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99].includes(scenario.code) ? scenario.precipitation ?? 0 : 0,
       snowfall: scenario.snowfall ?? 0,
       windSpeed,
-      windDirection: index * 23 % 360,
-      windGusts: windSpeed + 9,
+      windDirection: wind.direction,
+      windGusts: wind.gusts,
       tornado: scenario.tornado === true,
       visibility: scenario.visibility ?? 24000,
       surfacePressure: 1007 + Math.sin(index / 18) * 9,

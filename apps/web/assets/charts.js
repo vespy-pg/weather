@@ -205,41 +205,6 @@ function drawLightning(context, x, y, opacity, scale = 1) {
   context.restore();
 }
 
-function traceWindGust(context, startX, endX, centerY, amplitude, radiusX, radiusY, direction, phase) {
-  const curlCenterX = endX - radiusX;
-  const approachX = curlCenterX - radiusX;
-  const span = Math.max(radiusX * 1.5, approachX - startX);
-  context.beginPath();
-  context.moveTo(startX, centerY);
-  context.bezierCurveTo(
-    startX + span * .2,
-    centerY + amplitude * direction,
-    startX + span * .42,
-    centerY - amplitude * direction,
-    startX + span * .58,
-    centerY + Math.sin(phase) * amplitude * .3
-  );
-  context.bezierCurveTo(
-    startX + span * .72,
-    centerY + amplitude * direction,
-    approachX - span * .08,
-    centerY - amplitude * .65 * direction,
-    approachX,
-    centerY
-  );
-  const turns = Math.PI * 1.52;
-  const steps = 34;
-  for (let step = 0; step <= steps; step += 1) {
-    const progress = step / steps;
-    const angle = Math.PI + turns * progress * direction;
-    const taper = 1 - progress * .38;
-    context.lineTo(
-      curlCenterX + Math.cos(angle) * radiusX * taper,
-      centerY + Math.sin(angle) * radiusY * taper
-    );
-  }
-}
-
 function drawTornadoFunnel(context, centerX, height, width, color, visualScale) {
   const top = 4 * visualScale;
   const bottom = height - 4 * visualScale;
@@ -550,9 +515,11 @@ export function drawWindFlow(canvas, points, options = {}) {
     return Math.min(1, Math.max(0, gust - rawSpeeds[index]) / 18);
   });
   const speeds = rawSpeeds.map((speed, index) => {
-    const previous = rawSpeeds[index - 1] ?? speed;
-    const next = rawSpeeds[index + 1] ?? speed;
-    return (previous + speed * 2 + next) / 4;
+    const weighted = [-3, -2, -1, 0, 1, 2, 3]
+      .map((offset, weightIndex) => ({value: rawSpeeds[index + offset], weight: [1, 2, 3, 4, 3, 2, 1][weightIndex]}))
+      .filter(item => item.value !== undefined);
+    const totalWeight = weighted.reduce((sum, item) => sum + item.weight, 0);
+    return weighted.reduce((sum, item) => sum + item.value * item.weight, 0) / totalWeight;
   });
   const directions = points.map((point, index) => {
     const nearby = points.slice(Math.max(0, index - 1), index + 2);
@@ -564,24 +531,21 @@ export function drawWindFlow(canvas, points, options = {}) {
     }, {x: 0, y: 0});
     return Math.atan2(vector.y, vector.x);
   });
-  const strength = speeds.map(speed => Math.min(1, speed / 30));
-  const liftFactors = [.03, .1, .18, .27, .37, .48, .6, .73, .87, 1];
-  const strandWeights = [.42, .58, .72, .86, 1, .95, .82, .7, .55, .4];
+  const strength = speeds.map(speed => Math.min(1, speed / 32));
+  const strandPositions = [-1, -.6, -.2, .2, .6, 1];
+  const strandWeights = [.58, .78, 1, .96, .76, .56];
   const windColor = chartColor('--chart-wind-flow', '#9bc7d7');
   const flowCenterY = index => height * .61
-    + Math.sin(index * .12 + directions[index] * .2) * (.25 + strength[index] * 4.2) * visualScale
-    + Math.sin(index * .055 + directions[index] * .7) * (.15 + strength[index] * 2.8) * visualScale;
+    + Math.sin(index * .085 + directions[index] * .2) * (.15 + strength[index] * 1.2) * visualScale;
   const lineY = (index, lineIndex) => {
-    const lanePosition = .5 - lineIndex / (liftFactors.length - 1);
-    const directionLift = (Math.sin(directions[index] + lineIndex * .43) + 1) / 2
-      * strength[index] * (1 + lineIndex % 3 * .65) * visualScale;
-    const strengthLift = liftFactors[lineIndex] * strength[index] * height * .15;
-    const baseSeparation = lanePosition * 9 * visualScale;
-    const strengthTwist = Math.sin(index * (.48 + lineIndex * .035) + lineIndex * 1.06)
-      * Math.pow(strength[index], 1.05) * (5 + lineIndex % 5 * 1.45) * visualScale;
-    const turbulence = Math.sin(index * (.48 + lineIndex * .018) + lineIndex * 1.17)
-      * gustiness[index] * Math.pow(strength[index], .65) * (3.2 + lineIndex % 4 * 1.6) * visualScale;
-    return Math.max(3 * visualScale, Math.min(height - 3 * visualScale, flowCenterY(index) + baseSeparation - strengthLift - directionLift + strengthTwist + turbulence));
+    const currentStrength = strength[index];
+    const lanePosition = strandPositions[lineIndex];
+    const amplitude = Math.pow(currentStrength, 1.08) * height * .18 * visualScale;
+    const mainWave = Math.sin(index * (.32 + currentStrength * .08) + directions[index] * .14 + lineIndex * .11) * amplitude;
+    const secondaryWave = Math.sin(index * .16 + lineIndex * .23) * amplitude * .28;
+    const gustWave = Math.sin(index * .61 + lineIndex * .37) * gustiness[index] * amplitude * .38;
+    const separation = lanePosition * (2.2 + currentStrength * 5.1) * visualScale;
+    return Math.max(3 * visualScale, Math.min(height - 3 * visualScale, flowCenterY(index) + separation + mainWave + secondaryWave + gustWave));
   };
 
   context.clearRect(0, 0, width, height);
@@ -599,12 +563,12 @@ export function drawWindFlow(canvas, points, options = {}) {
     context.stroke();
   });
 
-  const lineCount = liftFactors.length;
+  const lineCount = strandPositions.length;
   for (let index = 0; index < points.length - 1; index += 1) {
     const startX = (index + .5) * columnWidth;
     const endX = (index + 1.5) * columnWidth;
-    const startLines = liftFactors.map((unused, lineIndex) => lineY(index, lineIndex));
-    const endLines = liftFactors.map((unused, lineIndex) => lineY(index + 1, lineIndex));
+    const startLines = strandPositions.map((unused, lineIndex) => lineY(index, lineIndex));
+    const endLines = strandPositions.map((unused, lineIndex) => lineY(index + 1, lineIndex));
     const startTop = Math.min(...startLines);
     const startBottom = Math.max(...startLines);
     const endTop = Math.min(...endLines);
@@ -618,8 +582,8 @@ export function drawWindFlow(canvas, points, options = {}) {
     context.bezierCurveTo(endX - columnWidth * .42, endBottom, startX + columnWidth * .42, startBottom, startX, startBottom);
     context.closePath();
     context.fillStyle = windColor;
-    context.globalAlpha = .002 + averageStrength * .04;
-    context.filter = `blur(${(1.5 + averageStrength * 4.5) * visualScale}px)`;
+    context.globalAlpha = .002 + averageStrength * .035;
+    context.filter = `blur(${(1 + averageStrength * 3) * visualScale}px)`;
     context.fill();
     context.restore();
   }
@@ -648,60 +612,28 @@ export function drawWindFlow(canvas, points, options = {}) {
       context.save();
       traceSegment();
       context.strokeStyle = windColor;
-      context.globalAlpha = (.002 + averageStrength * .05) * (.6 + strandWeight * .4);
-      context.lineWidth = (4 + averageStrength * 5) * (.72 + strandWeight * .28) * visualScale;
+      context.globalAlpha = (.002 + averageStrength * .055) * (.6 + strandWeight * .4);
+      context.lineWidth = (3 + averageStrength * 5) * (.72 + strandWeight * .28) * visualScale;
       context.shadowColor = windColor;
-      context.shadowBlur = (3 + averageStrength * 7) * visualScale;
+      context.shadowBlur = (2 + averageStrength * 6) * visualScale;
       context.stroke();
       context.restore();
 
       context.save();
       traceSegment();
       context.strokeStyle = windColor;
-      context.globalAlpha = (.012 + Math.pow(averageStrength, 1.3) * .88) * (.65 + strandWeight * .35);
-      context.lineWidth = (.7 + averageStrength * 1.3) * (.82 + strandWeight * .18) * visualScale;
+      context.globalAlpha = (.018 + Math.pow(averageStrength, 1.22) * .9) * (.65 + strandWeight * .35);
+      context.lineWidth = (.55 + averageStrength * 1.65) * (.82 + strandWeight * .18) * visualScale;
       context.lineCap = 'round';
       context.stroke();
       context.restore();
     }
   }
 
-  const tornadoIndexes = new Set(points.map((point, index) => point.tornado === true ? index : -1).filter(index => index >= 0));
-  const curlIndexes = [];
-  for (let index = 2; index < points.length - 2; index += 1) {
-    if (strength[index] < .4 || tornadoIndexes.has(index)) continue;
-    const localMaximum = Math.max(...strength.slice(index - 2, index + 3));
-    if (strength[index] < localMaximum || index - (curlIndexes.at(-1) ?? -10) < 7) continue;
-    curlIndexes.push(index);
-  }
   context.save();
   context.beginPath();
   context.rect(0, 0, plotWidth, height);
   context.clip();
-  curlIndexes.forEach((index, curlGroup) => {
-    const currentStrength = strength[index];
-    const curlCount = currentStrength >= .55 ? 4 : 3;
-    const gustWidth = Math.max(110, Math.min(190, columnWidth * 28)) * (.8 + currentStrength * .25) * visualScale;
-    const radiusX = (10 + currentStrength * 14) * visualScale;
-    const radiusY = (5 + currentStrength * 9) * visualScale;
-    const x = (index + .5) * columnWidth;
-    const y = flowCenterY(index) - currentStrength * height * .1;
-    for (let curl = 0; curl < curlCount; curl += 1) {
-      const direction = (curl + curlGroup) % 2 ? -1 : 1;
-      const lineY = y + (curl - (curlCount - 1) / 2) * radiusY * 1.05;
-      const endX = x + gustWidth * (.25 + curl * .1);
-      traceWindGust(context, x - gustWidth * .72, endX, lineY, radiusY * (.35 + curl * .08), radiusX * (1 - curl * .08), radiusY, direction, index * .4 + curl);
-      context.strokeStyle = windColor;
-      context.globalAlpha = .32 + currentStrength * .64;
-      context.lineWidth = (1.3 + currentStrength * 1.2) * visualScale;
-      context.lineCap = 'round';
-      context.lineJoin = 'round';
-      context.shadowColor = windColor;
-      context.shadowBlur = (2 + currentStrength * 4) * visualScale;
-      context.stroke();
-    }
-  });
-
   let tornadoStart = null;
   points.forEach((point, index) => {
     if (point.tornado === true && tornadoStart === null) tornadoStart = index;
