@@ -471,6 +471,127 @@ function drawCalculatedDayNightBands(context, start, end, x, padding, plotWidth,
   paintDayNightBands(context, nightSegments, padding, plotWidth, plotHeight);
 }
 
+function windFlowColor(speed) {
+  const value = Math.max(0, numericValue(speed) ?? 0);
+  const stops = isLightTheme() ? [
+    {speed: 0, color: '#526176'},
+    {speed: 5, color: '#668c9a'},
+    {speed: 10, color: '#1ca160'},
+    {speed: 18, color: '#d49a1f'},
+    {speed: 30, color: '#e52f47'}
+  ] : [
+    {speed: 0, color: '#8d98aa'},
+    {speed: 5, color: '#7ba8b4'},
+    {speed: 10, color: '#4bd48b'},
+    {speed: 18, color: '#f2bd55'},
+    {speed: 30, color: '#ff4d5f'}
+  ];
+  const upperIndex = stops.findIndex(stop => value <= stop.speed);
+  const upper = stops[upperIndex < 0 ? stops.length - 1 : upperIndex];
+  const lower = stops[Math.max(0, (upperIndex < 0 ? stops.length - 1 : upperIndex) - 1)];
+  const progress = upper.speed === lower.speed ? 0 : Math.min(1, (value - lower.speed) / (upper.speed - lower.speed));
+  return interpolateHexColor(lower.color, upper.color, progress);
+}
+
+export function drawWindFlow(canvas, points, options = {}) {
+  const rect = canvas.getBoundingClientRect();
+  if (!points.length || rect.width < 1 || rect.height < 1) return;
+  const ratio = window.devicePixelRatio || 1;
+  canvas.width = Math.max(1, Math.round(rect.width * ratio));
+  canvas.height = Math.max(1, Math.round(rect.height * ratio));
+  const context = canvas.getContext('2d');
+  context.scale(ratio, ratio);
+  const width = rect.width;
+  const height = rect.height;
+  const plotWidth = width - 34;
+  const columnWidth = plotWidth / points.length;
+  const visualScale = Math.max(.7, Math.min(1.6, Number(options.visualScale) || 1));
+  const rawSpeeds = points.map(point => Math.max(0, numericValue(point.windSpeed) ?? 0));
+  const speeds = rawSpeeds.map((speed, index) => {
+    const previous = rawSpeeds[index - 1] ?? speed;
+    const next = rawSpeeds[index + 1] ?? speed;
+    return (previous + speed * 2 + next) / 4;
+  });
+  const directions = points.map((point, index) => {
+    const nearby = points.slice(Math.max(0, index - 1), index + 2);
+    const vector = nearby.reduce((sum, item) => {
+      const radians = (numericValue(item.windDirection) ?? 0) * Math.PI / 180;
+      sum.x += Math.cos(radians);
+      sum.y += Math.sin(radians);
+      return sum;
+    }, {x: 0, y: 0});
+    return Math.atan2(vector.y, vector.x);
+  });
+  const strength = speeds.map(speed => Math.min(1, speed / 30));
+  const centerY = index => height / 2
+    + Math.sin(index * .12 + directions[index] * .35) * (1.1 + strength[index] * 1.8) * visualScale;
+  const lineY = (index, linePosition, phase) => centerY(index)
+    + linePosition * (2.2 + strength[index] * Math.min(height * .32, 15 * visualScale))
+    + Math.sin(index * .16 + phase) * (.35 + strength[index] * 1.15) * visualScale;
+
+  context.clearRect(0, 0, width, height);
+  points.forEach((point, index) => {
+    const x = index * columnWidth;
+    const date = String(point.timestamp || '').slice(0, 10);
+    const previousDate = String(points[index - 1]?.timestamp || '').slice(0, 10);
+    context.strokeStyle = index > 0 && date !== previousDate
+      ? chartColor('--chart-day-separator', 'rgba(154, 164, 178, .48)')
+      : chartColor('--chart-hour-grid', 'rgba(154, 164, 178, .1)');
+    context.lineWidth = 1;
+    context.beginPath();
+    context.moveTo(x, 0);
+    context.lineTo(x, height);
+    context.stroke();
+  });
+
+  const lineCount = 9;
+  for (let lineIndex = 0; lineIndex < lineCount; lineIndex += 1) {
+    const linePosition = lineIndex / (lineCount - 1) * 2 - 1;
+    const phase = lineIndex * .7;
+    for (let index = 0; index < points.length - 1; index += 1) {
+      const startX = (index + .5) * columnWidth;
+      const endX = (index + 1.5) * columnWidth;
+      const startY = lineY(index, linePosition, phase);
+      const endY = lineY(index + 1, linePosition, phase);
+      const averageStrength = (strength[index] + strength[index + 1]) / 2;
+      const gradient = context.createLinearGradient(startX, 0, endX, 0);
+      gradient.addColorStop(0, windFlowColor(speeds[index]));
+      gradient.addColorStop(1, windFlowColor(speeds[index + 1]));
+      const traceSegment = () => {
+        context.beginPath();
+        context.moveTo(startX, startY);
+        context.bezierCurveTo(
+          startX + columnWidth * .42,
+          startY,
+          endX - columnWidth * .42,
+          endY,
+          endX,
+          endY
+        );
+      };
+
+      context.save();
+      traceSegment();
+      context.strokeStyle = gradient;
+      context.globalAlpha = .025 + averageStrength * .2;
+      context.lineWidth = (3 + averageStrength * 8) * visualScale;
+      context.shadowColor = windFlowColor((speeds[index] + speeds[index + 1]) / 2);
+      context.shadowBlur = (2 + averageStrength * 11) * visualScale;
+      context.stroke();
+      context.restore();
+
+      context.save();
+      traceSegment();
+      context.strokeStyle = gradient;
+      context.globalAlpha = .16 + Math.pow(averageStrength, .75) * .84;
+      context.lineWidth = (.65 + averageStrength * 1.45) * visualScale;
+      context.lineCap = 'round';
+      context.stroke();
+      context.restore();
+    }
+  }
+}
+
 export function drawWeatherChart(canvas, points, days = [], options = {}) {
   const rect = canvas.getBoundingClientRect();
   if (!points.length || rect.width < 1) return;

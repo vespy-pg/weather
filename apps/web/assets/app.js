@@ -1,4 +1,4 @@
-import {drawForecastSky, drawWeatherChart} from './charts.js';
+import {drawForecastSky, drawWeatherChart, drawWindFlow} from './charts.js';
 import {createWeatherDemo} from './weather-demo.js';
 import {escapeHtml, formatForecastDate, formatTime, measurement, numericValue, temperature} from './components.js';
 import {setLanguage, t} from './i18n.js';
@@ -18,7 +18,8 @@ const DEFAULT_SETTINGS = {
   showHourlyTemperatures: true,
   showApparentTemperature: true,
   showPrecipitation: true,
-  showWind: true
+  showWind: true,
+  showWindArrows: false
 };
 
 let settings = loadSettings();
@@ -163,7 +164,7 @@ function applyZoom(nextIndex, preserveCenter = true) {
 
 function renderWind(hourly) {
   const strip = document.getElementById('forecastWindStrip');
-  strip.hidden = !settings.showWind;
+  strip.hidden = !settings.showWind || !settings.showWindArrows;
   strip.innerHTML = hourly.map((hour, index) => {
     const speed = numericValue(hour.windSpeed);
     const direction = numericValue(hour.windDirection);
@@ -183,8 +184,12 @@ function drawForecast() {
   const hourly = weather.hourly.slice(0, 240);
   const visualScale = zoomVisualScale(ZOOM_LEVELS[zoomIndex]);
   const skyHourly = settings.showPrecipitation ? hourly : hourly.map(point => ({...point, precipitation: 0, precipitationProbability: 0, snowfall: 0}));
+  const windVisual = document.getElementById('forecastWindVisual');
+  windVisual.hidden = !settings.showWind;
   drawForecastSky(document.getElementById('forecastWeatherCanvas'), skyHourly, weather.daily, {showHourlyTemperatures: settings.showHourlyTemperatures, visualScale});
   drawWeatherChart(document.getElementById('forecastChart'), hourly, weather.daily, {timeline: true, showApparentTemperature: settings.showApparentTemperature, visualScale});
+  if (settings.showWind) drawWindFlow(document.getElementById('forecastWindCanvas'), hourly, {visualScale});
+  renderWind(hourly);
 }
 
 function renderForecast() {
@@ -205,7 +210,6 @@ function renderForecast() {
 
   const hourly = weather.hourly.slice(0, 240);
   document.getElementById('forecastTimeline').style.setProperty('--forecast-hours', hourly.length);
-  renderWind(hourly);
   document.getElementById('dailyForecast').innerHTML = weather.daily.slice(0, 10).map(day => {
     const dayCondition = weatherPresentation(day.weatherCode);
     return `<article class="forecast-day">
@@ -257,6 +261,7 @@ function fillSettingsForm() {
   document.getElementById('showApparentTemperature').checked = settings.showApparentTemperature;
   document.getElementById('showPrecipitation').checked = settings.showPrecipitation;
   document.getElementById('showWind').checked = settings.showWind;
+  document.getElementById('showWindArrows').checked = settings.showWindArrows;
   document.getElementById('locationResults').innerHTML = '';
   document.getElementById('settingsError').textContent = '';
   document.getElementById('copyStatus').textContent = '';
@@ -347,7 +352,8 @@ document.getElementById('settingsForm').addEventListener('submit', event => {
     showHourlyTemperatures: document.getElementById('showHourlyTemperatures').checked,
     showApparentTemperature: document.getElementById('showApparentTemperature').checked,
     showPrecipitation: document.getElementById('showPrecipitation').checked,
-    showWind: document.getElementById('showWind').checked
+    showWind: document.getElementById('showWind').checked,
+    showWindArrows: document.getElementById('showWindArrows').checked
   };
   saveSettings();
   settings.language = setLanguage(settings.language);

@@ -12,7 +12,7 @@ The public demo uses fictional data so every weather phenomenon can be inspected
 - Temperature and apparent temperature with meaningful cold, comfort, heat, and frost colors.
 - Continuous sunlight and cloud cover instead of a row of repeated weather icons.
 - Rain, snow, hail, fog, and thunderstorms with probability and intensity encoded visually.
-- Wind direction and speed with smoothly changing color and opacity.
+- Flowing wind streams whose color, brightness, thickness, and spread show strength, with optional hourly direction arrows and speed values.
 - Ten daily forecast cards, starting today.
 - Dark and light themes saved for the next visit.
 - English and Polish interfaces, also available to embedded widgets.

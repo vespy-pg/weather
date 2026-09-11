@@ -67,7 +67,10 @@
         <div class="forecast-timeline" id="forecastTimeline">
           <canvas class="forecast-weather-canvas" id="forecastWeatherCanvas" height="100" aria-label="Hourly temperature and continuous weather conditions"></canvas>
           <canvas id="forecastChart" height="300" aria-label="Temperature and apparent temperature chart"></canvas>
-          <div class="forecast-wind-strip" id="forecastWindStrip" aria-label="Hourly wind direction and speed"></div>
+          <div class="forecast-wind-visual" id="forecastWindVisual" aria-label="Hourly wind strength">
+            <canvas class="forecast-wind-canvas" id="forecastWindCanvas" height="64"></canvas>
+            <div class="forecast-wind-strip" id="forecastWindStrip" aria-label="Hourly wind direction and speed"></div>
+          </div>
         </div>
       </div>
     </section>
@@ -98,8 +101,8 @@
           <p data-i18n="legend.stormText">Lightning appears on the temperature chart. A larger, brighter bolt means a more probable and stronger storm.</p>
         </article>
         <article class="legend-card">
-          <strong><span class="wind-symbol" aria-hidden="true">↑</span><span data-i18n="legend.windTitle">Wind</span></strong>
-          <p data-i18n="legend.windText">The arrow points in the wind direction. Faded gray means calm, then green means light, yellow means strong, and red means 30 km/h or more. The number is speed in km/h.</p>
+          <strong><span class="wind-flow-symbol" aria-hidden="true"><i></i><i></i><i></i></span><span data-i18n="legend.windTitle">Wind</span></strong>
+          <p data-i18n="legend.windText">Flow color, brightness, thickness, and spread show wind strength. Gray is calm, green is light, yellow is strong, and red is 30 km/h or more. Optional arrows show direction together with speed in km/h.</p>
         </article>
       </div>
     </section>
@@ -144,6 +147,7 @@
         <label class="setting-row"><span data-i18n="settings.apparent">Apparent temperature area</span><input id="showApparentTemperature" type="checkbox"></label>
         <label class="setting-row"><span data-i18n="settings.precipitation">Precipitation symbols</span><input id="showPrecipitation" type="checkbox"></label>
         <label class="setting-row"><span data-i18n="settings.wind">Wind timeline</span><input id="showWind" type="checkbox"></label>
+        <label class="setting-row"><span data-i18n="settings.windArrows">Wind direction arrows and speed</span><input id="showWindArrows" type="checkbox"></label>
       </fieldset>
 
       <fieldset>

@@ -105,7 +105,9 @@ h2 { margin-bottom: 2px; font-size: 18px; }
 .forecast-timeline { --forecast-hour-width: 18px; width: max(100%, calc(var(--forecast-hours, 240) * var(--forecast-hour-width) + 64px)); }
 .forecast-weather-canvas { display: block; width: 100%; height: 100px; border-bottom: 1px solid var(--chart-grid); background: var(--chart-surface); touch-action: pan-x pan-y; }
 #forecastChart { display: block; width: 100%; height: 270px; background: var(--chart-surface); touch-action: pan-x pan-y; }
-.forecast-wind-strip { display: grid; height: var(--forecast-wind-height, 46px); grid-template-columns: repeat(var(--forecast-hours, 240), minmax(0, 1fr)); padding-right: 34px; border-top: 1px solid var(--chart-grid); background: var(--chart-wind); }
+.forecast-wind-visual { position: relative; height: var(--forecast-wind-height, 46px); overflow: hidden; border-top: 1px solid var(--chart-grid); background: var(--chart-wind); }
+.forecast-wind-canvas { display: block; width: 100%; height: 100%; }
+.forecast-wind-strip { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(var(--forecast-hours, 240), minmax(0, 1fr)); padding-right: 34px; background: color-mix(in srgb, var(--chart-wind) 30%, transparent); }
 .forecast-wind-hour { display: grid; min-width: 0; grid-template-rows: var(--forecast-wind-arrow-row, 24px) var(--forecast-wind-speed-row, 11px); place-items: center; padding: 4px 1px 3px; border-right: 1px solid rgba(154, 164, 178, .1); }
 .forecast-wind-hour.new-day { border-left: 1px solid rgba(154, 164, 178, .48); scroll-snap-align: start; }
 .forecast-wind-arrow { display: inline-block; font-size: var(--forecast-wind-arrow-size, 19px); font-weight: 900; line-height: var(--forecast-wind-arrow-line, 22px); }
@@ -124,7 +126,11 @@ h2 { margin-bottom: 2px; font-size: 18px; }
 .legend-symbols p .legend-weather-icon { display: inline-block; min-width: 32px; color: #2d94df; font-size: 28px; line-height: 1; text-align: center; vertical-align: -4px; }
 .legend-symbols .hail-symbol { color: #9fdcff; text-shadow: 0 0 6px #58a6ff; }
 .lightning-symbol { color: #e9a900; font-size: 34px; line-height: 1; text-shadow: 0 0 9px rgba(255, 211, 77, .72); }
-.wind-symbol { color: #26b973; font-size: 32px; font-weight: 900; line-height: 1; transform: rotate(45deg); }
+.wind-flow-symbol { position: relative; width: 52px; height: 30px; flex: 0 0 auto; filter: drop-shadow(0 0 6px rgba(255, 77, 95, .4)); }
+.wind-flow-symbol i { position: absolute; left: 0; width: 100%; height: 3px; border-radius: 99px; background: linear-gradient(90deg, #8d98aa, #45cf88 35%, #f4c247 65%, #ff4d5f); }
+.wind-flow-symbol i:nth-child(1) { top: 6px; transform: rotate(4deg); }
+.wind-flow-symbol i:nth-child(2) { top: 14px; transform: rotate(-3deg); }
+.wind-flow-symbol i:nth-child(3) { top: 22px; transform: rotate(2deg); }
 
 .daily-grid { display: grid; grid-template-columns: repeat(10, minmax(150px, 1fr)); gap: 8px; margin-top: 12px; overflow-x: auto; padding-bottom: 4px; }
 .forecast-day { min-width: 150px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
