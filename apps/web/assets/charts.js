@@ -527,14 +527,14 @@ export function drawWindFlow(canvas, points, options = {}) {
     return Math.atan2(vector.y, vector.x);
   });
   const strength = speeds.map(speed => Math.min(1, speed / 30));
-  const liftFactors = [.06, .2, .13, .42, .33, .63, .55, .82, 1.05, .91];
-  const strandWeights = [.35, .58, .76, .52, 1, .84, .61, .9, .46, .3];
-  const anchorY = index => height - 16 * visualScale
+  const liftFactors = [.04, .13, .22, .32, .43, .54, .65, .77, .89, 1];
+  const strandWeights = [.42, .58, .72, .86, 1, .95, .82, .7, .55, .4];
+  const anchorY = index => height - 29 * visualScale
     + Math.sin(index * .12 + directions[index] * .2) * .8 * visualScale;
   const lineY = (index, lineIndex) => {
     const directionLift = (Math.sin(directions[index] + lineIndex * .43) + 1) / 2
       * strength[index] * (1.5 + lineIndex % 4) * visualScale;
-    const strengthLift = liftFactors[lineIndex] * (4 * visualScale + strength[index] * height * .68);
+    const strengthLift = liftFactors[lineIndex] * (4 * visualScale + strength[index] * height * .55);
     const turbulence = Math.sin(index * (.13 + lineIndex * .009) + lineIndex * 1.17)
       * gustiness[index] * (2.3 + lineIndex % 4 * 1.25) * visualScale;
     return Math.max(3 * visualScale, Math.min(anchorY(index), anchorY(index) - strengthLift - directionLift + turbulence));
@@ -556,6 +556,33 @@ export function drawWindFlow(canvas, points, options = {}) {
   });
 
   const lineCount = liftFactors.length;
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const startX = (index + .5) * columnWidth;
+    const endX = (index + 1.5) * columnWidth;
+    const startLines = liftFactors.map((unused, lineIndex) => lineY(index, lineIndex));
+    const endLines = liftFactors.map((unused, lineIndex) => lineY(index + 1, lineIndex));
+    const startTop = Math.min(...startLines);
+    const startBottom = Math.max(...startLines);
+    const endTop = Math.min(...endLines);
+    const endBottom = Math.max(...endLines);
+    const averageStrength = (strength[index] + strength[index + 1]) / 2;
+    const gradient = context.createLinearGradient(startX, 0, endX, 0);
+    gradient.addColorStop(0, windFlowColor(speeds[index]));
+    gradient.addColorStop(1, windFlowColor(speeds[index + 1]));
+    context.save();
+    context.beginPath();
+    context.moveTo(startX, startTop);
+    context.bezierCurveTo(startX + columnWidth * .42, startTop, endX - columnWidth * .42, endTop, endX, endTop);
+    context.lineTo(endX, endBottom);
+    context.bezierCurveTo(endX - columnWidth * .42, endBottom, startX + columnWidth * .42, startBottom, startX, startBottom);
+    context.closePath();
+    context.fillStyle = gradient;
+    context.globalAlpha = .025 + averageStrength * .12;
+    context.filter = `blur(${(1.5 + averageStrength * 4.5) * visualScale}px)`;
+    context.fill();
+    context.restore();
+  }
+
   for (let lineIndex = 0; lineIndex < lineCount; lineIndex += 1) {
     const strandWeight = strandWeights[lineIndex];
     for (let index = 0; index < points.length - 1; index += 1) {
@@ -583,18 +610,18 @@ export function drawWindFlow(canvas, points, options = {}) {
       context.save();
       traceSegment();
       context.strokeStyle = gradient;
-      context.globalAlpha = (.015 + averageStrength * .13) * (.55 + strandWeight * .45);
-      context.lineWidth = (2 + averageStrength * 4.5) * (.7 + strandWeight * .3) * visualScale;
+      context.globalAlpha = (.035 + averageStrength * .2) * (.6 + strandWeight * .4);
+      context.lineWidth = (4 + averageStrength * 8) * (.72 + strandWeight * .28) * visualScale;
       context.shadowColor = windFlowColor((speeds[index] + speeds[index + 1]) / 2);
-      context.shadowBlur = (1.5 + averageStrength * 7) * visualScale;
+      context.shadowBlur = (3 + averageStrength * 11) * visualScale;
       context.stroke();
       context.restore();
 
       context.save();
       traceSegment();
       context.strokeStyle = gradient;
-      context.globalAlpha = (.12 + Math.pow(averageStrength, .75) * .88) * (.48 + strandWeight * .52);
-      context.lineWidth = (.5 + averageStrength * 1.35) * (.72 + strandWeight * .28) * visualScale;
+      context.globalAlpha = (.24 + Math.pow(averageStrength, .75) * .76) * (.65 + strandWeight * .35);
+      context.lineWidth = (.9 + averageStrength * 2.1) * (.82 + strandWeight * .18) * visualScale;
       context.lineCap = 'round';
       context.stroke();
       context.restore();
