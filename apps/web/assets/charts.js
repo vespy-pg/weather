@@ -507,6 +507,10 @@ export function drawWindFlow(canvas, points, options = {}) {
   const columnWidth = plotWidth / points.length;
   const visualScale = Math.max(.7, Math.min(1.6, Number(options.visualScale) || 1));
   const rawSpeeds = points.map(point => Math.max(0, numericValue(point.windSpeed) ?? 0));
+  const gustiness = points.map((point, index) => {
+    const gust = Math.max(rawSpeeds[index], numericValue(point.windGusts) ?? rawSpeeds[index]);
+    return Math.min(1, Math.max(0, gust - rawSpeeds[index]) / 18);
+  });
   const speeds = rawSpeeds.map((speed, index) => {
     const previous = rawSpeeds[index - 1] ?? speed;
     const next = rawSpeeds[index + 1] ?? speed;
@@ -523,11 +527,21 @@ export function drawWindFlow(canvas, points, options = {}) {
     return Math.atan2(vector.y, vector.x);
   });
   const strength = speeds.map(speed => Math.min(1, speed / 30));
-  const centerY = index => height / 2
-    + Math.sin(index * .12 + directions[index] * .35) * (1.1 + strength[index] * 1.8) * visualScale;
-  const lineY = (index, linePosition, phase) => centerY(index)
-    + linePosition * (2.2 + strength[index] * Math.min(height * .32, 15 * visualScale))
-    + Math.sin(index * .16 + phase) * (.35 + strength[index] * 1.15) * visualScale;
+  const laneOffsets = [-1.15, -.72, -.93, -.32, -.08, .17, .82, .43, 1.17, .68];
+  const strandWeights = [.35, .58, .76, .52, 1, .84, .61, .9, .46, .3];
+  const centerY = index => height * .5
+    + Math.sin(index * .055 + directions[index] * .72) * (1.8 + strength[index] * 3.8) * visualScale
+    + Math.sin(index * .19 + directions[index] * .18) * 1.2 * visualScale;
+  const lineY = (index, lineIndex) => {
+    const lanePosition = lineIndex / (laneOffsets.length - 1) * 2 - 1;
+    const directionPush = Math.sin(directions[index] + lineIndex * .43)
+      * strength[index] * (2.5 + lineIndex % 4 * 1.2) * visualScale;
+    const irregularFan = laneOffsets[lineIndex] * strength[index] * Math.min(height * .24, 14 * visualScale);
+    const baseSeparation = lanePosition * (3 + strength[index] * 4.5) * visualScale;
+    const turbulence = Math.sin(index * (.13 + lineIndex * .009) + lineIndex * 1.17)
+      * gustiness[index] * (2.3 + lineIndex % 4 * 1.25) * visualScale;
+    return centerY(index) + baseSeparation + irregularFan + directionPush + turbulence;
+  };
 
   context.clearRect(0, 0, width, height);
   points.forEach((point, index) => {
@@ -544,15 +558,14 @@ export function drawWindFlow(canvas, points, options = {}) {
     context.stroke();
   });
 
-  const lineCount = 9;
+  const lineCount = laneOffsets.length;
   for (let lineIndex = 0; lineIndex < lineCount; lineIndex += 1) {
-    const linePosition = lineIndex / (lineCount - 1) * 2 - 1;
-    const phase = lineIndex * .7;
+    const strandWeight = strandWeights[lineIndex];
     for (let index = 0; index < points.length - 1; index += 1) {
       const startX = (index + .5) * columnWidth;
       const endX = (index + 1.5) * columnWidth;
-      const startY = lineY(index, linePosition, phase);
-      const endY = lineY(index + 1, linePosition, phase);
+      const startY = lineY(index, lineIndex);
+      const endY = lineY(index + 1, lineIndex);
       const averageStrength = (strength[index] + strength[index + 1]) / 2;
       const gradient = context.createLinearGradient(startX, 0, endX, 0);
       gradient.addColorStop(0, windFlowColor(speeds[index]));
@@ -573,18 +586,18 @@ export function drawWindFlow(canvas, points, options = {}) {
       context.save();
       traceSegment();
       context.strokeStyle = gradient;
-      context.globalAlpha = .025 + averageStrength * .2;
-      context.lineWidth = (3 + averageStrength * 8) * visualScale;
+      context.globalAlpha = (.015 + averageStrength * .13) * (.55 + strandWeight * .45);
+      context.lineWidth = (2 + averageStrength * 4.5) * (.7 + strandWeight * .3) * visualScale;
       context.shadowColor = windFlowColor((speeds[index] + speeds[index + 1]) / 2);
-      context.shadowBlur = (2 + averageStrength * 11) * visualScale;
+      context.shadowBlur = (1.5 + averageStrength * 7) * visualScale;
       context.stroke();
       context.restore();
 
       context.save();
       traceSegment();
       context.strokeStyle = gradient;
-      context.globalAlpha = .16 + Math.pow(averageStrength, .75) * .84;
-      context.lineWidth = (.65 + averageStrength * 1.45) * visualScale;
+      context.globalAlpha = (.12 + Math.pow(averageStrength, .75) * .88) * (.48 + strandWeight * .52);
+      context.lineWidth = (.5 + averageStrength * 1.35) * (.72 + strandWeight * .28) * visualScale;
       context.lineCap = 'round';
       context.stroke();
       context.restore();
