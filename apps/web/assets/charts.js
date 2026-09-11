@@ -530,8 +530,8 @@ export function drawWindFlow(canvas, points, options = {}) {
   const liftFactors = [.03, .1, .18, .27, .37, .48, .6, .73, .87, 1];
   const strandWeights = [.42, .58, .72, .86, 1, .95, .82, .7, .55, .4];
   const flowCenterY = index => height * .61
-    + Math.sin(index * .12 + directions[index] * .2) * 3.2 * visualScale
-    + Math.sin(index * .055 + directions[index] * .7) * 2 * visualScale;
+    + Math.sin(index * .12 + directions[index] * .2) * (.25 + strength[index] * 4.2) * visualScale
+    + Math.sin(index * .055 + directions[index] * .7) * (.15 + strength[index] * 2.8) * visualScale;
   const lineY = (index, lineIndex) => {
     const lanePosition = .5 - lineIndex / (liftFactors.length - 1);
     const directionLift = (Math.sin(directions[index] + lineIndex * .43) + 1) / 2
@@ -539,7 +539,7 @@ export function drawWindFlow(canvas, points, options = {}) {
     const strengthLift = liftFactors[lineIndex] * strength[index] * height * .2;
     const baseSeparation = lanePosition * 9 * visualScale;
     const turbulence = Math.sin(index * (.13 + lineIndex * .009) + lineIndex * 1.17)
-      * gustiness[index] * (2.3 + lineIndex % 4 * 1.25) * visualScale;
+      * gustiness[index] * Math.pow(strength[index], .65) * (2.5 + lineIndex % 4 * 1.45) * visualScale;
     return Math.max(3 * visualScale, Math.min(height - 3 * visualScale, flowCenterY(index) + baseSeparation - strengthLift - directionLift + turbulence));
   };
 

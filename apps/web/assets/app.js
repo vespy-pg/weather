@@ -54,8 +54,8 @@ const LEGEND_TEMPERATURE_POINTS = LEGEND_TEMPERATURES.map((value, index) => ({
   windSpeed: 0,
   weatherCode: 0
 }));
-const LEGEND_FEELS_TEMPERATURES = [7, 9, 12, 16, 20, 24, 28, 31, 30, 27, 23, 19, 16, 14];
-const LEGEND_FEELS_DIFFERENCES = [-10, -10, -9, -7, -3, 2, 6, 10, 10, 9, 7, 3, -3, -8];
+const LEGEND_FEELS_TEMPERATURES = [10, 11, 13, 16, 18, 20, 22, 24, 24, 22, 19, 16, 14, 12];
+const LEGEND_FEELS_DIFFERENCES = [-14, -14, -13, -10, -5, 4, 10, 14, 14, 12, 9, 4, -6, -12];
 const LEGEND_FEELS_POINTS = LEGEND_FEELS_TEMPERATURES.map((value, index) => ({
   timestamp: `2026-06-01T${String(index).padStart(2, '0')}:00`,
   temperature: value,
