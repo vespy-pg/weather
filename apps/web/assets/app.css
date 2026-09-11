@@ -70,6 +70,7 @@ h2 { margin-bottom: 2px; font-size: 18px; }
 .location-heading { position: relative; }
 .location-title-row { position: relative; display: flex; align-items: center; gap: 8px; }
 .location-edit-button { display: grid; width: 32px; height: 32px; place-items: center; border: 1px solid transparent; border-radius: 50%; background: transparent; color: var(--muted); font-size: 20px; cursor: pointer; }
+.location-edit-button svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .location-edit-button:hover, .location-edit-button[aria-expanded="true"] { border-color: var(--line); background: var(--control); color: var(--text); }
 .location-menu { position: absolute; z-index: 30; top: calc(100% + 8px); left: 0; width: min(340px, calc(100vw - 32px)); padding: 7px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel); box-shadow: 0 14px 38px rgba(0, 0, 0, .38); }
 .location-menu-list { display: grid; gap: 4px; }
