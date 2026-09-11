@@ -98,7 +98,7 @@ function weatherForHour(dayIndex, hour) {
     if (hour === 13) return weatherScenario(3, 72, 22, .1);
     if (hour === 14) return weatherScenario(96, 88, 38, .45);
     if (hour === 15) return weatherScenario(99, 100, 98, 5.5);
-    if (hour >= 16 && hour <= 19) return weatherScenario(99, 100, 96, 5.2);
+    if (hour >= 16 && hour <= 19) return {...weatherScenario(99, 100, 96, 5.2), tornado: true};
     if (hour === 20) return weatherScenario(95, 95, 84, 3.2);
     if (hour === 21) return weatherScenario(63, 82, 62, 1.2);
     return weatherScenario(2, 55, 20, .1);
@@ -195,6 +195,7 @@ export function createWeatherDemo() {
       windSpeed,
       windDirection: index * 23 % 360,
       windGusts: windSpeed + 9,
+      tornado: scenario.tornado === true,
       visibility: scenario.visibility ?? 24000,
       surfacePressure: 1007 + Math.sin(index / 18) * 9,
       uvIndex: scenario.cloudCover < 50 ? 4 : 1

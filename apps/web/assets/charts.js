@@ -205,6 +205,53 @@ function drawLightning(context, x, y, opacity, scale = 1) {
   context.restore();
 }
 
+function traceWindCurl(context, centerX, centerY, radiusX, radiusY, direction) {
+  context.beginPath();
+  context.moveTo(centerX - radiusX * 2.4, centerY + radiusY * .15 * direction);
+  context.bezierCurveTo(
+    centerX - radiusX * 1.75,
+    centerY + radiusY * .05 * direction,
+    centerX - radiusX * 1.3,
+    centerY,
+    centerX - radiusX,
+    centerY
+  );
+  const turns = Math.PI * 2.35;
+  const steps = 36;
+  for (let step = 0; step <= steps; step += 1) {
+    const progress = step / steps;
+    const angle = Math.PI + turns * progress * direction;
+    const taper = 1 - progress * .32;
+    context.lineTo(
+      centerX + Math.cos(angle) * radiusX * taper,
+      centerY + Math.sin(angle) * radiusY * taper
+    );
+  }
+}
+
+function drawTornadoFunnel(context, centerX, height, width, color, visualScale) {
+  const top = 4 * visualScale;
+  const bottom = height - 4 * visualScale;
+  context.save();
+  context.strokeStyle = color;
+  context.lineCap = 'round';
+  context.lineWidth = 1.35 * visualScale;
+  context.globalAlpha = .9;
+  context.shadowColor = color;
+  context.shadowBlur = 5 * visualScale;
+  for (let row = 0; row < 7; row += 1) {
+    const progress = row / 6;
+    const y = top + (bottom - top) * progress;
+    const radiusX = Math.max(2.2 * visualScale, width * .5 * Math.pow(1 - progress, .72));
+    const radiusY = Math.max(1.4 * visualScale, radiusX * .2);
+    const direction = row % 2 ? -1 : 1;
+    context.beginPath();
+    context.ellipse(centerX, y, radiusX, radiusY, 0, direction > 0 ? Math.PI * .16 : Math.PI * .84, direction > 0 ? Math.PI * 1.92 : -Math.PI * .92, direction < 0);
+    context.stroke();
+  }
+  context.restore();
+}
+
 export function drawForecastSky(canvas, points, days = [], options = {}) {
   const rect = canvas.getBoundingClientRect();
   if (!points.length || rect.width < 1) return;
@@ -607,6 +654,51 @@ export function drawWindFlow(canvas, points, options = {}) {
       context.restore();
     }
   }
+
+  const tornadoIndexes = new Set(points.map((point, index) => point.tornado === true ? index : -1).filter(index => index >= 0));
+  const curlIndexes = [];
+  for (let index = 2; index < points.length - 2; index += 1) {
+    if (strength[index] < .36 || tornadoIndexes.has(index)) continue;
+    const localMaximum = Math.max(...strength.slice(index - 2, index + 3));
+    if (strength[index] < localMaximum || index - (curlIndexes.at(-1) ?? -10) < 7) continue;
+    curlIndexes.push(index);
+  }
+  context.save();
+  context.beginPath();
+  context.rect(0, 0, plotWidth, height);
+  context.clip();
+  curlIndexes.forEach((index, curlGroup) => {
+    const currentStrength = strength[index];
+    const curlCount = currentStrength >= .82 ? 3 : currentStrength >= .58 ? 2 : 1;
+    const radiusX = Math.max(7, Math.min(16, columnWidth * 2.8)) * (.78 + currentStrength * .32) * visualScale;
+    const radiusY = (3.4 + currentStrength * 5.5) * visualScale;
+    const x = (index + .5) * columnWidth;
+    const y = flowCenterY(index) - radiusY * 1.05 - currentStrength * height * .04;
+    for (let curl = 0; curl < curlCount; curl += 1) {
+      traceWindCurl(context, x + curl * radiusX * .42, y + (curl - (curlCount - 1) / 2) * radiusY * .72, radiusX, radiusY, (curl + curlGroup) % 2 ? -1 : 1);
+      context.strokeStyle = windColor;
+      context.globalAlpha = .42 + currentStrength * .5;
+      context.lineWidth = (1 + currentStrength * .75) * visualScale;
+      context.lineCap = 'round';
+      context.lineJoin = 'round';
+      context.shadowColor = windColor;
+      context.shadowBlur = (2 + currentStrength * 4) * visualScale;
+      context.stroke();
+    }
+  });
+
+  let tornadoStart = null;
+  points.forEach((point, index) => {
+    if (point.tornado === true && tornadoStart === null) tornadoStart = index;
+    const closesTornado = tornadoStart !== null && (point.tornado !== true || index === points.length - 1);
+    if (!closesTornado) return;
+    const tornadoEnd = point.tornado === true ? index : index - 1;
+    const centerX = ((tornadoStart + tornadoEnd + 1) / 2) * columnWidth;
+    const tornadoWidth = Math.max(22 * visualScale, Math.min(40 * visualScale, (tornadoEnd - tornadoStart + 1) * columnWidth * 1.4));
+    drawTornadoFunnel(context, centerX, height, tornadoWidth, windColor, visualScale);
+    tornadoStart = null;
+  });
+  context.restore();
 }
 
 export function drawWeatherChart(canvas, points, days = [], options = {}) {

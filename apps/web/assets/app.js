@@ -36,12 +36,13 @@ const LEGEND_SKY_DAYS = [{
   sunrise: '2026-06-01T08:00',
   sunset: '2026-06-01T18:00'
 }];
-const LEGEND_WIND_SPEEDS = [2, 3, 5, 8, 13, 21, 32, 27, 18, 10, 5, 2];
+const LEGEND_WIND_SPEEDS = [2, 3, 5, 8, 13, 21, 32, 27, 18, 10, 25, 30];
 const LEGEND_WIND_POINTS = LEGEND_WIND_SPEEDS.map((windSpeed, index) => ({
   timestamp: `2026-06-01T${String(index + 5).padStart(2, '0')}:00`,
   windSpeed,
   windGusts: windSpeed + 3 + index % 4,
-  windDirection: 225 + Math.sin(index * .65) * 55
+  windDirection: 225 + Math.sin(index * .65) * 55,
+  tornado: index === 9 || index === 10
 }));
 const LEGEND_TEMPERATURES = [-16, -13, -9, -4, -.2, 0, 5, 11, 17, 18, 23, 27, 30, 32, 36, 40];
 const LEGEND_TEMPERATURE_POINTS = LEGEND_TEMPERATURES.map((value, index) => ({
