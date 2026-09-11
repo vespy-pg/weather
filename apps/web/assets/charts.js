@@ -529,7 +529,7 @@ export function drawWindFlow(canvas, points, options = {}) {
   const strength = speeds.map(speed => Math.min(1, speed / 30));
   const liftFactors = [.06, .2, .13, .42, .33, .63, .55, .82, 1.05, .91];
   const strandWeights = [.35, .58, .76, .52, 1, .84, .61, .9, .46, .3];
-  const anchorY = index => height - 8 * visualScale
+  const anchorY = index => height - 16 * visualScale
     + Math.sin(index * .12 + directions[index] * .2) * .8 * visualScale;
   const lineY = (index, lineIndex) => {
     const directionLift = (Math.sin(directions[index] + lineIndex * .43) + 1) / 2

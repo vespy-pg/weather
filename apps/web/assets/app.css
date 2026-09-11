@@ -102,7 +102,7 @@ h2 { margin-bottom: 2px; font-size: 18px; }
 .forecast-chart-y-axis-temperature .zero { color: #2358c7; }
 .forecast-chart-y-axis-temperature .deep-frost { color: #fff; }
 :root[data-theme="light"] .forecast-chart-y-axis-temperature .deep-frost { color: #526277; }
-.forecast-timeline { --forecast-hour-width: 18px; width: max(100%, calc(var(--forecast-hours, 240) * var(--forecast-hour-width) + 64px)); }
+.forecast-timeline { --forecast-hour-width: 18px; width: max(100%, calc(var(--forecast-hours, 240) * var(--forecast-hour-width) + 64px)); padding-bottom: 14px; }
 .forecast-weather-canvas { display: block; width: 100%; height: 100px; border-bottom: 1px solid var(--chart-grid); background: var(--chart-surface); touch-action: pan-x pan-y; }
 #forecastChart { display: block; width: 100%; height: 270px; background: var(--chart-surface); touch-action: pan-x pan-y; }
 .forecast-wind-visual { position: relative; height: var(--forecast-wind-height, 68px); overflow: hidden; border-top: 1px solid var(--chart-grid); background: var(--chart-wind); }
