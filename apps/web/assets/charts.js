@@ -512,7 +512,7 @@ export function drawWindFlow(canvas, points, options = {}) {
   const rawSpeeds = points.map(point => Math.max(0, numericValue(point.windSpeed) ?? 0));
   const gustiness = points.map((point, index) => {
     const gust = Math.max(rawSpeeds[index], numericValue(point.windGusts) ?? rawSpeeds[index]);
-    return Math.min(1, Math.max(0, gust - rawSpeeds[index]) / 18);
+    return Math.min(1, Math.max(0, gust - rawSpeeds[index]) / 30);
   });
   const speeds = rawSpeeds.map((speed, index) => {
     const weighted = [-3, -2, -1, 0, 1, 2, 3]
@@ -532,6 +532,14 @@ export function drawWindFlow(canvas, points, options = {}) {
     return Math.atan2(vector.y, vector.x);
   });
   const strength = speeds.map(speed => Math.min(1, speed / 32));
+  const cumulativePhases = frequencies => frequencies.reduce((phases, frequency, index) => {
+    phases.push(index === 0 ? 0 : phases[index - 1] + (frequencies[index - 1] + frequency) / 2);
+    return phases;
+  }, []);
+  const waveFrequencies = strength.map((value, index) => .28 + value * .06 + Math.pow(gustiness[index], 1.35) * 1.25);
+  const gustFrequencies = gustiness.map(value => .68 + value * 1.5);
+  const wavePhases = cumulativePhases(waveFrequencies);
+  const gustPhases = cumulativePhases(gustFrequencies);
   const strandPositions = [-1, -.6, -.2, .2, .6, 1];
   const strandWeights = [.58, .78, 1, .96, .76, .56];
   const windColor = chartColor('--chart-wind-flow', '#9bc7d7');
@@ -540,10 +548,12 @@ export function drawWindFlow(canvas, points, options = {}) {
   const lineY = (index, lineIndex) => {
     const currentStrength = strength[index];
     const lanePosition = strandPositions[lineIndex];
-    const amplitude = Math.pow(currentStrength, 1.08) * height * .18 * visualScale;
-    const mainWave = Math.sin(index * (.32 + currentStrength * .08) + directions[index] * .14 + lineIndex * .11) * amplitude;
+    const baseAmplitude = Math.pow(currentStrength, 1.08) * height * .18 * visualScale;
+    const gustMultiplier = 1 + Math.pow(gustiness[index], 1.6) * 1.8;
+    const amplitude = Math.min(height * .34 * visualScale, baseAmplitude * gustMultiplier);
+    const mainWave = Math.sin(wavePhases[index] + directions[index] * .14 + lineIndex * .11) * amplitude;
     const secondaryWave = Math.sin(index * .16 + lineIndex * .23) * amplitude * .28;
-    const gustWave = Math.sin(index * .61 + lineIndex * .37) * gustiness[index] * amplitude * .55;
+    const gustWave = Math.sin(gustPhases[index] + lineIndex * .37) * gustiness[index] * baseAmplitude * .8;
     const separation = lanePosition * (2.2 + currentStrength * 5.1) * visualScale;
     return Math.max(3 * visualScale, Math.min(height - 3 * visualScale, flowCenterY(index) + separation + mainWave + secondaryWave + gustWave));
   };

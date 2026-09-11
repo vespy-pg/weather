@@ -153,7 +153,8 @@ function windForHour(index, tornado) {
   const tornadoWind = tornado ? 40 : 0;
   const speed = Math.max(calm, longWind, gustyLongWind, shortWind, tornadoWind);
   const regularGust = Math.max(longWind / 29 * 3, shortWind / 36 * 14, tornadoWind / 40 * 20);
-  const strongGust = gustyLongWind / 29 * 26;
+  const gustPulse = .22 + Math.pow((Math.sin((index - 42) * .92) + 1) / 2, 3) * .78;
+  const strongGust = gustyLongWind / 29 * (8 + gustPulse * 24);
   return {
     speed: Number(speed.toFixed(1)),
     gusts: Number((speed + 2 + Math.max(regularGust, strongGust)).toFixed(1)),

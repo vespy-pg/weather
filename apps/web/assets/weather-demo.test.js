@@ -14,7 +14,7 @@ test('demo wind contains matching gradual events with different gusts and a shar
   assert.equal(hourly[54].windSpeed, hourly[22].windSpeed);
   assert.ok(hourly[66].windSpeed < 3);
   assert.ok(hourly[22].windGusts - hourly[22].windSpeed <= 5);
-  assert.ok(hourly[54].windGusts - hourly[54].windSpeed >= 25);
+  assert.ok(Math.max(...hourly.slice(42, 67).map(point => point.windGusts - point.windSpeed)) >= 25);
 
   assert.ok(hourly[82].windSpeed < 3);
   assert.ok(hourly[88].windSpeed >= 36);
