@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0a0e14">
+  <title>Weather</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">WEATHER</p>
+        <h1 id="locationTitle">Kamienica Polska</h1>
+        <p class="muted" id="updatedAt">Waiting for forecast</p>
+      </div>
+      <button class="settings-button" type="button" id="openSettings" aria-label="Open weather settings">
+        <span aria-hidden="true">⚙</span> Settings
+      </button>
+    </header>
+
+    <section class="current-grid" id="currentWeather" aria-live="polite"></section>
+
+    <section class="panel forecast-panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow" id="forecastRangeLabel">NEXT 10 DAYS</p>
+          <h2>Temperature, clouds and precipitation</h2>
+        </div>
+        <div class="forecast-heading-tools">
+          <span class="muted">Temperature from -20°C to +40°C</span>
+          <div class="forecast-zoom-controls" aria-label="Timeline zoom">
+            <button type="button" id="forecastZoomOut" aria-label="Zoom out timeline">-</button>
+            <button type="button" id="forecastZoomReset" aria-label="Reset timeline zoom">100%</button>
+            <button type="button" id="forecastZoomIn" aria-label="Zoom in timeline">+</button>
+          </div>
+        </div>
+      </div>
+      <div class="forecast-timeline-scroll" id="forecastTimelineScroll">
+        <div class="forecast-chart-y-axes" aria-hidden="true">
+          <div class="forecast-chart-y-axis forecast-chart-y-axis-temperature">
+            <span class="hot" style="--axis-position:140px">+40°</span>
+            <span class="zero" style="--axis-position:279px">0°</span>
+            <span class="deep-frost" style="--axis-position:348px">-20°</span>
+          </div>
+        </div>
+        <div class="forecast-timeline" id="forecastTimeline">
+          <canvas class="forecast-weather-canvas" id="forecastWeatherCanvas" height="100" aria-label="Hourly temperature and continuous weather conditions"></canvas>
+          <div class="forecast-chart-legend" aria-hidden="true">
+            <span class="precipitation">precip.</span>
+            <span class="apparent-temperature">feels</span>
+            <span class="legend-label">temp.:</span>
+            <span class="forecast-temperature-scale">
+              <i aria-hidden="true"></i>
+              <span class="forecast-temperature-ticks">
+                <b style="--position:0%">-20°</b><b style="--position:13.33%">-12°</b><b style="--position:33.33%">0°</b>
+                <b style="--position:63.33%">18°</b><b style="--position:78.33%">27°</b><b style="--position:86.67%">32°</b><b style="--position:100%">40°</b>
+              </span>
+            </span>
+          </div>
+          <canvas id="forecastChart" height="300" aria-label="Temperature and apparent temperature chart"></canvas>
+          <div class="forecast-wind-strip" id="forecastWindStrip" aria-label="Hourly wind direction and speed"></div>
+          <div class="forecast-wind-legend" id="forecastWindLegend" aria-label="Wind speed legend">
+            <span>0</span><i class="forecast-wind-gradient"></i><span>30+ km/h</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <p class="eyebrow">FOLLOWING 5 DAYS</p>
+      <h2>Daily forecast</h2>
+      <div class="daily-grid" id="dailyForecast"></div>
+    </section>
+  </main>
+
+  <dialog class="settings-dialog" id="settingsDialog">
+    <form method="dialog" class="settings-content" id="settingsForm">
+      <div class="dialog-heading">
+        <div><p class="eyebrow">PERSONALIZATION</p><h2>Weather settings</h2></div>
+        <button class="icon-button" value="cancel" aria-label="Close settings">×</button>
+      </div>
+
+      <fieldset>
+        <legend>Location</legend>
+        <p class="selected-location" id="selectedLocation"></p>
+        <div class="location-search-row">
+          <input id="locationQuery" type="search" minlength="2" autocomplete="off" placeholder="Search city or place">
+          <button type="button" id="searchLocation">Search</button>
+          <button type="button" id="useDeviceLocation">Use device</button>
+        </div>
+        <div class="location-results" id="locationResults" aria-live="polite"></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Forecast display</legend>
+        <label class="setting-row"><span>Default timeline zoom</span>
+          <select id="defaultZoom"><option value="0.5">50%</option><option value="0.75">75%</option><option value="1">100%</option><option value="1.25">125%</option><option value="1.5">150%</option><option value="2">200%</option></select>
+        </label>
+        <label class="setting-row"><span>Hourly temperature values</span><input id="showHourlyTemperatures" type="checkbox"></label>
+        <label class="setting-row"><span>Apparent temperature area</span><input id="showApparentTemperature" type="checkbox"></label>
+        <label class="setting-row"><span>Precipitation symbols</span><input id="showPrecipitation" type="checkbox"></label>
+        <label class="setting-row"><span>Wind timeline</span><input id="showWind" type="checkbox"></label>
+      </fieldset>
+
+      <p class="settings-error" id="settingsError" role="alert"></p>
+      <div class="dialog-actions">
+        <button class="secondary-button" value="cancel">Cancel</button>
+        <button class="primary-button" id="saveSettings" value="default">Save settings</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="assets/app.js" type="module"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "weather",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node --watch apps/api/server.js",
+    "start": "node apps/api/server.js",
+    "check": "node --check apps/api/server.js && node --check apps/web/assets/app.js && node --check apps/web/assets/charts.js && node --check apps/web/assets/components.js && node --check apps/web/assets/weather-demo.js",
+    "test": "node --test"
+  }
+}
+
