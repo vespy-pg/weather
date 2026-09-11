@@ -178,8 +178,8 @@ function apparentTemperatureFor({temperature, humidity, windSpeed, cloudCover, p
   return apparentTemperature + radiantWarmth - rainCooling;
 }
 
-export function createWeatherDemo() {
-  const start = new Date();
+export function createWeatherDemo(now = new Date()) {
+  const start = new Date(now);
   start.setMinutes(0, 0, 0);
   const firstDay = new Date(start);
   firstDay.setHours(0, 0, 0, 0);

@@ -4,7 +4,7 @@ import test from 'node:test';
 import {createWeatherDemo} from './weather-demo.js';
 
 test('demo wind contains matching gradual events with different gusts and a sharp event', () => {
-  const {hourly} = createWeatherDemo();
+  const {hourly} = createWeatherDemo(new Date(2026, 8, 11, 17));
 
   assert.ok(hourly[10].windSpeed < 3);
   assert.ok(hourly[22].windSpeed >= 29);

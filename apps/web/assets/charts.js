@@ -536,8 +536,8 @@ export function drawWindFlow(canvas, points, options = {}) {
     phases.push(index === 0 ? 0 : phases[index - 1] + (frequencies[index - 1] + frequency) / 2);
     return phases;
   }, []);
-  const waveFrequencies = strength.map((value, index) => .28 + value * .06 + Math.pow(gustiness[index], 1.35) * 1.25);
-  const gustFrequencies = gustiness.map(value => .68 + value * 1.5);
+  const waveFrequencies = strength.map((value, index) => .28 + value * .06 + Math.pow(gustiness[index], 1.35) * 5);
+  const gustFrequencies = gustiness.map(value => .68 + value * 6);
   const wavePhases = cumulativePhases(waveFrequencies);
   const gustPhases = cumulativePhases(gustFrequencies);
   const strandPositions = [-1, -.6, -.2, .2, .6, 1];
@@ -545,17 +545,26 @@ export function drawWindFlow(canvas, points, options = {}) {
   const windColor = chartColor('--chart-wind-flow', '#9bc7d7');
   const flowCenterY = index => height * .61
     + Math.sin(index * .085 + directions[index] * .2) * (.15 + strength[index] * 1.2) * visualScale;
-  const lineY = (index, lineIndex) => {
-    const currentStrength = strength[index];
+  const flowCenters = points.map((unused, index) => flowCenterY(index));
+  const sampleSeries = (values, position) => {
+    const start = Math.max(0, Math.min(values.length - 1, Math.floor(position)));
+    const end = Math.min(values.length - 1, start + 1);
+    const progress = Math.max(0, Math.min(1, position - start));
+    return values[start] + (values[end] - values[start]) * progress;
+  };
+  const lineY = (position, lineIndex) => {
+    const currentStrength = sampleSeries(strength, position);
+    const currentGustiness = sampleSeries(gustiness, position);
+    const direction = sampleSeries(directions, position);
     const lanePosition = strandPositions[lineIndex];
     const baseAmplitude = Math.pow(currentStrength, 1.08) * height * .18 * visualScale;
-    const gustMultiplier = 1 + Math.pow(gustiness[index], 1.6) * 1.8;
+    const gustMultiplier = 1 + Math.pow(currentGustiness, 1.6) * 1.8;
     const amplitude = Math.min(height * .34 * visualScale, baseAmplitude * gustMultiplier);
-    const mainWave = Math.sin(wavePhases[index] + directions[index] * .14 + lineIndex * .11) * amplitude;
-    const secondaryWave = Math.sin(index * .16 + lineIndex * .23) * amplitude * .28;
-    const gustWave = Math.sin(gustPhases[index] + lineIndex * .37) * gustiness[index] * baseAmplitude * .8;
+    const mainWave = Math.sin(sampleSeries(wavePhases, position) + direction * .14 + lineIndex * .11) * amplitude;
+    const secondaryWave = Math.sin(position * .16 + lineIndex * .23) * amplitude * .28;
+    const gustWave = Math.sin(sampleSeries(gustPhases, position) + lineIndex * .37) * currentGustiness * baseAmplitude * .8;
     const separation = lanePosition * (2.2 + currentStrength * 5.1) * visualScale;
-    return Math.max(3 * visualScale, Math.min(height - 3 * visualScale, flowCenterY(index) + separation + mainWave + secondaryWave + gustWave));
+    return Math.max(3 * visualScale, Math.min(height - 3 * visualScale, sampleSeries(flowCenters, position) + separation + mainWave + secondaryWave + gustWave));
   };
 
   context.clearRect(0, 0, width, height);
@@ -574,6 +583,7 @@ export function drawWindFlow(canvas, points, options = {}) {
   });
 
   const lineCount = strandPositions.length;
+  const samplesPerHour = 8;
   for (let index = 0; index < points.length - 1; index += 1) {
     const startX = (index + .5) * columnWidth;
     const endX = (index + 1.5) * columnWidth;
@@ -602,21 +612,14 @@ export function drawWindFlow(canvas, points, options = {}) {
     const strandWeight = strandWeights[lineIndex];
     for (let index = 0; index < points.length - 1; index += 1) {
       const startX = (index + .5) * columnWidth;
-      const endX = (index + 1.5) * columnWidth;
-      const startY = lineY(index, lineIndex);
-      const endY = lineY(index + 1, lineIndex);
       const averageStrength = (strength[index] + strength[index + 1]) / 2;
       const traceSegment = () => {
         context.beginPath();
-        context.moveTo(startX, startY);
-        context.bezierCurveTo(
-          startX + columnWidth * .42,
-          startY,
-          endX - columnWidth * .42,
-          endY,
-          endX,
-          endY
-        );
+        context.moveTo(startX, lineY(index, lineIndex));
+        for (let sample = 1; sample <= samplesPerHour; sample += 1) {
+          const position = index + sample / samplesPerHour;
+          context.lineTo((position + .5) * columnWidth, lineY(position, lineIndex));
+        }
       };
 
       context.save();
