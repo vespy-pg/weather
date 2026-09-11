@@ -59,14 +59,17 @@
       <div class="forecast-timeline-scroll" id="forecastTimelineScroll">
         <div class="forecast-chart-y-axes" aria-hidden="true">
           <div class="forecast-chart-y-axis forecast-chart-y-axis-temperature">
-            <span class="hot" style="--axis-position:114px">+40°</span>
-            <span class="zero" style="--axis-position:270px">0°</span>
-            <span class="deep-frost" style="--axis-position:348px">-20°</span>
+            <span class="hot" style="--axis-position:162px">+40°</span>
+            <span class="zero" style="--axis-position:318px">0°</span>
+            <span class="deep-frost" style="--axis-position:396px">-20°</span>
           </div>
         </div>
         <div class="forecast-timeline" id="forecastTimeline">
+          <div class="forecast-track-title"><span><i class="forecast-track-marker sky" aria-hidden="true"></i><b data-i18n="chart.skyLabel">Sky and precipitation</b></span></div>
           <canvas class="forecast-weather-canvas" id="forecastWeatherCanvas" height="100" aria-label="Hourly temperature and continuous weather conditions"></canvas>
+          <div class="forecast-track-title"><span><i class="forecast-track-marker temperature" aria-hidden="true"></i><b data-i18n="chart.temperatureLabel">Temperature and feels like</b></span></div>
           <canvas id="forecastChart" height="300" aria-label="Temperature and apparent temperature chart"></canvas>
+          <div class="forecast-track-title"><span><i class="forecast-track-marker wind" aria-hidden="true"></i><b data-i18n="chart.windLabel">Wind strength</b></span></div>
           <div class="forecast-wind-visual" id="forecastWindVisual" aria-label="Hourly wind strength">
             <canvas class="forecast-wind-canvas" id="forecastWindCanvas" height="64"></canvas>
             <div class="forecast-wind-strip" id="forecastWindStrip" aria-label="Hourly wind direction and speed"></div>
@@ -89,7 +92,8 @@
           <p data-i18n="legend.feelsText">The shaded area between the lines shows the difference from measured temperature. Blue means it feels colder, orange means it feels warmer.</p>
         </article>
         <article class="legend-card">
-          <strong><span class="legend-swatch sky" aria-hidden="true"></span><span data-i18n="legend.skyTitle">Sun, clouds and night</span></strong>
+          <strong data-i18n="legend.skyTitle">Sun, clouds and night</strong>
+          <canvas class="legend-preview legend-sky-preview" id="legendSkyCanvas" height="100" aria-hidden="true"></canvas>
           <p data-i18n="legend.skyText">Yellow glow is exposed sunlight and fades as cloud cover grows. The gray band becomes larger with more cloud. A moon marks nighttime.</p>
         </article>
         <article class="legend-card legend-symbols">
@@ -101,7 +105,8 @@
           <p data-i18n="legend.stormText">Lightning appears on the temperature chart. A larger, brighter bolt means a more probable and stronger storm.</p>
         </article>
         <article class="legend-card">
-          <strong><span class="wind-flow-symbol" aria-hidden="true"><i></i><i></i><i></i></span><span data-i18n="legend.windTitle">Wind</span></strong>
+          <strong data-i18n="legend.windTitle">Wind</strong>
+          <canvas class="legend-preview legend-wind-preview" id="legendWindCanvas" height="68" aria-hidden="true"></canvas>
           <p data-i18n="legend.windText">Flow color, brightness, thickness, and spread show wind strength. Gray is calm, green is light, yellow is strong, and red is 30 km/h or more. Optional arrows show direction together with speed in km/h.</p>
         </article>
       </div>

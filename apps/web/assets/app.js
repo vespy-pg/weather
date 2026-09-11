@@ -21,6 +21,28 @@ const DEFAULT_SETTINGS = {
   showWind: true,
   showWindArrows: false
 };
+const LEGEND_SKY_CLOUDS = [70, 78, 62, 42, 20, 4, 12, 35, 58, 82, 68, 38];
+const LEGEND_SKY_POINTS = LEGEND_SKY_CLOUDS.map((cloudCover, index) => ({
+  timestamp: `2026-06-01T${String(index + 5).padStart(2, '0')}:00`,
+  temperature: 20,
+  cloudCover,
+  weatherCode: cloudCover > 70 ? 3 : cloudCover > 25 ? 2 : 1,
+  precipitation: 0,
+  precipitationProbability: 0,
+  snowfall: 0
+}));
+const LEGEND_SKY_DAYS = [{
+  date: '2026-06-01',
+  sunrise: '2026-06-01T08:00',
+  sunset: '2026-06-01T18:00'
+}];
+const LEGEND_WIND_SPEEDS = [2, 3, 5, 8, 13, 21, 32, 27, 18, 10, 5, 2];
+const LEGEND_WIND_POINTS = LEGEND_WIND_SPEEDS.map((windSpeed, index) => ({
+  timestamp: `2026-06-01T${String(index + 5).padStart(2, '0')}:00`,
+  windSpeed,
+  windGusts: windSpeed + 3 + index % 4,
+  windDirection: 225 + Math.sin(index * .65) * 55
+}));
 
 let settings = loadSettings();
 let pendingLocation = settings.location;
@@ -179,6 +201,11 @@ function renderWind(hourly) {
   }).join('');
 }
 
+function drawLegendPreviews() {
+  drawForecastSky(document.getElementById('legendSkyCanvas'), LEGEND_SKY_POINTS, LEGEND_SKY_DAYS, {showHourlyTemperatures: false});
+  drawWindFlow(document.getElementById('legendWindCanvas'), LEGEND_WIND_POINTS);
+}
+
 function drawForecast() {
   if (!weather?.available) return;
   const hourly = weather.hourly.slice(0, 240);
@@ -190,6 +217,7 @@ function drawForecast() {
   drawWeatherChart(document.getElementById('forecastChart'), hourly, weather.daily, {timeline: true, showApparentTemperature: settings.showApparentTemperature, visualScale});
   if (settings.showWind) drawWindFlow(document.getElementById('forecastWindCanvas'), hourly, {visualScale});
   renderWind(hourly);
+  drawLegendPreviews();
 }
 
 function renderForecast() {
@@ -382,6 +410,7 @@ document.body.classList.toggle('embedded', IS_EMBEDDED);
 settings.language = setLanguage(settings.language);
 document.getElementById('languageSelect').value = settings.language;
 applyTheme(settings.theme);
+drawLegendPreviews();
 applyZoom(zoomIndex, false);
 loadWeather();
 if (!settings.configured && !IS_DEMO && !IS_EMBEDDED) {
