@@ -20,9 +20,16 @@
 <body>
   <main class="shell">
     <header class="topbar">
-      <div>
+      <div class="location-heading">
         <p class="eyebrow" data-i18n="app.weather">WEATHER</p>
-        <h1 id="locationTitle">Aurora Vale</h1>
+        <div class="location-title-row">
+          <h1 id="locationTitle">London</h1>
+          <button class="location-edit-button" type="button" id="editLocation" aria-label="Change location" title="Change location" aria-haspopup="menu" aria-expanded="false"><span aria-hidden="true">✎</span></button>
+          <div class="location-menu" id="locationMenu" hidden>
+            <div class="location-menu-list" id="locationMenuList"></div>
+            <button class="location-menu-edit" type="button" id="openSettings" data-i18n="action.editLocations">Edit locations and settings</button>
+          </div>
+        </div>
         <p class="muted" id="updatedAt" data-i18n="app.waiting">Waiting for forecast</p>
       </div>
       <div class="topbar-actions">
@@ -32,9 +39,6 @@
         </label>
         <button class="theme-button" type="button" id="themeToggle" aria-label="Switch to light mode" title="Switch to light mode">
           <span id="themeIcon" aria-hidden="true">☀</span><span id="themeLabel">Light</span>
-        </button>
-        <button class="settings-button" type="button" id="openSettings" aria-label="Open weather settings">
-          <span aria-hidden="true">⚙</span> <span data-i18n="action.settings">Settings</span>
         </button>
       </div>
     </header>
@@ -130,12 +134,14 @@
       <fieldset>
         <legend data-i18n="settings.location">Location</legend>
         <p class="selected-location" id="selectedLocation"></p>
+        <div class="saved-locations" id="savedLocations"></div>
         <div class="location-search-row">
           <input id="locationQuery" type="search" minlength="2" autocomplete="off" placeholder="Search city or place" data-i18n-placeholder="settings.searchPlaceholder">
           <button type="button" id="searchLocation" data-i18n="action.search">Search</button>
           <button type="button" id="useDeviceLocation" data-i18n="action.useDevice">Use device</button>
         </div>
         <div class="location-results" id="locationResults" aria-live="polite"></div>
+        <p class="location-status" id="locationStatus" aria-live="polite"></p>
       </fieldset>
 
       <fieldset>

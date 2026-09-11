@@ -2,6 +2,7 @@ import http from 'node:http';
 import {readFile, stat} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {findByIso2} from 'country-list-js';
 
 const PORT = Number(process.env.PORT || 8080);
 const CACHE_TTL_MS = Number(process.env.WEATHER_CACHE_TTL_MS || 10 * 60 * 1000);
@@ -135,6 +136,32 @@ async function locations(requestUrl, response) {
   return json(response, 200, {results});
 }
 
+export function selectCapitalResult(results, countryCode) {
+  const normalizedCode = String(countryCode || '').toUpperCase();
+  return (results || []).find(item => item.country_code === normalizedCode && item.feature_code === 'PPLC')
+    || (results || []).find(item => item.country_code === normalizedCode)
+    || null;
+}
+
+async function bootstrapLocation(request, response) {
+  const countryCode = String(request.headers['x-visitor-country'] || '').trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(countryCode)) return json(response, 200, {location: null});
+  const country = findByIso2(countryCode);
+  if (!country?.capital) return json(response, 200, {location: null});
+  const parameters = new URLSearchParams({name: country.capital, count: '10', language: 'en', format: 'json'});
+  const source = await cachedFetch(`https://geocoding-api.open-meteo.com/v1/search?${parameters}`);
+  const capital = selectCapitalResult(source.results, countryCode);
+  if (!capital) return json(response, 200, {location: null});
+  return json(response, 200, {location: {
+    id: `capital-${countryCode}`,
+    name: capital.name,
+    country: country.name,
+    latitude: capital.latitude,
+    longitude: capital.longitude,
+    timezone: capital.timezone || 'auto'
+  }});
+}
+
 async function weather(requestUrl, response) {
   const latitude = Number(requestUrl.searchParams.get('latitude'));
   const longitude = Number(requestUrl.searchParams.get('longitude'));
@@ -173,6 +200,7 @@ export function createServer() {
       }
       if (request.method !== 'GET') return json(response, 405, {error: 'Method not allowed.'});
       if (requestUrl.pathname === '/api/health') return json(response, 200, {status: 'ok'});
+      if (requestUrl.pathname === '/api/bootstrap-location') return await bootstrapLocation(request, response);
       if (requestUrl.pathname === '/api/locations') return await locations(requestUrl, response);
       if (requestUrl.pathname === '/api/weather') return await weather(requestUrl, response);
       return await staticFile(requestUrl, response);

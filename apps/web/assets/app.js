@@ -10,8 +10,10 @@ const IS_GITHUB_PAGES = location.hostname.endsWith('.github.io');
 const IS_DEMO = QUERY.get('demo') === '1' || IS_GITHUB_PAGES;
 const IS_EMBEDDED = QUERY.get('embed') === '1';
 const API_ROOT = new URL('./api/', location.href);
+const DEFAULT_LOCATION = {id: 'capital-GB', name: 'London', country: 'United Kingdom', latitude: 51.5074, longitude: -0.1278, timezone: 'Europe/London'};
 const DEFAULT_SETTINGS = {
-  location: {name: 'Aurora Vale', country: 'Northland', latitude: 46.81, longitude: 9.84, timezone: 'Europe/Zurich'},
+  location: DEFAULT_LOCATION,
+  locations: [DEFAULT_LOCATION],
   configured: false,
   zoom: 1,
   theme: 'dark',
@@ -71,13 +73,43 @@ const LEGEND_FEELS_POINTS = LEGEND_FEELS_TEMPERATURES.map((value, index) => ({
 
 let settings = loadSettings();
 let pendingLocation = settings.location;
+let pendingLocations = settings.locations;
 let weather = null;
+let weatherRequest = 0;
 let zoomIndex = Math.max(0, ZOOM_LEVELS.indexOf(Number(settings.zoom)));
+
+function locationKey(item) {
+  if (item?.id !== undefined && item?.id !== null) return String(item.id);
+  return `${Number(item?.latitude).toFixed(4)}:${Number(item?.longitude).toFixed(4)}`;
+}
+
+function sameLocation(first, second) {
+  return locationKey(first) === locationKey(second);
+}
+
+function locationLabel(item) {
+  return `${item.name}${item.country ? `, ${item.country}` : ''}`;
+}
+
+function withLocation(collection, item) {
+  const index = collection.findIndex(location => sameLocation(location, item));
+  if (index < 0) return [...collection, item];
+  return collection.map((location, locationIndex) => locationIndex === index ? item : location);
+}
 
 function loadSettings() {
   try {
-    const stored = {...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')};
-    if (stored.location?.name === 'Kamienica Polska') stored.location = {...DEFAULT_SETTINGS.location};
+    const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+    const stored = {...DEFAULT_SETTINGS, ...saved};
+    const legacyPlaceholder = stored.location?.name === 'Kamienica Polska'
+      || (stored.location?.name === 'Aurora Vale' && stored.location?.country === 'Northland');
+    if (legacyPlaceholder) {
+      stored.location = {...DEFAULT_LOCATION};
+      stored.locations = [{...DEFAULT_LOCATION}];
+      stored.configured = false;
+    }
+    stored.locations = Array.isArray(saved.locations) && saved.locations.length ? saved.locations : [stored.location];
+    if (!stored.locations.some(item => sameLocation(item, stored.location))) stored.locations.push(stored.location);
     const latitude = Number(QUERY.get('lat'));
     const longitude = Number(QUERY.get('lon'));
     if (QUERY.has('lat') && QUERY.has('lon') && Number.isFinite(latitude) && Number.isFinite(longitude)) {
@@ -88,6 +120,7 @@ function loadSettings() {
         longitude,
         timezone: QUERY.get('timezone') || 'auto'
       };
+      stored.locations = [stored.location];
       stored.configured = true;
     }
     if (['dark', 'light'].includes(QUERY.get('theme'))) stored.theme = QUERY.get('theme');
@@ -95,7 +128,7 @@ function loadSettings() {
     if (ZOOM_LEVELS.includes(Number(QUERY.get('zoom')))) stored.zoom = Number(QUERY.get('zoom'));
     return stored;
   } catch {
-    return {...DEFAULT_SETTINGS};
+    return {...DEFAULT_SETTINGS, location: {...DEFAULT_LOCATION}, locations: [{...DEFAULT_LOCATION}]};
   }
 }
 
@@ -269,11 +302,13 @@ function renderError(message) {
 }
 
 async function loadWeather() {
+  const requestId = ++weatherRequest;
   document.getElementById('updatedAt').textContent = t('status.loading');
   try {
+    let nextWeather;
     if (IS_DEMO) {
-      weather = createWeatherDemo();
-      weather.location = {...settings.location, name: `${settings.location.name} - demo`};
+      nextWeather = createWeatherDemo();
+      nextWeather.location = {...settings.location, name: `${settings.location.name} - demo`};
       document.getElementById('forecastRangeLabel').textContent = t('forecast.demo');
     } else {
       const parameters = new URLSearchParams({
@@ -284,18 +319,23 @@ async function loadWeather() {
       });
       const response = await fetch(new URL(`weather?${parameters}`, API_ROOT));
       if (!response.ok) throw new Error((await response.json()).error || 'Forecast request failed.');
-      weather = await response.json();
+      nextWeather = await response.json();
       document.getElementById('forecastRangeLabel').textContent = t('forecast.next');
     }
+    if (requestId !== weatherRequest) return;
+    weather = nextWeather;
     renderForecast();
   } catch (error) {
+    if (requestId !== weatherRequest) return;
     renderError(error.message);
   }
 }
 
 function fillSettingsForm() {
   pendingLocation = settings.location;
-  document.getElementById('selectedLocation').textContent = `${pendingLocation.name}${pendingLocation.country ? `, ${pendingLocation.country}` : ''}`;
+  pendingLocations = [...settings.locations];
+  document.getElementById('locationQuery').value = '';
+  renderPendingLocations();
   document.getElementById('defaultZoom').value = String(settings.zoom);
   document.getElementById('colorTheme').value = settings.theme;
   document.getElementById('languageSetting').value = settings.language;
@@ -305,9 +345,66 @@ function fillSettingsForm() {
   document.getElementById('showWind').checked = settings.showWind;
   document.getElementById('showWindArrows').checked = settings.showWindArrows;
   document.getElementById('locationResults').innerHTML = '';
+  document.getElementById('locationResults').hidden = true;
+  document.getElementById('locationStatus').textContent = '';
   document.getElementById('settingsError').textContent = '';
   document.getElementById('copyStatus').textContent = '';
   document.getElementById('embedCode').value = embedCode(pendingLocation, settings.theme, settings.language);
+}
+
+function renderPendingLocations() {
+  document.getElementById('selectedLocation').textContent = `${t('settings.activeLocation')}: ${locationLabel(pendingLocation)}`;
+  const container = document.getElementById('savedLocations');
+  container.innerHTML = pendingLocations.map((item, index) => `<div class="saved-location">
+    <button type="button" class="saved-location-select" data-saved-location="${index}" aria-pressed="${sameLocation(item, pendingLocation)}">${escapeHtml(locationLabel(item))}</button>
+    <button type="button" class="saved-location-remove" data-remove-location="${index}" aria-label="${escapeHtml(t('action.removeLocation'))}" title="${escapeHtml(t('action.removeLocation'))}" ${pendingLocations.length === 1 ? 'disabled' : ''}>×</button>
+  </div>`).join('');
+  container.querySelectorAll('[data-saved-location]').forEach(button => button.addEventListener('click', () => {
+    pendingLocation = pendingLocations[Number(button.dataset.savedLocation)];
+    renderPendingLocations();
+    updateEmbedPreview();
+  }));
+  container.querySelectorAll('[data-remove-location]').forEach(button => button.addEventListener('click', () => {
+    if (pendingLocations.length === 1) return;
+    const removed = pendingLocations[Number(button.dataset.removeLocation)];
+    pendingLocations = pendingLocations.filter(item => !sameLocation(item, removed));
+    if (sameLocation(removed, pendingLocation)) pendingLocation = pendingLocations[0];
+    renderPendingLocations();
+    updateEmbedPreview();
+  }));
+}
+
+function updateEmbedPreview() {
+  document.getElementById('embedCode').value = embedCode(pendingLocation, document.getElementById('colorTheme').value, document.getElementById('languageSetting').value);
+}
+
+function renderLocationMenu() {
+  const list = document.getElementById('locationMenuList');
+  list.innerHTML = settings.locations.map((item, index) => `<button type="button" class="location-menu-location" data-menu-location="${index}" aria-current="${sameLocation(item, settings.location)}">${escapeHtml(locationLabel(item))}</button>`).join('');
+  list.querySelectorAll('[data-menu-location]').forEach(button => button.addEventListener('click', () => {
+    activateLocation(settings.locations[Number(button.dataset.menuLocation)]);
+    closeLocationMenu();
+  }));
+}
+
+function closeLocationMenu() {
+  document.getElementById('locationMenu').hidden = true;
+  document.getElementById('editLocation').setAttribute('aria-expanded', 'false');
+}
+
+function openSettingsDialog() {
+  closeLocationMenu();
+  fillSettingsForm();
+  document.getElementById('settingsDialog').showModal();
+}
+
+function activateLocation(item, locations = settings.locations) {
+  settings.location = item;
+  settings.locations = withLocation(locations, item);
+  settings.configured = true;
+  saveSettings();
+  renderLocationMenu();
+  loadWeather();
 }
 
 async function searchLocations() {
@@ -315,6 +412,8 @@ async function searchLocations() {
   const resultsElement = document.getElementById('locationResults');
   if (query.length < 2) return document.getElementById('settingsError').textContent = t('error.shortQuery');
   resultsElement.textContent = t('status.searching');
+  resultsElement.hidden = false;
+  document.getElementById('locationStatus').textContent = '';
   document.getElementById('settingsError').textContent = '';
   try {
     if (IS_GITHUB_PAGES) throw new Error(t('error.locationApi'));
@@ -324,8 +423,13 @@ async function searchLocations() {
     resultsElement.innerHTML = payload.results.length ? payload.results.map((item, index) => `<button type="button" class="location-result" data-location-index="${index}"><strong>${escapeHtml(item.name)}</strong> - ${escapeHtml([item.admin1, item.country].filter(Boolean).join(', '))}</button>`).join('') : `<p class="muted">${t('error.noLocations')}</p>`;
     resultsElement.querySelectorAll('[data-location-index]').forEach(button => button.addEventListener('click', () => {
       pendingLocation = payload.results[Number(button.dataset.locationIndex)];
-      document.getElementById('selectedLocation').textContent = `${pendingLocation.name}, ${pendingLocation.country}`;
-      document.getElementById('embedCode').value = embedCode(pendingLocation, document.getElementById('colorTheme').value, document.getElementById('languageSetting').value);
+      pendingLocations = withLocation(pendingLocations, pendingLocation);
+      document.getElementById('locationQuery').value = locationLabel(pendingLocation);
+      resultsElement.innerHTML = '';
+      resultsElement.hidden = true;
+      document.getElementById('locationStatus').textContent = t('status.locationAdded');
+      renderPendingLocations();
+      updateEmbedPreview();
     }));
   } catch (error) {
     resultsElement.innerHTML = '';
@@ -333,9 +437,17 @@ async function searchLocations() {
   }
 }
 
-document.getElementById('openSettings').addEventListener('click', () => {
-  fillSettingsForm();
-  document.getElementById('settingsDialog').showModal();
+document.getElementById('openSettings').addEventListener('click', openSettingsDialog);
+document.getElementById('editLocation').addEventListener('click', () => {
+  if (settings.locations.length === 1) return openSettingsDialog();
+  const menu = document.getElementById('locationMenu');
+  const opening = menu.hidden;
+  menu.hidden = !opening;
+  document.getElementById('editLocation').setAttribute('aria-expanded', String(opening));
+  if (opening) renderLocationMenu();
+});
+document.addEventListener('click', event => {
+  if (!event.target.closest('.location-title-row')) closeLocationMenu();
 });
 document.getElementById('themeToggle').addEventListener('click', () => {
   applyTheme(settings.theme === 'dark' ? 'light' : 'dark', true);
@@ -348,10 +460,10 @@ document.getElementById('languageSelect').addEventListener('change', event => {
   renderForecast();
 });
 document.getElementById('colorTheme').addEventListener('change', event => {
-  document.getElementById('embedCode').value = embedCode(pendingLocation, event.target.value, document.getElementById('languageSetting').value);
+  updateEmbedPreview();
 });
 document.getElementById('languageSetting').addEventListener('change', event => {
-  document.getElementById('embedCode').value = embedCode(pendingLocation, document.getElementById('colorTheme').value, event.target.value);
+  updateEmbedPreview();
 });
 document.getElementById('copyEmbedCode').addEventListener('click', async () => {
   try {
@@ -371,14 +483,17 @@ document.getElementById('useDeviceLocation').addEventListener('click', () => {
   document.getElementById('settingsError').textContent = t('status.waitingLocation');
   navigator.geolocation.getCurrentPosition(position => {
     pendingLocation = {
+      id: `device-${position.coords.latitude.toFixed(4)}-${position.coords.longitude.toFixed(4)}`,
       name: t('location.current'),
       country: '',
       latitude: Number(position.coords.latitude.toFixed(5)),
       longitude: Number(position.coords.longitude.toFixed(5)),
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'auto'
     };
-    document.getElementById('selectedLocation').textContent = `${pendingLocation.name} (${pendingLocation.latitude}, ${pendingLocation.longitude})`;
-    document.getElementById('embedCode').value = embedCode(pendingLocation, document.getElementById('colorTheme').value, document.getElementById('languageSetting').value);
+    pendingLocations = withLocation(pendingLocations, pendingLocation);
+    document.getElementById('locationQuery').value = locationLabel(pendingLocation);
+    renderPendingLocations();
+    updateEmbedPreview();
     document.getElementById('settingsError').textContent = '';
   }, error => { document.getElementById('settingsError').textContent = error.message; }, {enableHighAccuracy: false, timeout: 10000});
 });
@@ -387,6 +502,7 @@ document.getElementById('settingsForm').addEventListener('submit', event => {
   if (event.submitter?.value === 'cancel') return document.getElementById('settingsDialog').close();
   settings = {
     location: pendingLocation,
+    locations: pendingLocations,
     configured: true,
     zoom: Number(document.getElementById('defaultZoom').value),
     theme: document.getElementById('colorTheme').value,
@@ -426,11 +542,47 @@ document.getElementById('languageSelect').value = settings.language;
 applyTheme(settings.theme);
 drawLegendPreviews();
 applyZoom(zoomIndex, false);
-loadWeather();
-if (!settings.configured && !IS_DEMO && !IS_EMBEDDED) {
-  fillSettingsForm();
-  document.getElementById('settingsDialog').showModal();
+renderLocationMenu();
+
+function devicePosition() {
+  return new Promise(resolve => {
+    if (!navigator.geolocation) return resolve(null);
+    navigator.geolocation.getCurrentPosition(resolve, () => resolve(null), {enableHighAccuracy: false, timeout: 10000});
+  });
 }
+
+function locationFromPosition(position) {
+  return {
+    id: `device-${position.coords.latitude.toFixed(4)}-${position.coords.longitude.toFixed(4)}`,
+    name: t('location.current'),
+    country: '',
+    latitude: Number(position.coords.latitude.toFixed(5)),
+    longitude: Number(position.coords.longitude.toFixed(5)),
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'auto'
+  };
+}
+
+async function initialize() {
+  if (settings.configured || IS_DEMO || IS_EMBEDDED) return loadWeather();
+  const requestedPosition = devicePosition();
+  try {
+    const response = await fetch(new URL('bootstrap-location', API_ROOT));
+    const payload = await response.json();
+    if (response.ok && payload.location) {
+      settings.location = payload.location;
+      settings.locations = [payload.location];
+    }
+  } catch {}
+  settings.configured = true;
+  saveSettings();
+  renderLocationMenu();
+  await loadWeather();
+
+  const position = await requestedPosition;
+  if (position) activateLocation(locationFromPosition(position));
+}
+
+initialize();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));

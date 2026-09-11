@@ -11,5 +11,8 @@
     "start": "node apps/api/server.js",
     "check": "node --check apps/api/server.js && node --check apps/web/assets/app.js && node --check apps/web/assets/charts.js && node --check apps/web/assets/components.js && node --check apps/web/assets/i18n.js && node --check apps/web/assets/weather-demo.js",
     "test": "node --test"
+  },
+  "dependencies": {
+    "country-list-js": "4.0.0"
   }
 }

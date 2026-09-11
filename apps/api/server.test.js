@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {forecastUrl, normalizeForecast} from './server.js';
+import {forecastUrl, normalizeForecast, selectCapitalResult} from './server.js';
 
 test('forecastUrl requests the fields shared by web and Android clients', () => {
   const url = new URL(forecastUrl({latitude: 50.67, longitude: 19.12, timezone: 'Europe/Warsaw'}));
@@ -51,4 +51,14 @@ test('normalizeForecast starts the hourly timeline at the current hour', () => {
   const result = normalizeForecast(source, {name: 'Test'});
   assert.deepEqual(result.hourly.map(point => point.timestamp), ['2026-09-11T12:00', '2026-09-11T13:00']);
   assert.deepEqual(result.hourly.map(point => point.temperature), [19, 20]);
+});
+
+test('selectCapitalResult prefers the matching national capital', () => {
+  const results = [
+    {name: 'London', country_code: 'CA', feature_code: 'PPL'},
+    {name: 'London', country_code: 'GB', feature_code: 'PPLC'},
+    {name: 'London', country_code: 'GB', feature_code: 'PPL'}
+  ];
+  assert.equal(selectCapitalResult(results, 'gb'), results[1]);
+  assert.equal(selectCapitalResult(results, 'US'), null);
 });
