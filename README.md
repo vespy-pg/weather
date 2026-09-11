@@ -134,6 +134,8 @@ docker run --rm -p 127.0.0.1:8080:8080 weather
 
 The application uses relative API URLs, so the same image can be reverse-proxied from a domain root or a path such as `/pogoda/`.
 
+The production templates used for `vespy.pl/pogoda/` are stored in `deploy/`. The Apache virtual host proxies the path to a container bound only to `127.0.0.1:18080`, while the systemd unit keeps that container running after reboots.
+
 ## Akacjowa integration
 
 Akacjowa will eventually consume `/api/weather` from this service instead of maintaining its own provider integration. Its existing forecast remains intact until the standalone service has a stable live API URL.

@@ -1,0 +1,18 @@
+[Unit]
+Description=Weather web application and API
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Restart=always
+RestartSec=5
+ExecStartPre=-/usr/bin/docker rm -f weather
+ExecStart=/usr/bin/docker run --name weather --read-only --tmpfs /tmp:rw,noexec,nosuid,size=16m -p 127.0.0.1:18080:8080 -e WEATHER_ALLOWED_ORIGIN=https://vespy.pl weather:latest
+ExecStop=/usr/bin/docker stop -t 10 weather
+ExecStopPost=-/usr/bin/docker rm -f weather
+TimeoutStartSec=0
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
