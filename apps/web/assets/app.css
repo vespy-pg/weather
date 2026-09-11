@@ -125,10 +125,9 @@ h2 { margin-bottom: 2px; font-size: 18px; }
 .legend-card strong { display: flex; align-items: center; gap: 10px; font-size: 15px; }
 .legend-card p { margin: 12px 0 0; color: var(--muted); font-size: 14px; line-height: 1.55; }
 .legend-card p b { color: var(--text); font-weight: 750; }
-.legend-swatch { width: 46px; height: 14px; flex: 0 0 auto; border-radius: 99px; }
-.legend-swatch.feels { background: linear-gradient(90deg, rgba(59, 142, 229, .8), rgba(242, 142, 62, .8)); }
 .legend-preview { display: block; width: 100%; margin-top: 14px; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: var(--chart-surface); }
 .legend-temperature-preview { height: 110px; }
+.legend-feels-preview { height: 110px; }
 .legend-sky-preview { height: 100px; }
 .legend-wind-preview { height: 68px; background: var(--chart-wind); }
 .legend-symbols p .legend-weather-icon { display: inline-block; min-width: 32px; color: #2d94df; font-size: 28px; line-height: 1; text-align: center; vertical-align: -4px; }

@@ -88,8 +88,9 @@
           <p data-i18n="legend.temperatureText">White: deep frost at -12°C or below. Gray: frost below 0°C. Blue: cold from 0°C to 18°C. Green: comfortable from 18°C to 27°C. Orange: hot from 27°C to 32°C. Red: extreme heat above 32°C.</p>
         </article>
         <article class="legend-card">
-          <strong><span class="legend-swatch feels" aria-hidden="true"></span><span data-i18n="legend.feelsTitle">Feels-like area</span></strong>
-          <p data-i18n="legend.feelsText">The shaded area between the lines shows the difference from measured temperature. Blue means it feels colder, orange means it feels warmer.</p>
+          <strong data-i18n="legend.feelsTitle">Feels-like area</strong>
+          <canvas class="legend-preview legend-feels-preview" id="legendFeelsCanvas" height="110" aria-hidden="true"></canvas>
+          <p data-i18n="legend.feelsText">The colored line is measured temperature. The edge of the shaded area is feels-like temperature: blue extends below the line when it feels colder, orange above it when it feels warmer.</p>
         </article>
         <article class="legend-card">
           <strong data-i18n="legend.skyTitle">Sun, clouds and night</strong>
