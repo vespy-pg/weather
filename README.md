@@ -134,7 +134,7 @@ docker run --rm -p 127.0.0.1:8080:8080 weather
 
 The application uses relative API URLs, so the same image can be reverse-proxied from a domain root or a path such as `/pogoda/`.
 
-The production templates used for `vespy.pl/pogoda/` are stored in `deploy/`. The Apache virtual host proxies the path to a container bound only to `127.0.0.1:18080`, while the systemd unit keeps that container running after reboots. The virtual host uses the local GeoIP database and `mod_geoip` to pass only the visitor's country code to the application, so visitor IP addresses are not sent to an external location service.
+The production templates used for `vespy.pl/pogoda/` are stored in `deploy/`. The HTTP and HTTPS Apache virtual hosts proxy the path to a container bound only to `127.0.0.1:18080`, while the systemd unit keeps that container running after reboots. Both virtual hosts use the local GeoIP database and `mod_geoip` to pass only the visitor's country code to the application, so visitor IP addresses are not sent to an external location service.
 
 ## Akacjowa integration
 
