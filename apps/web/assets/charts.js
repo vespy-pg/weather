@@ -527,20 +527,17 @@ export function drawWindFlow(canvas, points, options = {}) {
     return Math.atan2(vector.y, vector.x);
   });
   const strength = speeds.map(speed => Math.min(1, speed / 30));
-  const laneOffsets = [-1.15, -.72, -.93, -.32, -.08, .17, .82, .43, 1.17, .68];
+  const liftFactors = [.06, .2, .13, .42, .33, .63, .55, .82, 1.05, .91];
   const strandWeights = [.35, .58, .76, .52, 1, .84, .61, .9, .46, .3];
-  const centerY = index => height * .5
-    + Math.sin(index * .055 + directions[index] * .72) * (1.8 + strength[index] * 3.8) * visualScale
-    + Math.sin(index * .19 + directions[index] * .18) * 1.2 * visualScale;
+  const anchorY = index => height - 8 * visualScale
+    + Math.sin(index * .12 + directions[index] * .2) * .8 * visualScale;
   const lineY = (index, lineIndex) => {
-    const lanePosition = lineIndex / (laneOffsets.length - 1) * 2 - 1;
-    const directionPush = Math.sin(directions[index] + lineIndex * .43)
-      * strength[index] * (2.5 + lineIndex % 4 * 1.2) * visualScale;
-    const irregularFan = laneOffsets[lineIndex] * strength[index] * Math.min(height * .24, 14 * visualScale);
-    const baseSeparation = lanePosition * (3 + strength[index] * 4.5) * visualScale;
+    const directionLift = (Math.sin(directions[index] + lineIndex * .43) + 1) / 2
+      * strength[index] * (1.5 + lineIndex % 4) * visualScale;
+    const strengthLift = liftFactors[lineIndex] * (4 * visualScale + strength[index] * height * .68);
     const turbulence = Math.sin(index * (.13 + lineIndex * .009) + lineIndex * 1.17)
       * gustiness[index] * (2.3 + lineIndex % 4 * 1.25) * visualScale;
-    return centerY(index) + baseSeparation + irregularFan + directionPush + turbulence;
+    return Math.max(3 * visualScale, Math.min(anchorY(index), anchorY(index) - strengthLift - directionLift + turbulence));
   };
 
   context.clearRect(0, 0, width, height);
@@ -558,7 +555,7 @@ export function drawWindFlow(canvas, points, options = {}) {
     context.stroke();
   });
 
-  const lineCount = laneOffsets.length;
+  const lineCount = liftFactors.length;
   for (let lineIndex = 0; lineIndex < lineCount; lineIndex += 1) {
     const strandWeight = strandWeights[lineIndex];
     for (let index = 0; index < points.length - 1; index += 1) {
