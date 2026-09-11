@@ -67,6 +67,7 @@ Supported URL parameters:
 | `embed` | Enable the compact widget layout | `embed=1` |
 | `theme` | Select a dark or light appearance | `theme=light` |
 | `lang` | Select an English or Polish interface | `lang=pl` |
+| `zoom` | Set the initial timeline zoom from 50% to 200% | `zoom=1.5` |
 | `lat` and `lon` | Select coordinates for a live deployment | `lat=50.67&lon=19.12` |
 | `name` | Set the displayed location name | `name=Katowice` |
 | `timezone` | Set the forecast time zone | `timezone=Europe/Warsaw` |

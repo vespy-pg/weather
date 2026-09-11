@@ -44,6 +44,7 @@ function loadSettings() {
     }
     if (['dark', 'light'].includes(QUERY.get('theme'))) stored.theme = QUERY.get('theme');
     if (['en', 'pl'].includes(QUERY.get('lang'))) stored.language = QUERY.get('lang');
+    if (ZOOM_LEVELS.includes(Number(QUERY.get('zoom')))) stored.zoom = Number(QUERY.get('zoom'));
     return stored;
   } catch {
     return {...DEFAULT_SETTINGS};
@@ -78,6 +79,7 @@ function embedCode(locationOverride = settings.location, theme = settings.theme,
   url.searchParams.set('timezone', locationOverride.timezone || 'auto');
   url.searchParams.set('theme', theme);
   url.searchParams.set('lang', languageOverride);
+  url.searchParams.set('zoom', settings.zoom);
   if (IS_DEMO) url.searchParams.set('demo', '1');
   return `<iframe src="${url}" title="${t('embed.title')}" width="100%" height="680" loading="lazy" style="border:0;border-radius:12px" allow="geolocation"></iframe>`;
 }
@@ -130,6 +132,10 @@ function forecastBaseHourWidth() {
   return window.matchMedia('(max-width: 760px)').matches ? 22 : 18;
 }
 
+function zoomVisualScale(zoom) {
+  return zoom < 1 ? .5 + zoom * .5 : 1 + (zoom - 1) * .5;
+}
+
 function applyZoom(nextIndex, preserveCenter = true) {
   const scroll = document.getElementById('forecastTimelineScroll');
   const timeline = document.getElementById('forecastTimeline');
@@ -138,7 +144,14 @@ function applyZoom(nextIndex, preserveCenter = true) {
     : 0;
   zoomIndex = Math.max(0, Math.min(ZOOM_LEVELS.length - 1, nextIndex));
   const zoom = ZOOM_LEVELS[zoomIndex];
+  const visualScale = zoomVisualScale(zoom);
   timeline.style.setProperty('--forecast-hour-width', `${forecastBaseHourWidth() * zoom}px`);
+  timeline.style.setProperty('--forecast-wind-height', `${46 * visualScale}px`);
+  timeline.style.setProperty('--forecast-wind-arrow-row', `${24 * visualScale}px`);
+  timeline.style.setProperty('--forecast-wind-speed-row', `${11 * visualScale}px`);
+  timeline.style.setProperty('--forecast-wind-arrow-size', `${19 * visualScale}px`);
+  timeline.style.setProperty('--forecast-wind-arrow-line', `${22 * visualScale}px`);
+  timeline.style.setProperty('--forecast-wind-speed-size', `${8 * visualScale}px`);
   document.getElementById('forecastZoomReset').textContent = `${Math.round(zoom * 100)}%`;
   document.getElementById('forecastZoomOut').disabled = zoomIndex === 0;
   document.getElementById('forecastZoomIn').disabled = zoomIndex === ZOOM_LEVELS.length - 1;
@@ -150,9 +163,7 @@ function applyZoom(nextIndex, preserveCenter = true) {
 
 function renderWind(hourly) {
   const strip = document.getElementById('forecastWindStrip');
-  const legend = document.getElementById('forecastWindLegend');
   strip.hidden = !settings.showWind;
-  legend.hidden = !settings.showWind;
   strip.innerHTML = hourly.map((hour, index) => {
     const speed = numericValue(hour.windSpeed);
     const direction = numericValue(hour.windDirection);
@@ -170,9 +181,10 @@ function renderWind(hourly) {
 function drawForecast() {
   if (!weather?.available) return;
   const hourly = weather.hourly.slice(0, 240);
+  const visualScale = zoomVisualScale(ZOOM_LEVELS[zoomIndex]);
   const skyHourly = settings.showPrecipitation ? hourly : hourly.map(point => ({...point, precipitation: 0, precipitationProbability: 0, snowfall: 0}));
-  drawForecastSky(document.getElementById('forecastWeatherCanvas'), skyHourly, weather.daily, {showHourlyTemperatures: settings.showHourlyTemperatures});
-  drawWeatherChart(document.getElementById('forecastChart'), hourly, weather.daily, {timeline: true, showApparentTemperature: settings.showApparentTemperature});
+  drawForecastSky(document.getElementById('forecastWeatherCanvas'), skyHourly, weather.daily, {showHourlyTemperatures: settings.showHourlyTemperatures, visualScale});
+  drawWeatherChart(document.getElementById('forecastChart'), hourly, weather.daily, {timeline: true, showApparentTemperature: settings.showApparentTemperature, visualScale});
 }
 
 function renderForecast() {
@@ -194,8 +206,6 @@ function renderForecast() {
   const hourly = weather.hourly.slice(0, 240);
   document.getElementById('forecastTimeline').style.setProperty('--forecast-hours', hourly.length);
   renderWind(hourly);
-  document.querySelector('.forecast-chart-legend .precipitation').hidden = !settings.showPrecipitation;
-  document.querySelector('.forecast-chart-legend .apparent-temperature').hidden = !settings.showApparentTemperature;
   document.getElementById('dailyForecast').innerHTML = weather.daily.slice(0, 10).map(day => {
     const dayCondition = weatherPresentation(day.weatherCode);
     return `<article class="forecast-day">
@@ -359,8 +369,7 @@ document.getElementById('forecastTimelineScroll').addEventListener('wheel', even
 }, {passive: false});
 
 window.addEventListener('resize', () => {
-  document.getElementById('forecastTimeline').style.setProperty('--forecast-hour-width', `${forecastBaseHourWidth() * ZOOM_LEVELS[zoomIndex]}px`);
-  drawForecast();
+  applyZoom(zoomIndex);
 });
 
 document.body.classList.toggle('embedded', IS_EMBEDDED);

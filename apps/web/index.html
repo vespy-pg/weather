@@ -59,30 +59,15 @@
       <div class="forecast-timeline-scroll" id="forecastTimelineScroll">
         <div class="forecast-chart-y-axes" aria-hidden="true">
           <div class="forecast-chart-y-axis forecast-chart-y-axis-temperature">
-            <span class="hot" style="--axis-position:140px">+40°</span>
-            <span class="zero" style="--axis-position:279px">0°</span>
+            <span class="hot" style="--axis-position:114px">+40°</span>
+            <span class="zero" style="--axis-position:270px">0°</span>
             <span class="deep-frost" style="--axis-position:348px">-20°</span>
           </div>
         </div>
         <div class="forecast-timeline" id="forecastTimeline">
           <canvas class="forecast-weather-canvas" id="forecastWeatherCanvas" height="100" aria-label="Hourly temperature and continuous weather conditions"></canvas>
-          <div class="forecast-chart-legend" aria-hidden="true">
-            <span class="precipitation" data-i18n="forecast.precipitationShort">precip.</span>
-            <span class="apparent-temperature" data-i18n="forecast.feelsShort">feels</span>
-            <span class="legend-label" data-i18n="forecast.temperatureShort">temp.:</span>
-            <span class="forecast-temperature-scale">
-              <i aria-hidden="true"></i>
-              <span class="forecast-temperature-ticks">
-                <b style="--position:0%">-20°</b><b style="--position:13.33%">-12°</b><b style="--position:33.33%">0°</b>
-                <b style="--position:63.33%">18°</b><b style="--position:78.33%">27°</b><b style="--position:86.67%">32°</b><b style="--position:100%">40°</b>
-              </span>
-            </span>
-          </div>
           <canvas id="forecastChart" height="300" aria-label="Temperature and apparent temperature chart"></canvas>
           <div class="forecast-wind-strip" id="forecastWindStrip" aria-label="Hourly wind direction and speed"></div>
-          <div class="forecast-wind-legend" id="forecastWindLegend" aria-label="Wind speed legend">
-            <span>0</span><i class="forecast-wind-gradient"></i><span>30+ km/h</span>
-          </div>
         </div>
       </div>
     </section>

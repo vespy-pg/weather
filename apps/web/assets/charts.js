@@ -218,6 +218,7 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
   const padding = {left: 0, right: 34};
   const plotWidth = width - padding.left - padding.right;
   const columnWidth = plotWidth / points.length;
+  const visualScale = Math.max(.7, Math.min(1.6, Number(options.visualScale) || 1));
   const daylightByDate = forecastDaylightByDate(days);
   const daylight = points.map(point => pointIsDaylight(point, daylightByDate));
   const weatherLineY = 45;
@@ -311,14 +312,14 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
     context.save();
     context.fillStyle = isLightTheme() ? '#50647f' : '#dbe8ff';
     context.shadowColor = isLightTheme() ? 'rgba(55, 91, 138, .5)' : 'rgba(160, 195, 255, .65)';
-    context.shadowBlur = isLightTheme() ? 5 : 8;
+    context.shadowBlur = (isLightTheme() ? 5 : 8) * visualScale;
     context.beginPath();
-    context.arc(center, 64, 7, 0, Math.PI * 2);
+    context.arc(center, 64, 7 * visualScale, 0, Math.PI * 2);
     context.fill();
     context.shadowBlur = 0;
     context.fillStyle = chartColor('--chart-night-cutout', '#080c12');
     context.beginPath();
-    context.arc(center + 3, 61, 7, 0, Math.PI * 2);
+    context.arc(center + 3 * visualScale, 64 - 3 * visualScale, 7 * visualScale, 0, Math.PI * 2);
     context.fill();
     context.restore();
     nightStart = null;
@@ -368,7 +369,7 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
     const x = padding.left + index * columnWidth;
     context.save();
     context.strokeStyle = code === 48 ? 'rgba(220, 231, 239, .72)' : 'rgba(220, 231, 239, .5)';
-    context.lineWidth = 2;
+    context.lineWidth = 2 * visualScale;
     context.lineCap = 'round';
     [74, 80, 86].forEach((y, line) => {
       context.beginPath();
@@ -389,15 +390,17 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
     const center = padding.left + (index + .5) * columnWidth;
     if ([71, 73, 75, 77, 85, 86].includes(code)) {
       const snowfall = numericValue(point.snowfall);
-      drawSnowflake(context, center, 84, 3 + Math.min(6, Math.sqrt(Math.max(0, snowfall ?? 0)) * 3), opacity);
+      drawSnowflake(context, center, 84, (3 + Math.min(6, Math.sqrt(Math.max(0, snowfall ?? 0)) * 3)) * visualScale, opacity);
     } else if ([96, 99].includes(code)) {
-      drawHailstone(context, center, 85, Math.min(8, dropSize * .7), opacity);
+      drawHailstone(context, center, 83, Math.min(8, dropSize * .7) * visualScale, opacity);
     } else {
-      drawRainDrop(context, center, 84, dropSize, opacity);
+      drawRainDrop(context, center, 84, dropSize * visualScale, opacity);
     }
   });
 
-  context.font = '700 9px ui-monospace, monospace';
+  const hourFontSize = 9 * visualScale;
+  const temperatureFontSize = 7 * visualScale;
+  context.font = `700 ${hourFontSize}px ui-monospace, monospace`;
   context.textAlign = 'center';
   points.forEach((point, index) => {
     const x = padding.left + (index + .5) * columnWidth;
@@ -406,9 +409,9 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
     const numericTemperature = numericValue(point.temperature);
     if (options.showHourlyTemperatures !== false && numericTemperature !== null) {
       context.fillStyle = temperatureColor(numericTemperature);
-      context.font = '700 7px ui-monospace, monospace';
+      context.font = `700 ${temperatureFontSize}px ui-monospace, monospace`;
       context.fillText(`${Math.round(numericTemperature)}°`, x, 36);
-      context.font = '700 9px ui-monospace, monospace';
+      context.font = `700 ${hourFontSize}px ui-monospace, monospace`;
     }
     const date = String(point.timestamp).slice(0, 10);
     const previousDate = String(points[index - 1]?.timestamp || '').slice(0, 10);
@@ -420,7 +423,7 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
     context.stroke();
     context.fillStyle = chartColor('--chart-text', '#e7edf7');
     context.textAlign = 'left';
-    context.fillText(formatForecastDate(point.timestamp, {weekday: 'short', day: 'numeric', month: 'short'}).toUpperCase(), padding.left + index * columnWidth + 4, 10);
+    context.fillText(formatForecastDate(point.timestamp, {weekday: 'short', day: 'numeric', month: 'short'}).toUpperCase(), padding.left + index * columnWidth + 4, Math.max(10, hourFontSize));
     context.textAlign = 'center';
   });
 }
@@ -478,10 +481,11 @@ export function drawWeatherChart(canvas, points, days = [], options = {}) {
   context.scale(ratio, ratio);
   const width = rect.width;
   const height = rect.height;
-  const padding = {left: options.timeline ? 0 : 30, right: 34, top: options.timeline ? 40 : 24, bottom: 22};
+  const padding = {left: options.timeline ? 0 : 30, right: 34, top: options.timeline ? 14 : 24, bottom: 22};
   const plotWidth = width - padding.left - padding.right;
   const plotHeight = height - padding.top - padding.bottom;
   const columnWidth = plotWidth / points.length;
+  const visualScale = Math.max(.7, Math.min(1.6, Number(options.visualScale) || 1));
   const precipitationValues = points.map(point => numericValue(point.precipitation)).filter(value => value !== null);
   const forecastMaximum = Math.max(0, ...(precipitationValues.length ? precipitationValues : [0]));
   const maxPrecipitation = Math.max(10, Math.ceil(forecastMaximum / 5) * 5);
@@ -645,7 +649,7 @@ export function drawWeatherChart(canvas, points, days = [], options = {}) {
       const probability = Math.max(0, Math.min(100, numericValue(point.precipitationProbability) ?? 0));
       const pointX = padding.left + (index + .5) * columnWidth;
       const lineY = temperatureY(displayedTemperatures[index]);
-      const lightningScale = .55 + probability / 100 * 1.25;
+      const lightningScale = (.55 + probability / 100 * 1.25) * visualScale;
       drawLightning(
         context,
         pointX,
