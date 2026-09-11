@@ -105,7 +105,13 @@ function windDirection(degrees) {
 
 function windVisual(speed) {
   const value = Math.max(0, numericValue(speed) ?? 0);
-  const stops = [
+  const lightMode = document.documentElement.dataset.theme === 'light';
+  const stops = lightMode ? [
+    {speed: 0, color: [72, 87, 108]},
+    {speed: 5, color: [28, 161, 96]},
+    {speed: 15, color: [196, 134, 24]},
+    {speed: 30, color: [222, 58, 72]}
+  ] : [
     {speed: 0, color: [141, 152, 170]},
     {speed: 5, color: [75, 212, 139]},
     {speed: 15, color: [242, 189, 85]},
@@ -116,7 +122,8 @@ function windVisual(speed) {
   const lower = stops[Math.max(0, (upperIndex < 0 ? stops.length - 1 : upperIndex) - 1)];
   const progress = upper.speed === lower.speed ? 0 : Math.min(1, (value - lower.speed) / (upper.speed - lower.speed));
   const color = lower.color.map((channel, index) => Math.round(channel + (upper.color[index] - channel) * progress));
-  return {color: `rgb(${color.join(', ')})`, opacity: .08 + Math.pow(Math.min(1, value / 30), 1.4) * .92};
+  const minimumOpacity = lightMode ? .22 : .12;
+  return {color: `rgb(${color.join(', ')})`, opacity: minimumOpacity + Math.pow(Math.min(1, value / 30), 1.35) * (1 - minimumOpacity)};
 }
 
 function forecastBaseHourWidth() {

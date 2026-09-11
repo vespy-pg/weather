@@ -29,6 +29,10 @@ function chartColor(property, fallback) {
   return getComputedStyle(document.documentElement).getPropertyValue(property).trim() || fallback;
 }
 
+function isLightTheme() {
+  return document.documentElement.dataset.theme === 'light';
+}
+
 function interpolateHexColor(start, end, progress) {
   const channel = (color, offset) => Number.parseInt(color.slice(offset, offset + 2), 16);
   const channels = [1, 3, 5].map(offset => Math.round(channel(start, offset) + (channel(end, offset) - channel(start, offset)) * progress));
@@ -142,7 +146,7 @@ function smoothCloudCover(points) {
 function drawRainDrop(context, x, y, size, opacity) {
   context.save();
   context.globalAlpha = opacity;
-  context.fillStyle = '#58a6ff';
+  context.fillStyle = isLightTheme() ? '#1976bd' : '#58a6ff';
   context.beginPath();
   context.moveTo(x, y - size);
   context.bezierCurveTo(x - size * .65, y - size * .15, x - size * .55, y + size * .55, x, y + size * .65);
@@ -154,11 +158,11 @@ function drawRainDrop(context, x, y, size, opacity) {
 function drawSnowflake(context, x, y, size, opacity) {
   context.save();
   context.globalAlpha = opacity;
-  context.fillStyle = '#d9f1ff';
+  context.fillStyle = isLightTheme() ? '#2879ae' : '#d9f1ff';
   context.font = `${Math.round(12 + size * .8)}px "DejaVu Sans", sans-serif`;
   context.textAlign = 'center';
   context.textBaseline = 'middle';
-  context.shadowColor = 'rgba(150, 220, 255, .8)';
+  context.shadowColor = isLightTheme() ? 'rgba(40, 121, 174, .42)' : 'rgba(150, 220, 255, .8)';
   context.shadowBlur = 7;
   context.fillText('❄', x, y);
   context.restore();
@@ -167,9 +171,9 @@ function drawSnowflake(context, x, y, size, opacity) {
 function drawHailstone(context, x, y, size, opacity) {
   context.save();
   context.globalAlpha = opacity;
-  context.fillStyle = '#e9f7ff';
-  context.strokeStyle = '#7fcfff';
-  context.lineWidth = 1.2;
+  context.fillStyle = isLightTheme() ? '#8bd2f4' : '#e9f7ff';
+  context.strokeStyle = isLightTheme() ? '#1672aa' : '#7fcfff';
+  context.lineWidth = isLightTheme() ? 1.8 : 1.2;
   context.shadowColor = 'rgba(125, 205, 255, .9)';
   context.shadowBlur = 7;
   context.beginPath();
@@ -305,9 +309,9 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
     const nightEnd = index;
     const center = padding.left + ((nightStart + nightEnd) / 2) * columnWidth;
     context.save();
-    context.fillStyle = '#dbe8ff';
-    context.shadowColor = 'rgba(160, 195, 255, .65)';
-    context.shadowBlur = 8;
+    context.fillStyle = isLightTheme() ? '#50647f' : '#dbe8ff';
+    context.shadowColor = isLightTheme() ? 'rgba(55, 91, 138, .5)' : 'rgba(160, 195, 255, .65)';
+    context.shadowBlur = isLightTheme() ? 5 : 8;
     context.beginPath();
     context.arc(center, 64, 7, 0, Math.PI * 2);
     context.fill();
@@ -324,7 +328,11 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
   const paintCloudSegment = values => {
     if (!values.length) return;
     const gradient = context.createLinearGradient(values[0].x, 0, values[values.length - 1].x, 0);
-    values.forEach((item, index) => gradient.addColorStop(values.length === 1 ? 0 : index / (values.length - 1), `rgba(190, 199, 211, ${(.18 + item.value / 100 * .62).toFixed(2)})`));
+    values.forEach((item, index) => {
+      const alpha = isLightTheme() ? .24 + item.value / 100 * .52 : .18 + item.value / 100 * .62;
+      const color = isLightTheme() ? `rgba(91, 107, 128, ${alpha.toFixed(2)})` : `rgba(190, 199, 211, ${alpha.toFixed(2)})`;
+      gradient.addColorStop(values.length === 1 ? 0 : index / (values.length - 1), color);
+    });
     context.beginPath();
     context.moveTo(values[0].x, weatherLineY);
     context.lineTo(values[0].x, values[0].y);
@@ -377,7 +385,7 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
     if (probability === null || probability <= 0) return;
     const code = numericValue(point.weatherCode);
     const dropSize = 3 + Math.min(7, Math.sqrt(Math.max(0, amount ?? 0)) * 3.5);
-    const opacity = .18 + Math.min(100, probability) / 100 * .82;
+    const opacity = (isLightTheme() ? .3 : .2) + Math.min(100, probability) / 100 * (isLightTheme() ? .7 : .8);
     const center = padding.left + (index + .5) * columnWidth;
     if ([71, 73, 75, 77, 85, 86].includes(code)) {
       const snowfall = numericValue(point.snowfall);
@@ -615,13 +623,13 @@ export function drawWeatherChart(canvas, points, days = [], options = {}) {
     context.rect(padding.left, clipTop, plotWidth, clipHeight);
     context.clip();
     traceLine(displayedTemperatures, temperatureY, true);
-    if (document.documentElement.dataset.theme === 'light') {
+    if (isLightTheme()) {
       context.strokeStyle = 'rgba(31, 48, 70, .32)';
-      context.lineWidth = 4;
+      context.lineWidth = 5;
       context.stroke();
     }
     context.strokeStyle = color;
-    context.lineWidth = 2;
+    context.lineWidth = 3;
     context.stroke();
     context.restore();
   };
