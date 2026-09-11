@@ -148,13 +148,15 @@ function windEvent(index, start, duration, peak, sharpness = 1) {
 function windForHour(index, tornado) {
   const calm = 1.2 + (Math.sin(index * .31) + 1) * .65;
   const longWind = windEvent(index, 10, 24, 29, .82);
+  const gustyLongWind = windEvent(index, 42, 24, 29, .82);
   const shortWind = windEvent(index, 82, 12, 36, 1.7);
   const tornadoWind = tornado ? 40 : 0;
-  const speed = Math.max(calm, longWind, shortWind, tornadoWind);
-  const eventStrength = Math.max(longWind / 29, shortWind / 36, tornadoWind / 40);
+  const speed = Math.max(calm, longWind, gustyLongWind, shortWind, tornadoWind);
+  const regularGust = Math.max(longWind / 29 * 3, shortWind / 36 * 14, tornadoWind / 40 * 20);
+  const strongGust = gustyLongWind / 29 * 26;
   return {
     speed: Number(speed.toFixed(1)),
-    gusts: Number((speed + 2 + eventStrength * 16).toFixed(1)),
+    gusts: Number((speed + 2 + Math.max(regularGust, strongGust)).toFixed(1)),
     direction: Number((235 + Math.sin(index / 13) * 22 + Math.sin(index / 31) * 12).toFixed(0))
   };
 }

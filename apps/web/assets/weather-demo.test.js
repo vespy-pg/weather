@@ -3,12 +3,18 @@ import test from 'node:test';
 
 import {createWeatherDemo} from './weather-demo.js';
 
-test('demo wind contains a gradual 24-hour event and a sharp 12-hour event', () => {
+test('demo wind contains matching gradual events with different gusts and a sharp event', () => {
   const {hourly} = createWeatherDemo();
 
   assert.ok(hourly[10].windSpeed < 3);
   assert.ok(hourly[22].windSpeed >= 29);
   assert.ok(hourly[34].windSpeed < 3);
+
+  assert.ok(hourly[42].windSpeed < 3);
+  assert.equal(hourly[54].windSpeed, hourly[22].windSpeed);
+  assert.ok(hourly[66].windSpeed < 3);
+  assert.ok(hourly[22].windGusts - hourly[22].windSpeed <= 5);
+  assert.ok(hourly[54].windGusts - hourly[54].windSpeed >= 25);
 
   assert.ok(hourly[82].windSpeed < 3);
   assert.ok(hourly[88].windSpeed >= 36);

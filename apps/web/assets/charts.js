@@ -543,7 +543,7 @@ export function drawWindFlow(canvas, points, options = {}) {
     const amplitude = Math.pow(currentStrength, 1.08) * height * .18 * visualScale;
     const mainWave = Math.sin(index * (.32 + currentStrength * .08) + directions[index] * .14 + lineIndex * .11) * amplitude;
     const secondaryWave = Math.sin(index * .16 + lineIndex * .23) * amplitude * .28;
-    const gustWave = Math.sin(index * .61 + lineIndex * .37) * gustiness[index] * amplitude * .38;
+    const gustWave = Math.sin(index * .61 + lineIndex * .37) * gustiness[index] * amplitude * .55;
     const separation = lanePosition * (2.2 + currentStrength * 5.1) * visualScale;
     return Math.max(3 * visualScale, Math.min(height - 3 * visualScale, flowCenterY(index) + separation + mainWave + secondaryWave + gustWave));
   };
