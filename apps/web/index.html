@@ -6,6 +6,13 @@
   <meta name="theme-color" content="#0a0e14">
   <title>Weather</title>
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <script>
+    try {
+      const saved = JSON.parse(localStorage.getItem('weather.settings.v1') || '{}');
+      document.documentElement.dataset.theme = new URLSearchParams(location.search).get('theme') || saved.theme || 'dark';
+    } catch { document.documentElement.dataset.theme = 'dark'; }
+  </script>
   <link rel="stylesheet" href="assets/app.css">
 </head>
 <body>
@@ -16,9 +23,14 @@
         <h1 id="locationTitle">Kamienica Polska</h1>
         <p class="muted" id="updatedAt">Waiting for forecast</p>
       </div>
-      <button class="settings-button" type="button" id="openSettings" aria-label="Open weather settings">
-        <span aria-hidden="true">⚙</span> Settings
-      </button>
+      <div class="topbar-actions">
+        <button class="theme-button" type="button" id="themeToggle" aria-label="Switch to light mode" title="Switch to light mode">
+          <span id="themeIcon" aria-hidden="true">☀</span><span id="themeLabel">Light</span>
+        </button>
+        <button class="settings-button" type="button" id="openSettings" aria-label="Open weather settings">
+          <span aria-hidden="true">⚙</span> Settings
+        </button>
+      </div>
     </header>
 
     <section class="current-grid" id="currentWeather" aria-live="polite"></section>
@@ -69,8 +81,40 @@
       </div>
     </section>
 
-    <section class="panel">
-      <p class="eyebrow">FOLLOWING 5 DAYS</p>
+    <section class="panel forecast-guide" aria-labelledby="forecastGuideTitle">
+      <p class="eyebrow">FORECAST LEGEND</p>
+      <h2 id="forecastGuideTitle">How to read this forecast</h2>
+      <div class="legend-grid">
+        <article class="legend-card legend-temperature">
+          <strong>Temperature line</strong>
+          <span class="legend-temperature-bar" aria-hidden="true"></span>
+          <p>White: deep frost at -12°C or below. Gray: frost below 0°C. Blue: cold from 0°C to 18°C. Green: comfortable from 18°C to 27°C. Orange: hot from 27°C to 32°C. Red: extreme heat above 32°C.</p>
+        </article>
+        <article class="legend-card">
+          <strong><span class="legend-swatch feels" aria-hidden="true"></span>Feels-like area</strong>
+          <p>The shaded area between the lines shows the difference from measured temperature. Blue means it feels colder, orange means it feels warmer.</p>
+        </article>
+        <article class="legend-card">
+          <strong><span class="legend-swatch sky" aria-hidden="true"></span>Sun, clouds and night</strong>
+          <p>Yellow glow is exposed sunlight and fades as cloud cover grows. The gray band becomes larger with more cloud. A moon marks nighttime.</p>
+        </article>
+        <article class="legend-card legend-symbols">
+          <strong>Precipitation - one symbol per hour</strong>
+          <p><span aria-hidden="true">💧</span> rain, <span aria-hidden="true">❄</span> snow, <span class="hail-symbol" aria-hidden="true">◆</span> hail. Symbol size shows the amount. Opacity shows probability.</p>
+        </article>
+        <article class="legend-card">
+          <strong><span class="lightning-symbol" aria-hidden="true">⚡</span>Thunderstorm</strong>
+          <p>Lightning appears on the temperature chart. A larger, brighter bolt means a more probable and stronger storm.</p>
+        </article>
+        <article class="legend-card">
+          <strong><span class="wind-symbol" aria-hidden="true">↑</span>Wind</strong>
+          <p>The arrow points in the wind direction. Faded gray means calm, then green means light, yellow means strong, and red means 30 km/h or more. The number is speed in km/h.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel daily-panel">
+      <p class="eyebrow">DAILY OUTLOOK - 10 DAYS</p>
       <h2>Daily forecast</h2>
       <div class="daily-grid" id="dailyForecast"></div>
     </section>
@@ -96,6 +140,9 @@
 
       <fieldset>
         <legend>Forecast display</legend>
+        <label class="setting-row"><span>Color theme</span>
+          <select id="colorTheme"><option value="dark">Dark</option><option value="light">Light</option></select>
+        </label>
         <label class="setting-row"><span>Default timeline zoom</span>
           <select id="defaultZoom"><option value="0.5">50%</option><option value="0.75">75%</option><option value="1">100%</option><option value="1.25">125%</option><option value="1.5">150%</option><option value="2">200%</option></select>
         </label>
@@ -103,6 +150,16 @@
         <label class="setting-row"><span>Apparent temperature area</span><input id="showApparentTemperature" type="checkbox"></label>
         <label class="setting-row"><span>Precipitation symbols</span><input id="showPrecipitation" type="checkbox"></label>
         <label class="setting-row"><span>Wind timeline</span><input id="showWind" type="checkbox"></label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Embed on a website</legend>
+        <p class="settings-help">Paste this iframe into any HTML page. It uses the selected location and theme.</p>
+        <div class="embed-code-row">
+          <textarea id="embedCode" rows="4" readonly aria-label="Embed code"></textarea>
+          <button type="button" class="secondary-button" id="copyEmbedCode">Copy code</button>
+        </div>
+        <p class="copy-status" id="copyStatus" aria-live="polite"></p>
       </fieldset>
 
       <p class="settings-error" id="settingsError" role="alert"></p>
