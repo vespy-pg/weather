@@ -296,6 +296,7 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
   let sunlightSegment = [];
   const paintSunlightSegment = values => {
     if (!values.length) return;
+    if (values[0].x <= padding.left + columnWidth) values.unshift({...values[0], x: padding.left});
     const endX = values.length === 1 ? values[0].x + 1 : values[values.length - 1].x;
     const gradient = context.createLinearGradient(values[0].x, 0, endX, 0);
     values.forEach((item, index) => {
@@ -379,6 +380,7 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
   let cloudSegment = [];
   const paintCloudSegment = values => {
     if (!values.length) return;
+    if (values[0].x <= padding.left + columnWidth) values.unshift({...values[0], x: padding.left});
     const gradient = context.createLinearGradient(values[0].x, 0, values[values.length - 1].x, 0);
     values.forEach((item, index) => {
       const alpha = isLightTheme() ? .24 + item.value / 100 * .52 : .18 + item.value / 100 * .62;
@@ -483,7 +485,10 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
     context.stroke();
     context.fillStyle = chartColor('--chart-text', '#e7edf7');
     context.textAlign = 'left';
-    context.fillText(formatForecastDate(point.timestamp, {weekday: 'short', day: 'numeric', month: 'short'}).toUpperCase(), padding.left + index * columnWidth + 4, Math.max(10, hourFontSize));
+    const dayLabel = index === 0
+      ? t('forecast.today')
+      : formatForecastDate(point.timestamp, {weekday: 'short', day: 'numeric', month: 'short'});
+    context.fillText(dayLabel.toUpperCase(), padding.left + index * columnWidth + 4, Math.max(10, hourFontSize));
     context.textAlign = 'center';
   });
   drawDayDividers(context, points, {left: padding.left, top: 0}, columnWidth, height);
@@ -650,7 +655,8 @@ export function drawWindFlow(canvas, points, options = {}) {
     const strandWeight = strandWeights[lineIndex];
     context.save();
     context.beginPath();
-    context.moveTo(.5 * columnWidth, lineY(0, lineIndex));
+    context.moveTo(0, lineY(0, lineIndex));
+    context.lineTo(.5 * columnWidth, lineY(0, lineIndex));
     for (let index = 0; index < points.length - 1; index += 1) {
       for (let sample = 1; sample <= samplesPerHour; sample += 1) {
         const position = index + sample / samplesPerHour;
@@ -715,7 +721,7 @@ export function drawWeatherChart(canvas, points, days = [], options = {}) {
   context.scale(ratio, ratio);
   const width = rect.width;
   const height = rect.height;
-  const padding = {left: options.timeline ? 0 : 30, right: 34, top: options.timeline ? 14 : 24, bottom: 22};
+  const padding = {left: options.timeline ? 0 : 30, right: 34, top: options.timeline ? 0 : 24, bottom: options.timeline ? 0 : 22};
   const plotWidth = width - padding.left - padding.right;
   const plotHeight = height - padding.top - padding.bottom;
   const columnWidth = plotWidth / points.length;
@@ -788,7 +794,8 @@ export function drawWeatherChart(canvas, points, days = [], options = {}) {
       const pointX = padding.left + (index + .5) * columnWidth;
       const pointY = y(value);
       if (!drawing) {
-        context.moveTo(pointX, pointY);
+        context.moveTo(options.timeline ? padding.left : pointX, pointY);
+        if (options.timeline) context.lineTo(pointX, pointY);
         drawing = true;
         return;
       }
@@ -824,26 +831,12 @@ export function drawWeatherChart(canvas, points, days = [], options = {}) {
     const value = numericValue(point.temperature);
     return value === null || options.timeline ? value : Math.max(-20, Math.min(40, value));
   });
-  const displayedTemperatures = temperatures.map((value, index) => {
-    if (value === null) return null;
-    const weighted = [[index - 1, 1], [index, 2], [index + 1, 1]]
-      .map(([itemIndex, weight]) => [temperatures[itemIndex], weight])
-      .filter(([item]) => item !== null && item !== undefined);
-    const totalWeight = weighted.reduce((sum, item) => sum + item[1], 0);
-    return weighted.reduce((sum, item) => sum + item[0] * item[1], 0) / totalWeight;
-  });
+  const displayedTemperatures = temperatures;
   const apparentTemperatures = points.map(point => {
     const value = numericValue(point.apparentTemperature);
     return value === null || options.timeline ? value : Math.max(-20, Math.min(40, value));
   });
-  const displayedApparentTemperatures = apparentTemperatures.map((value, index) => {
-    if (value === null) return null;
-    const weighted = [[index - 1, 1], [index, 2], [index + 1, 1]]
-      .map(([itemIndex, weight]) => [apparentTemperatures[itemIndex], weight])
-      .filter(([item]) => item !== null && item !== undefined);
-    const totalWeight = weighted.reduce((sum, item) => sum + item[1], 0);
-    return weighted.reduce((sum, item) => sum + item[0] * item[1], 0) / totalWeight;
-  });
+  const displayedApparentTemperatures = apparentTemperatures;
   if (options.timeline && options.showApparentTemperature !== false) {
     for (let index = 0; index < displayedTemperatures.length - 1; index += 1) {
       const actualStart = displayedTemperatures[index];

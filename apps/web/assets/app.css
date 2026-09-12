@@ -126,9 +126,11 @@ h2 { margin-bottom: 2px; font-size: 18px; }
 .forecast-symbol-sun { color: #f0b72d; }
 .forecast-symbol-cloud { color: #aeb9c8; fill: color-mix(in srgb, #aeb9c8 16%, transparent); }
 .forecast-symbol-rain { color: #58a6ff; fill: color-mix(in srgb, #58a6ff 22%, transparent); }
-.forecast-temperature-symbol { display: flex; align-items: center; gap: 5px; }
-.forecast-temperature-symbol svg { width: 18px; height: 48px; stroke-width: 1.8; }
-.forecast-temperature-symbol i { width: 6px; height: 58px; border-radius: 99px; background: linear-gradient(to bottom, #ff263f, #f28e3e 25%, #45cf88 48%, #3b9ee5 72%, #2358c7); box-shadow: 0 0 6px rgba(69, 207, 136, .3); }
+.forecast-temperature-symbol { display: grid; place-items: center; }
+.forecast-temperature-symbol svg { width: 26px; height: 110px; }
+.forecast-temperature-symbol .forecast-thermometer-outline { stroke: currentColor; stroke-width: 1.8; }
+.forecast-temperature-symbol .forecast-thermometer-scale { stroke: url("#forecastTemperatureScale"); stroke-width: 6; }
+.forecast-temperature-symbol .forecast-thermometer-bulb { fill: #fff; stroke: #fff; stroke-width: 1; }
 .forecast-wind-symbol { width: 38px; height: 38px; color: var(--chart-wind-flow); stroke-width: 2.2; filter: drop-shadow(0 0 4px color-mix(in srgb, var(--chart-wind-flow) 38%, transparent)); }
 .forecast-weather-canvas { display: block; width: 100%; height: 100px; border-bottom: 1px solid var(--chart-grid); background: var(--chart-surface); touch-action: pan-x pan-y; }
 #forecastChart { display: block; width: 100%; height: 140px; background: var(--chart-surface); touch-action: pan-x pan-y; }

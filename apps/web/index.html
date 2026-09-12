@@ -85,8 +85,12 @@
           <div class="forecast-track forecast-track-temperature">
             <div class="forecast-track-title" title="Temperature and feels like">
               <span class="forecast-temperature-symbol" aria-hidden="true">
-                <svg viewBox="0 0 18 48"><path d="M7 27V8a4 4 0 0 1 8 0v19a8 8 0 1 1-8 0Z"></path><path d="M11 12v20"></path><circle cx="11" cy="36" r="3"></circle></svg>
-                <i></i>
+                <svg viewBox="0 0 24 88">
+                  <defs><linearGradient id="forecastTemperatureScale" gradientUnits="userSpaceOnUse" x1="12" y1="59" x2="12" y2="12"><stop offset="0%" stop-color="#fff"></stop><stop offset="18%" stop-color="#7f8996"></stop><stop offset="36%" stop-color="#2358c7"></stop><stop offset="58%" stop-color="#45cf88"></stop><stop offset="78%" stop-color="#f28e3e"></stop><stop offset="100%" stop-color="#ff263f"></stop></linearGradient></defs>
+                  <path class="forecast-thermometer-outline" d="M7 57V11a5 5 0 0 1 10 0v46a10 10 0 1 1-10 0Z"></path>
+                  <path class="forecast-thermometer-scale" d="M12 59V12"></path>
+                  <circle class="forecast-thermometer-bulb" cx="12" cy="68" r="6"></circle>
+                </svg>
               </span>
               <b class="visually-hidden" data-i18n="chart.temperatureLabel">Temperature and feels like</b>
             </div>

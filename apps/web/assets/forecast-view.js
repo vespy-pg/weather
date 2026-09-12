@@ -57,10 +57,18 @@ function averageWindDirection(points) {
 export function groupHourlyForecast(hourly, size) {
   const groupSize = Math.max(1, Math.round(Number(size) || 1));
   if (groupSize === 1) return hourly;
-  const grouped = [];
-  for (let index = 0; index < hourly.length; index += groupSize) {
-    const points = hourly.slice(index, index + groupSize);
-    grouped.push({
+  const buckets = [];
+  hourly.forEach(point => {
+    const timestamp = String(point.timestamp || '');
+    const hour = Number(timestamp.slice(11, 13));
+    const key = `${timestamp.slice(0, 10)}-${Math.floor(hour / groupSize)}`;
+    const current = buckets[buckets.length - 1];
+    if (current?.key === key) current.points.push(point);
+    else buckets.push({key, points: [point]});
+  });
+  return buckets.map(bucket => {
+    const {points} = bucket;
+    return {
       ...points[0],
       temperature: average(points, 'temperature'),
       apparentTemperature: average(points, 'apparentTemperature'),
@@ -76,9 +84,8 @@ export function groupHourlyForecast(hourly, size) {
       windGusts: maximum(points, 'windGusts'),
       tornado: points.some(point => point.tornado === true),
       groupHours: points.length
-    });
-  }
-  return grouped;
+    };
+  });
 }
 
 export function temperatureRange(points, includeApparent = true) {

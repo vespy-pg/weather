@@ -21,6 +21,17 @@ test('groups forecast values without hiding severe weather', () => {
   assert.ok(grouped[0].windDirection < 1 || grouped[0].windDirection > 359);
 });
 
+test('keeps grouped forecast buckets inside calendar days', () => {
+  const grouped = groupHourlyForecast([
+    {timestamp: '2026-09-12T22:00', temperature: 10},
+    {timestamp: '2026-09-12T23:00', temperature: 12},
+    {timestamp: '2026-09-13T00:00', temperature: 14},
+    {timestamp: '2026-09-13T01:00', temperature: 16}
+  ], 6);
+  assert.equal(grouped.length, 2);
+  assert.deepEqual(grouped.map(point => point.temperature), [11, 15]);
+});
+
 test('uses a compact temperature range with margin', () => {
   assert.deepEqual(temperatureRange([{temperature: 11, apparentTemperature: 9}, {temperature: 15, apparentTemperature: 14}]), {minimum: 6, maximum: 18});
   assert.deepEqual(temperatureRange([{temperature: 20}, {temperature: 21}], false), {minimum: 16, maximum: 24});
