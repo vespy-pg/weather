@@ -71,14 +71,40 @@
           </div>
         </div>
         <div class="forecast-timeline" id="forecastTimeline">
-          <div class="forecast-track-title"><span><i class="forecast-track-marker sky" aria-hidden="true"></i><b data-i18n="chart.skyLabel">Sky and precipitation</b></span></div>
-          <canvas class="forecast-weather-canvas" id="forecastWeatherCanvas" height="100" aria-label="Hourly temperature and continuous weather conditions"></canvas>
-          <div class="forecast-track-title"><span><i class="forecast-track-marker temperature" aria-hidden="true"></i><b data-i18n="chart.temperatureLabel">Temperature and feels like</b></span></div>
-          <canvas id="forecastChart" height="140" aria-label="Temperature and apparent temperature chart"></canvas>
-          <div class="forecast-track-title"><span><i class="forecast-track-marker wind" aria-hidden="true"></i><b data-i18n="chart.windLabel">Wind strength</b></span></div>
-          <div class="forecast-wind-visual" id="forecastWindVisual" aria-label="Hourly wind strength">
-            <canvas class="forecast-wind-canvas" id="forecastWindCanvas" height="64"></canvas>
-            <div class="forecast-wind-strip" id="forecastWindStrip" aria-label="Hourly wind direction and speed"></div>
+          <div class="forecast-track forecast-track-sky">
+            <div class="forecast-track-title" title="Sky and precipitation">
+              <svg class="forecast-sky-symbols" viewBox="0 0 32 82" aria-hidden="true">
+                <g class="forecast-symbol-sun"><circle cx="16" cy="11" r="5"></circle><path d="M16 1v3M16 18v3M6 11h3M23 11h3M9 4l2 2M21 16l2 2M23 4l-2 2M11 16l-2 2"></path></g>
+                <path class="forecast-symbol-cloud" d="M7 48h18a5 5 0 0 0 0-10 8 8 0 0 0-15-2 6 6 0 0 0-3 12Z"></path>
+                <path class="forecast-symbol-rain" d="M16 60c0 0-5 7-5 11a5 5 0 0 0 10 0c0-4-5-11-5-11Z"></path>
+              </svg>
+              <b class="visually-hidden" data-i18n="chart.skyLabel">Sky and precipitation</b>
+            </div>
+            <canvas class="forecast-weather-canvas" id="forecastWeatherCanvas" height="100" aria-label="Hourly temperature and continuous weather conditions"></canvas>
+          </div>
+          <div class="forecast-track forecast-track-temperature">
+            <div class="forecast-track-title" title="Temperature and feels like">
+              <span class="forecast-temperature-symbol" aria-hidden="true">
+                <svg viewBox="0 0 18 48"><path d="M7 27V8a4 4 0 0 1 8 0v19a8 8 0 1 1-8 0Z"></path><path d="M11 12v20"></path><circle cx="11" cy="36" r="3"></circle></svg>
+                <i></i>
+              </span>
+              <b class="visually-hidden" data-i18n="chart.temperatureLabel">Temperature and feels like</b>
+            </div>
+            <canvas id="forecastChart" height="140" aria-label="Temperature and apparent temperature chart"></canvas>
+          </div>
+          <div class="forecast-track forecast-track-wind">
+            <div class="forecast-track-title" title="Wind strength">
+              <svg class="forecast-wind-symbol" viewBox="0 0 40 38" aria-hidden="true">
+                <path d="M3 11h22c7 0 7-8 2-8-3 0-4 2-4 4"></path>
+                <path d="M3 18h30c7 0 7-9 2-9-3 0-5 2-5 4"></path>
+                <path d="M3 25h20c7 0 7 10 1 10-4 0-5-3-5-5"></path>
+              </svg>
+              <b class="visually-hidden" data-i18n="chart.windLabel">Wind strength</b>
+            </div>
+            <div class="forecast-wind-visual" id="forecastWindVisual" aria-label="Hourly wind strength">
+              <canvas class="forecast-wind-canvas" id="forecastWindCanvas" height="64"></canvas>
+              <div class="forecast-wind-strip" id="forecastWindStrip" aria-label="Hourly wind direction and speed"></div>
+            </div>
           </div>
         </div>
       </div>

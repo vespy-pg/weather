@@ -118,13 +118,20 @@ h2 { margin-bottom: 2px; font-size: 18px; }
 .forecast-chart-y-axis-temperature .zero { color: #2358c7; }
 .forecast-chart-y-axis-temperature .deep-frost { color: #fff; }
 :root[data-theme="light"] .forecast-chart-y-axis-temperature .deep-frost { color: #526277; }
-.forecast-timeline { --forecast-slot-width: 18px; width: max(100%, calc(var(--forecast-slots, 40) * var(--forecast-slot-width) + 64px)); padding-bottom: 14px; }
-.forecast-track-title { position: relative; height: 24px; border-bottom: 1px solid var(--chart-grid); background: var(--chart-wind); }
-.forecast-track-title span { position: sticky; z-index: 5; left: 0; display: inline-flex; height: 24px; align-items: center; gap: 7px; padding: 0 9px; background: linear-gradient(90deg, var(--chart-wind) 82%, transparent); color: var(--chart-text); font: 800 10px/1 ui-monospace, monospace; letter-spacing: .04em; text-transform: uppercase; }
-.forecast-track-marker { width: 22px; height: 4px; flex: 0 0 auto; border-radius: 99px; }
-.forecast-track-marker.sky { background: linear-gradient(90deg, #9aa4b2 0 42%, #f0b72d 58% 100%); box-shadow: 0 2px 7px rgba(240, 183, 45, .42); }
-.forecast-track-marker.temperature { background: linear-gradient(90deg, #2358c7, #45cf88 48%, #f28e3e 72%, #ff263f); }
-.forecast-track-marker.wind { background: var(--chart-wind-flow); box-shadow: 0 0 7px color-mix(in srgb, var(--chart-wind-flow) 45%, transparent); }
+.forecast-timeline { --forecast-slot-width: 18px; width: max(100%, calc(var(--forecast-slots, 40) * var(--forecast-slot-width) + 116px)); padding-bottom: 14px; }
+.forecast-track { display: grid; grid-template-columns: 52px minmax(0, 1fr); }
+.forecast-track + .forecast-track { border-top: 1px solid var(--chart-grid); }
+.forecast-track-title { display: grid; min-width: 0; place-items: center; border-right: 1px solid var(--chart-day-separator); background: var(--chart-wind); color: var(--chart-text); }
+.forecast-track-title svg { display: block; overflow: visible; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
+.visually-hidden { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; white-space: nowrap !important; }
+.forecast-sky-symbols { width: 28px; height: 78px; stroke-width: 1.7; }
+.forecast-symbol-sun { color: #f0b72d; }
+.forecast-symbol-cloud { color: #aeb9c8; fill: color-mix(in srgb, #aeb9c8 16%, transparent); }
+.forecast-symbol-rain { color: #58a6ff; fill: color-mix(in srgb, #58a6ff 22%, transparent); }
+.forecast-temperature-symbol { display: flex; align-items: center; gap: 5px; }
+.forecast-temperature-symbol svg { width: 18px; height: 48px; stroke-width: 1.8; }
+.forecast-temperature-symbol i { width: 6px; height: 58px; border-radius: 99px; background: linear-gradient(to bottom, #ff263f, #f28e3e 25%, #45cf88 48%, #3b9ee5 72%, #2358c7); box-shadow: 0 0 6px rgba(69, 207, 136, .3); }
+.forecast-wind-symbol { width: 38px; height: 38px; color: var(--chart-wind-flow); stroke-width: 2.2; filter: drop-shadow(0 0 4px color-mix(in srgb, var(--chart-wind-flow) 38%, transparent)); }
 .forecast-weather-canvas { display: block; width: 100%; height: 100px; border-bottom: 1px solid var(--chart-grid); background: var(--chart-surface); touch-action: pan-x pan-y; }
 #forecastChart { display: block; width: 100%; height: 140px; background: var(--chart-surface); touch-action: pan-x pan-y; }
 .forecast-wind-visual { position: relative; height: var(--forecast-wind-height, 46px); overflow: hidden; border-top: 1px solid var(--chart-grid); background: var(--chart-wind); }

@@ -244,7 +244,7 @@ function renderWind(hourly) {
 }
 
 function updateTemperatureAxis(range) {
-  const canvasTop = 24 + 100 + 24;
+  const canvasTop = document.querySelector('.forecast-track-temperature').offsetTop;
   const chartHeight = document.getElementById('forecastChart').getBoundingClientRect().height || 140;
   const plotTop = canvasTop + 14;
   const plotHeight = chartHeight - 36;
