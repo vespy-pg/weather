@@ -13,6 +13,7 @@ const APP_SHELL = [
   './assets/location-state.js',
   './assets/temperature-scale.js',
   './assets/weather-demo.js',
+  './assets/dinpanel-promo.svg',
   './assets/favicon.svg'
 ];
 

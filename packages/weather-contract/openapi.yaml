@@ -65,6 +65,35 @@ paths:
           description: Nearest named locality for coordinates supplied after browser permission
         '400':
           description: Invalid coordinates
+  /api/promotions:
+    get:
+      operationId: getPromotions
+      parameters:
+        - in: query
+          name: platform
+          schema:
+            type: string
+            enum: [web, android, ios]
+        - in: query
+          name: placement
+          schema:
+            type: string
+        - in: query
+          name: language
+          schema:
+            type: string
+        - in: query
+          name: theme
+          schema:
+            type: string
+            enum: [dark, light]
+      responses:
+        '200':
+          description: Eligible native card and image banner campaigns
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromotionFeed'
   /api/weather:
     get:
       operationId: getWeather
@@ -90,3 +119,74 @@ paths:
       responses:
         '200':
           description: Normalized current, hourly, and daily forecast
+components:
+  schemas:
+    PromotionFeed:
+      type: object
+      required: [schemaVersion, platform, placement, rotationSeconds, cacheSeconds, campaigns]
+      properties:
+        schemaVersion:
+          type: integer
+        platform:
+          type: string
+          enum: [web, android, ios]
+        placement:
+          type: string
+        rotationSeconds:
+          type: integer
+          minimum: 1
+        cacheSeconds:
+          type: integer
+          minimum: 0
+        campaigns:
+          type: array
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/NativeCardPromotion'
+              - $ref: '#/components/schemas/ImageBannerPromotion'
+    NativeCardPromotion:
+      type: object
+      required: [id, type, title, description, actionLabel, logoUrl, targetUrl, priority]
+      properties:
+        id:
+          type: string
+        type:
+          const: native-card
+        eyebrow:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        actionLabel:
+          type: string
+        logoUrl:
+          type: string
+        targetUrl:
+          type: string
+          format: uri
+        backgroundColor:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+        accentColor:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+        priority:
+          type: integer
+    ImageBannerPromotion:
+      type: object
+      required: [id, type, imageUrl, imageAlt, targetUrl, priority]
+      properties:
+        id:
+          type: string
+        type:
+          const: image-banner
+        imageUrl:
+          type: string
+        imageAlt:
+          type: string
+        targetUrl:
+          type: string
+          format: uri
+        priority:
+          type: integer

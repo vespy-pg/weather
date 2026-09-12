@@ -25,13 +25,44 @@ const contentTypes = {
   '.svg': 'image/svg+xml'
 };
 
-function json(response, status, body) {
+function json(response, status, body, additionalHeaders = {}) {
   response.writeHead(status, {
     'Access-Control-Allow-Origin': process.env.WEATHER_ALLOWED_ORIGIN || '*',
     'Cache-Control': 'no-store',
-    'Content-Type': 'application/json; charset=utf-8'
+    'Content-Type': 'application/json; charset=utf-8',
+    ...additionalHeaders
   });
   response.end(JSON.stringify(body));
+}
+
+export function promotionFeed({platform = 'web', placement = 'web_forecast', language = DEFAULT_LOCALE, theme = 'dark'} = {}) {
+  const localized = normalizeLocale(language) === 'pl-PL';
+  const supportedPlatforms = ['web', 'android', 'ios'];
+  const normalizedPlatform = supportedPlatforms.includes(platform) ? platform : 'web';
+  const normalizedTheme = theme === 'light' ? 'light' : 'dark';
+  const campaigns = placement === 'web_forecast' ? [{
+    id: 'dinpanel-web-2026-09',
+    type: 'native-card',
+    eyebrow: localized ? 'APLIKACJA VESPY' : 'A VESPY APP',
+    title: 'DINPanel',
+    description: localized
+      ? 'Projektuj instalacje elektryczne, rozdzielnice i dokumentację w jednym miejscu.'
+      : 'Design electrical installations, distribution boards, and documentation in one place.',
+    actionLabel: localized ? 'Poznaj DINPanel' : 'Explore DINPanel',
+    logoUrl: 'assets/dinpanel-promo.svg',
+    targetUrl: localized ? 'https://dinpanel.com/pl/' : 'https://dinpanel.com/',
+    backgroundColor: normalizedTheme === 'light' ? '#fff8f3' : '#181513',
+    accentColor: '#f47b32',
+    priority: 100
+  }] : [];
+  return {
+    schemaVersion: 1,
+    platform: normalizedPlatform,
+    placement,
+    rotationSeconds: 8,
+    cacheSeconds: 3600,
+    campaigns
+  };
 }
 
 async function cachedFetch(url) {
@@ -244,6 +275,16 @@ async function weather(requestUrl, response) {
   return json(response, 200, normalizeForecast(source, location));
 }
 
+function promotions(requestUrl, response) {
+  const feed = promotionFeed({
+    platform: requestUrl.searchParams.get('platform') || 'web',
+    placement: requestUrl.searchParams.get('placement') || 'web_forecast',
+    language: requestUrl.searchParams.get('language') || 'en',
+    theme: requestUrl.searchParams.get('theme') || 'dark'
+  });
+  return json(response, 200, feed, {'Cache-Control': `public, max-age=${feed.cacheSeconds}`});
+}
+
 async function staticFile(requestUrl, response) {
   const requestedPath = decodeURIComponent(requestUrl.pathname === '/' ? '/index.html' : requestUrl.pathname);
   const filePath = path.resolve(WEB_ROOT, `.${requestedPath}`);
@@ -272,6 +313,7 @@ export function createServer() {
       if (requestUrl.pathname === '/api/bootstrap-location') return await bootstrapLocation(request, response);
       if (requestUrl.pathname === '/api/locations') return await locations(requestUrl, response);
       if (requestUrl.pathname === '/api/reverse-location') return await reverseLocation(requestUrl, response);
+      if (requestUrl.pathname === '/api/promotions') return promotions(requestUrl, response);
       if (requestUrl.pathname === '/api/weather') return await weather(requestUrl, response);
       return await staticFile(requestUrl, response);
     } catch (error) {

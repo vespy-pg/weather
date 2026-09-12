@@ -114,9 +114,11 @@ The server exposes:
 - `GET /api/health`
 - `GET /api/locations?q=...`
 - `GET /api/reverse-location?latitude=...&longitude=...&timezone=...&language=...`
+- `GET /api/promotions?platform=...&placement=...&language=...&theme=...`
 - `GET /api/weather?latitude=...&longitude=...&timezone=...&name=...`
 
 The API contract is available in [`packages/weather-contract/openapi.yaml`](packages/weather-contract/openapi.yaml).
+Promotion delivery rules are documented in [`docs/promotion-feed.md`](docs/promotion-feed.md).
 
 ## Verify a change
 

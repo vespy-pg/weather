@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {forecastUrl, locationSearchUrl, normalizeForecast, normalizeLocale, normalizeReverseLocation, preferredLanguageForCountry, selectCapitalResult} from './server.js';
+import {forecastUrl, locationSearchUrl, normalizeForecast, normalizeLocale, normalizeReverseLocation, preferredLanguageForCountry, promotionFeed, selectCapitalResult} from './server.js';
 
 test('forecastUrl requests the fields shared by web and Android clients', () => {
   const url = new URL(forecastUrl({latitude: 50.67, longitude: 19.12, timezone: 'Europe/Warsaw'}));
@@ -94,4 +94,20 @@ test('normalizeReverseLocation uses the nearest named locality and country', () 
     name: 'Jastrząb Rozparcelowany',
     country: 'Poland'
   });
+});
+
+test('promotionFeed returns a localized native card without executable content', () => {
+  const feed = promotionFeed({platform: 'web', placement: 'web_forecast', language: 'pl-PL', theme: 'light'});
+  assert.equal(feed.schemaVersion, 1);
+  assert.equal(feed.campaigns.length, 1);
+  assert.equal(feed.campaigns[0].type, 'native-card');
+  assert.equal(feed.campaigns[0].title, 'DINPanel');
+  assert.equal(feed.campaigns[0].actionLabel, 'Poznaj DINPanel');
+  assert.equal(feed.campaigns[0].backgroundColor, '#fff8f3');
+  assert.equal('html' in feed.campaigns[0], false);
+});
+
+test('promotionFeed returns no campaign for an unsupported placement', () => {
+  const feed = promotionFeed({platform: 'android', placement: 'unknown'});
+  assert.deepEqual(feed.campaigns, []);
 });

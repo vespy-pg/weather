@@ -103,6 +103,18 @@ h2 { margin-bottom: 2px; font-size: 18px; }
 .weather-symbol { margin-right: 8px; font-family: sans-serif; }
 .error-card .metric-value { color: var(--orange); }
 
+.web-promotion { min-height: 76px; margin-top: 10px; overflow: hidden; border: 1px solid var(--promotion-accent, var(--line)); border-radius: 10px; background: var(--promotion-background, var(--panel)); }
+.web-promotion-link { display: grid; grid-template-columns: 54px minmax(0, 1fr) auto; align-items: center; gap: 14px; min-height: 76px; padding: 10px 14px; color: var(--text); text-decoration: none; }
+.web-promotion-logo { width: 54px; height: 54px; border-radius: 11px; filter: drop-shadow(0 5px 10px rgba(0, 0, 0, .2)); }
+.web-promotion-copy { display: grid; gap: 4px; min-width: 0; }
+.web-promotion-label { color: var(--promotion-accent, var(--orange)); font: 800 8px/1 ui-monospace, monospace; letter-spacing: .12em; }
+.web-promotion-title { font-size: 17px; line-height: 1.1; }
+.web-promotion-description { color: var(--muted); font-size: 12px; line-height: 1.35; }
+.web-promotion-action { padding: 9px 13px; border: 1px solid color-mix(in srgb, var(--promotion-accent, var(--orange)) 65%, var(--line)); border-radius: 7px; color: var(--promotion-accent, var(--orange)); font-size: 11px; font-weight: 800; white-space: nowrap; }
+.web-promotion-link:hover .web-promotion-action { background: color-mix(in srgb, var(--promotion-accent, var(--orange)) 12%, transparent); }
+.web-promotion-image-link { display: block; }
+.web-promotion-image { display: block; width: 100%; max-height: 180px; object-fit: cover; }
+
 .forecast-heading-tools { display: grid; justify-items: end; gap: 6px; }
 .forecast-zoom-controls { display: inline-grid; grid-template-columns: 28px 48px 28px; overflow: hidden; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
 .forecast-zoom-controls button { min-height: 25px; border: 0; border-right: 1px solid var(--line); background: transparent; color: var(--muted); font: 800 10px/1 ui-monospace, monospace; cursor: pointer; }
@@ -233,7 +245,7 @@ h2 { margin-bottom: 2px; font-size: 18px; }
 
 body.embedded { background: transparent; }
 body.embedded .shell { width: 100%; margin: 0; }
-body.embedded .topbar, body.embedded .current-grid, body.embedded .daily-panel { display: none; }
+body.embedded .topbar, body.embedded .current-grid, body.embedded .daily-panel, body.embedded .web-promotion { display: none; }
 body.embedded .forecast-panel { margin: 0; border-radius: 0; }
 body.embedded .forecast-guide { margin: 0; border-top: 0; border-radius: 0; }
 body.embedded .forecast-heading-tools .muted { display: none; }
@@ -255,4 +267,8 @@ body.embedded .forecast-heading-tools .muted { display: none; }
   .location-search-row input { grid-column: 1 / -1; }
   .legend-grid { grid-template-columns: 1fr; }
   .embed-code-row { grid-template-columns: 1fr; }
+  .web-promotion-link { grid-template-columns: 44px minmax(0, 1fr); gap: 10px; padding: 9px 10px; }
+  .web-promotion-logo { width: 44px; height: 44px; }
+  .web-promotion-description { font-size: 10px; }
+  .web-promotion-action { grid-column: 2; justify-self: start; padding: 0; border: 0; }
 }

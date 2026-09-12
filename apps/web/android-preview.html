@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080c12">
+  <title>Weather Android app preview</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/app.css">
+  <link rel="stylesheet" href="assets/android-preview.css">
+</head>
+<body>
+  <main class="prototype-shell">
+    <header class="prototype-heading">
+      <p class="eyebrow">ANDROID APP PROTOTYPE</p>
+      <h1>Forecast and widget setup</h1>
+      <p>Preview the full app in portrait and landscape, then configure an individual home-screen widget.</p>
+    </header>
+
+    <section class="prototype-controls" aria-label="Prototype controls">
+      <div class="control-group" aria-label="Screen">
+        <button class="active" type="button" data-screen="forecast">Forecast</button>
+        <button type="button" data-screen="widget">Widget setup</button>
+      </div>
+      <div class="control-group" aria-label="Orientation">
+        <button class="active" type="button" data-orientation="portrait">Portrait</button>
+        <button type="button" data-orientation="landscape">Landscape</button>
+      </div>
+    </section>
+
+    <section class="device-stage">
+      <div class="device portrait" id="device">
+        <div class="device-camera" aria-hidden="true"></div>
+
+        <section class="app-view forecast-view" id="forecastView">
+          <div class="app-layout">
+            <div class="app-content">
+              <header class="app-bar">
+                <div>
+                  <span class="app-kicker">WEATHER</span>
+                  <strong id="activeLocation">Jastrząb Rozparcelowany</strong>
+                  <small>Updated 20:00</small>
+                </div>
+                <button type="button" aria-label="Open settings">⚙</button>
+              </header>
+
+              <nav class="favorite-locations" aria-label="Favorite locations">
+                <button class="active" type="button" data-location="Jastrząb Rozparcelowany">Jastrząb Rozparcelowany</button>
+                <button type="button" data-location="Katowice">Katowice</button>
+                <button type="button" data-location="London">London</button>
+                <button class="add-location" type="button" aria-label="Add location">+</button>
+              </nav>
+
+              <section class="forecast-card">
+                <div class="forecast-card-heading">
+                  <div><span>10-DAY FORECAST</span><strong>Temperature and conditions</strong></div>
+                  <button type="button">50%</button>
+                </div>
+                <div class="app-forecast-scroll">
+                  <div class="app-forecast-track" id="appForecastTrack">
+                    <canvas id="appSkyCanvas" height="100" aria-label="Sky and precipitation"></canvas>
+                    <canvas id="appTemperatureCanvas" height="150" aria-label="Temperature and apparent temperature"></canvas>
+                    <canvas id="appWindCanvas" height="48" aria-label="Wind strength"></canvas>
+                  </div>
+                </div>
+              </section>
+
+              <section class="metric-row" aria-label="Current conditions">
+                <article><span>Feels like</span><strong>14°</strong></article>
+                <article><span>Rain</span><strong>18%</strong></article>
+                <article><span>Wind</span><strong>12 km/h</strong></article>
+              </section>
+
+              <section class="daily-strip" aria-label="Daily forecast">
+                <article><span>Today</span><strong>20°</strong><small>Clear</small></article>
+                <article><span>Sun</span><strong>23°</strong><small>Cloudy</small></article>
+                <article><span>Mon</span><strong>31°</strong><small>Storm</small></article>
+                <article><span>Tue</span><strong>21°</strong><small>Rain</small></article>
+              </section>
+            </div>
+
+            <aside class="ad-slot ad-bottom" aria-label="Advertisement placeholder">
+              <span>ADVERTISEMENT</span><strong>Anchored adaptive banner</strong><small>Reserved space - no layout shift</small>
+            </aside>
+            <aside class="promo-rail ad-side" aria-label="More apps from Vespy" aria-live="polite">
+              <span class="promo-rail-label">MORE FROM VESPY</span>
+              <a class="promo-card promo-card-dinpanel active" data-promo="0" href="https://dinpanel.com" target="_blank" rel="noreferrer">
+                <svg class="promo-logo" viewBox="0 0 64 64" aria-hidden="true">
+                  <rect x="2" y="2" width="60" height="60" rx="11" fill="#fff" stroke="#f47b32" stroke-width="3"/>
+                  <path d="M15 11v42h26" fill="none" stroke="#202831" stroke-width="4"/>
+                  <circle cx="32" cy="32" r="18" fill="none" stroke="#202831" stroke-width="3"/>
+                  <path d="m34 15-13 20h10l-3 15 15-23H32z" fill="#f36f21"/>
+                </svg>
+                <span class="promo-copy"><strong>DINPanel</strong><small>Electrical design made clear</small></span>
+                <span class="promo-action">OPEN <b aria-hidden="true">›</b></span>
+              </a>
+              <a class="promo-card promo-card-threadbox" data-promo="1" href="https://github.com/vespy-pg/threadbox" target="_blank" rel="noreferrer">
+                <svg class="promo-logo" viewBox="0 0 64 64" aria-hidden="true">
+                  <rect width="64" height="64" rx="15" fill="#18231f"/>
+                  <rect x="15" y="13" width="34" height="38" rx="6" fill="#edf7f1"/>
+                  <path d="M23 23c0-2 2-4 4-4h12a4 4 0 0 1 0 8h-2v15a4 4 0 0 1-8 0V27h-2c-2 0-4-2-4-4Z" fill="#267657"/>
+                  <circle cx="48" cy="48" r="9" fill="#e97c4b"/>
+                  <path d="m44 48 3 3 5-6" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"/>
+                </svg>
+                <span class="promo-copy"><strong>Threadbox</strong><small>Turn conversations into tasks</small></span>
+                <span class="promo-action">OPEN <b aria-hidden="true">›</b></span>
+              </a>
+              <div class="promo-pagination" aria-label="Select promoted app">
+                <button class="active" type="button" data-promo-target="0" aria-label="Show DINPanel promotion"></button>
+                <button type="button" data-promo-target="1" aria-label="Show Threadbox promotion"></button>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <section class="app-view widget-view" id="widgetView" hidden>
+          <header class="config-bar">
+            <button type="button" aria-label="Back">‹</button>
+            <div><span>HOME-SCREEN WIDGET</span><strong>Configure widget</strong></div>
+          </header>
+          <div class="config-scroll">
+            <section class="config-card widget-summary">
+              <div class="mini-widget" aria-hidden="true"><span>16°</span><span>24°</span><span>17°</span><span>19°</span><i></i></div>
+              <div><strong id="widgetSizeSummary">2 x 2 - 24 hours</strong><small>Tap the widget to open the full forecast</small></div>
+            </section>
+
+            <section class="config-card">
+              <span class="config-label">SIZE BEHAVIOR</span>
+              <div class="two-fields">
+                <label>Columns<select id="configColumns"><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select></label>
+                <label>Rows<select id="configRows"><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select></label>
+              </div>
+              <div class="behavior-result">
+                <span>Forecast range<strong id="forecastRange">24 hours</strong></span>
+                <span>Vertical layout<strong id="verticalLayout">Compact chart</strong></span>
+              </div>
+              <small>Each column adds 12 hours. Sky stops growing at four rows; additional height expands the temperature chart.</small>
+            </section>
+
+            <section class="config-card">
+              <span class="config-label">WIDGET LOCATION</span>
+              <div class="location-choice" id="configLocations">
+                <button class="active" type="button">Warsaw</button><button type="button">Katowice</button><button type="button">London</button>
+              </div>
+              <button class="wide-button" type="button">Search or add location</button>
+              <small>Favorites are shared with the app. Each widget instance keeps its own selected location.</small>
+            </section>
+
+            <section class="config-card">
+              <span class="config-label">DISPLAY</span>
+              <div class="setting-line"><span>Temperature</span><div class="segmented"><button class="active" type="button">°C</button><button type="button">°F</button></div></div>
+              <div class="setting-line"><span>Theme</span><div class="segmented theme-choice"><button class="active" type="button">System</button><button type="button">Dark</button><button type="button">Light</button></div></div>
+            </section>
+
+            <section class="config-card system-settings">
+              <span class="config-label">SYSTEM DEFAULTS</span>
+              <p><span>Language</span><strong>Polish</strong><small>from system</small></p>
+              <p><span>Country</span><strong>Poland</strong><small>from system region</small></p>
+              <p><span>Initial location</span><strong>Warsaw</strong><small>country capital</small></p>
+            </section>
+
+            <button class="save-widget" type="button">Save widget</button>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section class="prototype-notes">
+      <p>The portrait ad uses a bottom anchored adaptive slot. Landscape reserves a narrow full-height rail for one rotating first-party app promotion, so the forecast remains the primary content.</p>
+      <p>Language and region are initialized from Android system settings. The country capital is used without requesting precise location permission.</p>
+    </section>
+  </main>
+  <script src="assets/android-preview.js" type="module"></script>
+</body>
+</html>

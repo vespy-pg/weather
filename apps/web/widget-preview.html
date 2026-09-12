@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080c12">
+  <title>Weather Android widget preview</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/app.css">
+  <link rel="stylesheet" href="assets/widget-preview.css">
+</head>
+<body>
+  <main class="preview-shell">
+    <header class="preview-heading">
+      <p class="eyebrow">ANDROID WIDGET PROTOTYPE</p>
+      <h1>Weather widget size lab</h1>
+      <p>Choose a launcher grid size. The preview uses 64 x 55 CSS pixels per cell as a stable visual reference.</p>
+    </header>
+
+    <section class="preview-controls" aria-label="Preview controls">
+      <label for="widgetColumns">Columns</label>
+      <select id="widgetColumns" aria-label="Widget columns">
+        <option value="2" selected>2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+        <option value="6">6</option>
+        <option value="7">7</option>
+        <option value="8">8</option>
+      </select>
+      <label for="widgetRows">Rows</label>
+      <select id="widgetRows" aria-label="Widget rows">
+        <option value="1">1</option>
+        <option value="2" selected>2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+        <option value="6">6</option>
+        <option value="7">7</option>
+        <option value="8">8</option>
+      </select>
+      <div class="size-readout" aria-live="polite">
+        <strong id="widgetGridValue">2 x 2</strong>
+        <span id="widgetSizeValue">128 x 110 dp</span>
+      </div>
+      <button id="toggleTheme" type="button">Light background</button>
+    </section>
+
+    <section class="device-preview" id="devicePreview">
+      <a class="weather-widget" id="weatherWidget" href="./?demo=1" aria-label="Open the complete weather forecast">
+        <canvas class="widget-base-canvas" id="widgetCanvas" width="320" height="110"></canvas>
+        <canvas class="widget-layer-canvas" id="widgetSkyCanvas" width="320" height="38" aria-label="Sky, precipitation, and temperature values"></canvas>
+        <canvas class="widget-layer-canvas" id="widgetTemperatureCanvas" width="320" height="63" aria-label="Temperature and apparent temperature chart"></canvas>
+        <canvas class="widget-wind-canvas" id="widgetWindCanvas" width="320" height="12" aria-hidden="true"></canvas>
+      </a>
+    </section>
+
+    <section class="prototype-notes">
+      <p><strong>Current content:</strong> <span id="forecastHoursValue">24</span> hours grouped into 3-hour periods, day and night, sunlight, cloud cover, precipitation, the temperature curve, and wind strength.</p>
+      <p>Below the temperature header, the vertical layout reserves 20% for sky and precipitation, 70% for the temperature chart, and 10% for wind. Sky height stops growing at four rows, leaving additional space for the chart.</p>
+      <p>The home-screen widget contains no legend. Tapping it opens the complete forecast and explanation.</p>
+      <p>The 2-8 column and 1-8 row ranges belong only to this prototype. Android launchers determine the real grid and available size.</p>
+    </section>
+  </main>
+  <script src="assets/widget-preview.js" type="module"></script>
+</body>
+</html>

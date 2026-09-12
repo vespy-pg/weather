@@ -96,6 +96,100 @@ let zoomIndex = Math.max(0, ZOOM_LEVELS.indexOf(Number(settings.zoom)));
 let forecastDrawFrame = 0;
 let locationSearchTimer = 0;
 let locationSearchRequest = 0;
+let promotionRequest = 0;
+
+function safePromotionUrl(value, {asset = false} = {}) {
+  try {
+    const url = new URL(String(value || ''), location.href);
+    if (url.protocol === 'https:' || (asset && url.origin === location.origin)) return url.href;
+  } catch {}
+  return null;
+}
+
+function safePromotionColor(value, fallback) {
+  return /^#[0-9a-f]{6}$/i.test(String(value || '')) ? value : fallback;
+}
+
+function renderPromotion(campaign) {
+  const slot = document.getElementById('webPromotion');
+  const targetUrl = safePromotionUrl(campaign?.targetUrl);
+  if (!targetUrl || !['native-card', 'image-banner'].includes(campaign?.type)) {
+    slot.hidden = true;
+    slot.replaceChildren();
+    return;
+  }
+
+  const link = document.createElement('a');
+  link.href = targetUrl;
+  link.target = '_blank';
+  link.rel = 'noreferrer sponsored';
+
+  if (campaign.type === 'image-banner') {
+    const imageUrl = safePromotionUrl(campaign.imageUrl, {asset: true});
+    if (!imageUrl) return;
+    link.className = 'web-promotion-image-link';
+    const image = document.createElement('img');
+    image.className = 'web-promotion-image';
+    image.src = imageUrl;
+    image.alt = String(campaign.imageAlt || campaign.title || '');
+    image.loading = 'lazy';
+    link.append(image);
+  } else {
+    const logoUrl = safePromotionUrl(campaign.logoUrl, {asset: true});
+    if (!logoUrl) return;
+    link.className = 'web-promotion-link';
+    const logo = document.createElement('img');
+    logo.className = 'web-promotion-logo';
+    logo.src = logoUrl;
+    logo.alt = '';
+
+    const copy = document.createElement('span');
+    copy.className = 'web-promotion-copy';
+    const eyebrow = document.createElement('span');
+    eyebrow.className = 'web-promotion-label';
+    eyebrow.textContent = String(campaign.eyebrow || 'VESPY');
+    const title = document.createElement('strong');
+    title.className = 'web-promotion-title';
+    title.textContent = String(campaign.title || '');
+    const description = document.createElement('span');
+    description.className = 'web-promotion-description';
+    description.textContent = String(campaign.description || '');
+    copy.append(eyebrow, title, description);
+
+    const action = document.createElement('span');
+    action.className = 'web-promotion-action';
+    action.textContent = String(campaign.actionLabel || 'Open');
+    link.append(logo, copy, action);
+    slot.style.setProperty('--promotion-background', safePromotionColor(campaign.backgroundColor, 'var(--panel)'));
+    slot.style.setProperty('--promotion-accent', safePromotionColor(campaign.accentColor, 'var(--orange)'));
+  }
+
+  slot.replaceChildren(link);
+  slot.hidden = false;
+}
+
+async function loadPromotion() {
+  if (IS_EMBEDDED) return;
+  const requestId = ++promotionRequest;
+  try {
+    const parameters = new URLSearchParams({
+      platform: 'web',
+      placement: 'web_forecast',
+      language: settings.language,
+      theme: settings.theme
+    });
+    const response = await fetch(new URL(`promotions?${parameters}`, API_ROOT));
+    if (!response.ok) throw new Error('Promotion request failed.');
+    const feed = await response.json();
+    if (requestId !== promotionRequest) return;
+    const campaign = Array.isArray(feed.campaigns)
+      ? [...feed.campaigns].sort((left, right) => Number(right.priority || 0) - Number(left.priority || 0))[0]
+      : null;
+    renderPromotion(campaign);
+  } catch {
+    if (requestId === promotionRequest) renderPromotion(null);
+  }
+}
 
 function locationLabel(item) {
   return `${item.name}${item.country ? `, ${item.country}` : ''}`;
@@ -492,6 +586,7 @@ function settingsFromForm() {
 
 function saveFormChanges({reloadWeather = false} = {}) {
   const previousLanguage = settings.language;
+  const previousTheme = settings.theme;
   const previousUnit = settings.temperatureUnit;
   settings = settingsFromForm();
   settings.language = setLanguage(settings.language);
@@ -507,6 +602,7 @@ function saveFormChanges({reloadWeather = false} = {}) {
   applyZoom(zoomIndex, false);
   drawLegendPreviews();
   if (weather) renderForecast();
+  if (previousLanguage !== settings.language || previousTheme !== settings.theme) loadPromotion();
   if (reloadWeather) loadWeather();
 }
 
@@ -622,14 +718,17 @@ document.getElementById('themeToggle').addEventListener('click', () => {
   document.getElementById('colorTheme').value = settings.theme;
   drawForecast();
   drawLegendPreviews();
+  loadPromotion();
 });
 document.getElementById('languageSelect').addEventListener('change', event => {
   settings.language = setLanguage(event.target.value);
+  settings.languageSource = 'user';
   saveSettings();
   document.getElementById('languageSetting').value = settings.language;
   applyTheme(settings.theme);
   renderForecast();
   drawLegendPreviews();
+  loadPromotion();
 });
 document.getElementById('settingsForm').addEventListener('change', event => {
   if (event.target.matches('[data-temperature-threshold]')) return;
@@ -796,7 +895,7 @@ async function initialize() {
   }
 }
 
-initialize();
+initialize().finally(loadPromotion);
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
