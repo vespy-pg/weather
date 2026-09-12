@@ -45,8 +45,6 @@
       </div>
     </header>
 
-    <section class="current-grid" id="currentWeather" aria-live="polite"></section>
-
     <section class="panel forecast-panel">
       <div class="section-heading">
         <div>
@@ -57,7 +55,7 @@
           <span class="muted" data-i18n="forecast.range">Temperature scale follows the forecast</span>
           <div class="forecast-zoom-controls" aria-label="Timeline zoom">
             <button type="button" id="forecastZoomOut" aria-label="Zoom out timeline">-</button>
-            <button type="button" id="forecastZoomReset" aria-label="Reset timeline zoom">25%</button>
+            <button type="button" id="forecastZoomReset" aria-label="Reset timeline zoom">50%</button>
             <button type="button" id="forecastZoomIn" aria-label="Zoom in timeline">+</button>
           </div>
         </div>
@@ -86,10 +84,10 @@
             <div class="forecast-track-title" title="Temperature and feels like">
               <span class="forecast-temperature-symbol" aria-hidden="true">
                 <svg viewBox="0 0 24 88">
-                  <defs><linearGradient id="forecastTemperatureScale" gradientUnits="userSpaceOnUse" x1="12" y1="59" x2="12" y2="12"><stop offset="0%" stop-color="#fff"></stop><stop offset="18%" stop-color="#7f8996"></stop><stop offset="36%" stop-color="#2358c7"></stop><stop offset="58%" stop-color="#45cf88"></stop><stop offset="78%" stop-color="#f28e3e"></stop><stop offset="100%" stop-color="#ff263f"></stop></linearGradient></defs>
+                  <defs><linearGradient id="forecastTemperatureScale" gradientUnits="userSpaceOnUse" x1="12" y1="57" x2="12" y2="12"><stop offset="0%" stop-color="#fff"></stop><stop offset="18%" stop-color="#7f8996"></stop><stop offset="36%" stop-color="#2358c7"></stop><stop offset="58%" stop-color="#45cf88"></stop><stop offset="78%" stop-color="#f28e3e"></stop><stop offset="100%" stop-color="#ff263f"></stop></linearGradient></defs>
                   <path class="forecast-thermometer-outline" d="M7 57V11a5 5 0 0 1 10 0v46a10 10 0 1 1-10 0Z"></path>
-                  <path class="forecast-thermometer-scale" d="M12 59V12"></path>
-                  <circle class="forecast-thermometer-bulb" cx="12" cy="68" r="6"></circle>
+                  <path class="forecast-thermometer-scale" d="M12 57V12"></path>
+                  <circle class="forecast-thermometer-bulb" cx="12" cy="65" r="6"></circle>
                 </svg>
               </span>
               <b class="visually-hidden" data-i18n="chart.temperatureLabel">Temperature and feels like</b>
@@ -110,6 +108,7 @@
               <div class="forecast-wind-strip" id="forecastWindStrip" aria-label="Hourly wind direction and speed"></div>
             </div>
           </div>
+          <div class="forecast-day-dividers" id="forecastDayDividers" aria-hidden="true"></div>
         </div>
       </div>
     </section>
@@ -148,6 +147,8 @@
         </article>
       </div>
     </section>
+
+    <section class="current-grid" id="currentWeather" aria-live="polite"></section>
 
     <section class="panel daily-panel">
       <p class="eyebrow" data-i18n="daily.eyebrow">DAILY OUTLOOK - 10 DAYS</p>

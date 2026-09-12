@@ -56,8 +56,13 @@ export function installChartTooltip(canvas, resolver) {
   tooltip.hidden = true;
   document.body.appendChild(tooltip);
 
-  const hide = () => { tooltip.hidden = true; };
-  const show = event => {
+  let pinned = false;
+  let touchGesture = null;
+  const hide = () => {
+    pinned = false;
+    tooltip.hidden = true;
+  };
+  const show = (event, pin = false) => {
     const rect = canvas.getBoundingClientRect();
     const result = canvas.chartTooltipResolver?.(event.clientX - rect.left);
     if (!result) {
@@ -66,6 +71,7 @@ export function installChartTooltip(canvas, resolver) {
     }
     tooltip.innerHTML = chartTooltipMarkup(result.title, result.rows);
     tooltip.hidden = false;
+    pinned = pin;
     const spacing = 14;
     const left = Math.min(event.clientX + spacing, window.innerWidth - tooltip.offsetWidth - 8);
     const below = event.clientY + spacing;
@@ -75,8 +81,30 @@ export function installChartTooltip(canvas, resolver) {
     tooltip.style.left = `${Math.max(8, left)}px`;
     tooltip.style.top = `${top}px`;
   };
-  canvas.addEventListener('pointermove', show);
-  canvas.addEventListener('pointerdown', show);
-  canvas.addEventListener('pointerleave', hide);
+  canvas.addEventListener('pointerdown', event => {
+    if (event.pointerType !== 'touch') return show(event);
+    hide();
+    touchGesture = {x: event.clientX, y: event.clientY, moved: false};
+  });
+  canvas.addEventListener('pointermove', event => {
+    if (event.pointerType !== 'touch') return show(event);
+    if (!touchGesture) return;
+    if (Math.hypot(event.clientX - touchGesture.x, event.clientY - touchGesture.y) > 8) {
+      touchGesture.moved = true;
+      hide();
+    }
+  });
+  canvas.addEventListener('pointerup', event => {
+    if (event.pointerType !== 'touch' || !touchGesture) return;
+    if (!touchGesture.moved) show(event, true);
+    touchGesture = null;
+  });
+  canvas.addEventListener('pointerleave', event => {
+    if (event.pointerType !== 'touch' && !pinned) hide();
+  });
   canvas.addEventListener('pointercancel', hide);
+  canvas.closest('.forecast-timeline-scroll')?.addEventListener('scroll', hide, {passive: true});
+  document.addEventListener('pointerdown', event => {
+    if (pinned && event.target !== canvas) hide();
+  }, {passive: true});
 }

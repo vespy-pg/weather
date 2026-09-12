@@ -39,21 +39,6 @@ function canvasPixelRatio(rect) {
   return Math.max(.25, Math.min(deviceRatio, 4096 / rect.width, 2048 / rect.height));
 }
 
-function drawDayDividers(context, points, padding, columnWidth, plotHeight) {
-  points.forEach((point, index) => {
-    const date = String(point.timestamp || '').slice(0, 10);
-    const previousDate = String(points[index - 1]?.timestamp || '').slice(0, 10);
-    if (date === previousDate) return;
-    const x = padding.left + index * columnWidth;
-    context.strokeStyle = chartColor('--chart-day-separator', 'rgba(154, 164, 178, .72)');
-    context.lineWidth = 2;
-    context.beginPath();
-    context.moveTo(x, padding.top);
-    context.lineTo(x, padding.top + plotHeight);
-    context.stroke();
-  });
-}
-
 function colorWithAlpha(color, alpha) {
   const match = /^#([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(color);
   if (!match) return color;
@@ -491,7 +476,6 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
     context.fillText(dayLabel.toUpperCase(), padding.left + index * columnWidth + 4, Math.max(10, hourFontSize));
     context.textAlign = 'center';
   });
-  drawDayDividers(context, points, {left: padding.left, top: 0}, columnWidth, height);
 }
 
 function approximateSunTimes(dayTimestamp) {
@@ -618,8 +602,6 @@ export function drawWindFlow(canvas, points, options = {}) {
     context.lineTo(x, height);
     context.stroke();
   });
-  drawDayDividers(context, points, {left: 0, top: 0}, columnWidth, height);
-
   const lineCount = strandPositions.length;
   const samplesPerHour = 8;
   const windGradient = opacity => {
@@ -740,7 +722,6 @@ export function drawWeatherChart(canvas, points, days = [], options = {}) {
 
   context.clearRect(0, 0, width, height);
   if (!options.timeline) drawForecastDayNightBands(context, points, days, padding, columnWidth, plotHeight);
-  if (options.timeline) drawDayDividers(context, points, padding, columnWidth, plotHeight);
   context.font = '9px ui-monospace, monospace';
   [0, .5, 1].forEach(ratioValue => {
     const lineY = padding.top + (1 - ratioValue) * plotHeight;

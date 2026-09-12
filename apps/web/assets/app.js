@@ -6,8 +6,8 @@ import {setLanguage, t} from './i18n.js';
 import {replacingLocation, sameLocation, withLocation} from './location-state.js';
 
 const SETTINGS_KEY = 'weather.settings.v1';
-const DEFAULT_ZOOM = .25;
-const LAYOUT_VERSION = 2;
+const DEFAULT_ZOOM = .5;
+const LAYOUT_VERSION = 3;
 const ZOOM_LEVELS = [.25, .375, .5, .75, 1, 1.25, 1.5, 2];
 const QUERY = new URLSearchParams(location.search);
 const IS_GITHUB_PAGES = location.hostname.endsWith('.github.io');
@@ -258,6 +258,16 @@ function updateTemperatureAxis(range) {
   }).join('');
 }
 
+function renderDayDividers(hourly) {
+  const container = document.getElementById('forecastDayDividers');
+  container.innerHTML = hourly.map((point, index) => {
+    if (index === 0) return '';
+    const date = String(point.timestamp || '').slice(0, 10);
+    const previousDate = String(hourly[index - 1]?.timestamp || '').slice(0, 10);
+    return date === previousDate ? '' : `<i style="left:${index / hourly.length * 100}%"></i>`;
+  }).join('');
+}
+
 function drawLegendPreviews() {
   drawWeatherChart(document.getElementById('legendTemperatureCanvas'), LEGEND_TEMPERATURE_POINTS, [], {timeline: true, showApparentTemperature: false, interactive: false});
   drawWeatherChart(document.getElementById('legendFeelsCanvas'), LEGEND_FEELS_POINTS, [], {timeline: true, showApparentTemperature: true, apparentAreaOpacity: .46, interactive: false});
@@ -277,6 +287,7 @@ function drawForecast() {
   const timeline = document.getElementById('forecastTimeline');
   timeline.style.setProperty('--forecast-slots', displayedHourly.length);
   updateTemperatureAxis(range);
+  renderDayDividers(displayedHourly);
   const windVisual = document.getElementById('forecastWindVisual');
   windVisual.hidden = !settings.showWind;
   drawForecastSky(document.getElementById('forecastWeatherCanvas'), skyHourly, weather.daily, {showHourlyTemperatures: settings.showHourlyTemperatures, visualScale, groupHours});
