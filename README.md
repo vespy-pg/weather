@@ -15,6 +15,7 @@ The public demo uses fictional data so every weather phenomenon can be inspected
 - Flowing wind bands that progress from nearly straight and faded in calm conditions to wider waves with increasing amplitude in stronger wind, with tapered event edges, an explicit tornado funnel, and optional hourly direction arrows and speed values.
 - Ten daily forecast cards, starting today.
 - Dark and light themes saved for the next visit.
+- Celsius or Fahrenheit display with adjustable temperature color thresholds and a fixed water-freezing boundary.
 - English and Polish interfaces, also available to embedded widgets.
 - A clear built-in legend explaining every symbol and color.
 
@@ -67,6 +68,7 @@ Supported URL parameters:
 | `embed` | Enable the compact widget layout | `embed=1` |
 | `theme` | Select a dark or light appearance | `theme=light` |
 | `lang` | Select an English or Polish interface | `lang=pl` |
+| `unit` | Select Celsius or Fahrenheit temperature display | `unit=F` |
 | `zoom` | Set the initial timeline zoom from 25% to 200%; compact levels group values into 6, 4, 3, or 2-hour intervals | `zoom=0.5` |
 | `lat` and `lon` | Select coordinates for a live deployment | `lat=50.67&lon=19.12` |
 | `name` | Set the displayed location name | `name=Katowice` |
@@ -87,7 +89,7 @@ npm start
 
 Open `http://127.0.0.1:8080/`. On the first visit, the application selects the capital of the visitor's country and requests browser location permission. When permission is granted, it uses OpenStreetMap Nominatim to resolve the coordinates to the nearest named locality and replaces the capital. Open `http://127.0.0.1:8080/?demo=1` to inspect the fictional extreme-weather dataset without contacting a weather provider.
 
-Settings are stored only in the browser. No account is required. The API caches upstream responses in memory for ten minutes by default.
+Settings are stored immediately after each change and only in the browser. No account is required. The API caches upstream responses in memory for ten minutes by default.
 
 Optional environment variables:
 

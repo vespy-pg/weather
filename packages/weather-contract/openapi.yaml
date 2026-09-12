@@ -19,6 +19,11 @@ paths:
           schema:
             type: string
             minLength: 2
+        - in: query
+          name: language
+          schema:
+            type: string
+            enum: [en, pl]
       responses:
         '200':
           description: Matching locations

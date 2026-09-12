@@ -42,6 +42,10 @@
         <button class="theme-button" type="button" id="themeToggle" aria-label="Switch to light mode" title="Switch to light mode">
           <span id="themeIcon" aria-hidden="true">☀</span><span id="themeLabel">Light</span>
         </button>
+        <button class="settings-button" type="button" id="settingsButton" aria-label="Settings" title="Settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Zm8 3.5-.1-1-2.1-.8a7 7 0 0 0-.7-1.7l.9-2-1.5-1.5-2 .9a7 7 0 0 0-1.7-.7L12 3h-2l-.8 2.1a7 7 0 0 0-1.7.7l-2-.9L4 6.5l.9 2a7 7 0 0 0-.7 1.7L2 11v2l2.1.8a7 7 0 0 0 .7 1.7l-.9 2L5.5 19l2-.9a7 7 0 0 0 1.7.7L10 21h2l.8-2.1a7 7 0 0 0 1.7-.7l2 .9 1.5-1.5-.9-2a7 7 0 0 0 .7-1.7L20 13v-1Z"/></svg>
+          <span data-i18n="action.settings">Settings</span>
+        </button>
       </div>
     </header>
 
@@ -171,7 +175,7 @@
         <p class="selected-location" id="selectedLocation"></p>
         <div class="saved-locations" id="savedLocations"></div>
         <div class="location-search-row">
-          <input id="locationQuery" type="search" minlength="2" autocomplete="off" placeholder="Search city or place" data-i18n-placeholder="settings.searchPlaceholder">
+          <input id="locationQuery" type="search" minlength="2" autocomplete="off" placeholder="Search city, place or postal code" data-i18n-placeholder="settings.searchPlaceholder">
           <button type="button" id="searchLocation" data-i18n="action.search">Search</button>
           <button type="button" id="useDeviceLocation" data-i18n="action.useDevice">Use device</button>
         </div>
@@ -187,6 +191,21 @@
         <label class="setting-row"><span data-i18n="settings.theme">Color theme</span>
           <select id="colorTheme"><option value="dark" data-i18n="action.dark">Dark</option><option value="light" data-i18n="action.light">Light</option></select>
         </label>
+        <label class="setting-row temperature-unit-row"><span data-i18n="settings.temperatureUnit">Temperature unit</span>
+          <span class="unit-switch"><b>°C</b><input id="temperatureUnit" type="checkbox" role="switch" aria-label="Use Fahrenheit"><b>°F</b></span>
+        </label>
+        <div class="temperature-scale-setting">
+          <div class="temperature-scale-heading"><span data-i18n="settings.temperatureColors">Temperature color thresholds</span><small data-i18n="settings.freezingFixed">Freezing point is fixed</small></div>
+          <div class="temperature-scale-slider" id="temperatureScaleSlider">
+            <div class="temperature-scale-gradient"></div>
+            <input type="range" data-temperature-threshold="deepFrost" aria-label="Deep frost threshold">
+            <input type="range" data-temperature-threshold="freezing" aria-label="Freezing point" disabled>
+            <input type="range" data-temperature-threshold="mild" aria-label="Mild threshold">
+            <input type="range" data-temperature-threshold="warm" aria-label="Warm threshold">
+            <input type="range" data-temperature-threshold="hot" aria-label="Hot threshold">
+          </div>
+          <div class="temperature-scale-values" id="temperatureScaleValues"></div>
+        </div>
         <label class="setting-row"><span data-i18n="settings.zoom">Default timeline zoom</span>
           <select id="defaultZoom"><option value="0.25">25% (6 h)</option><option value="0.375">38% (4 h)</option><option value="0.5">50% (3 h)</option><option value="0.75">75% (2 h)</option><option value="1">100% (1 h)</option><option value="1.25">125% (1 h)</option><option value="1.5">150% (1 h)</option><option value="2">200% (1 h)</option></select>
         </label>
@@ -209,8 +228,8 @@
 
       <p class="settings-error" id="settingsError" role="alert"></p>
       <div class="dialog-actions">
-        <button class="secondary-button" value="cancel" data-i18n="action.cancel">Cancel</button>
-        <button class="primary-button" id="saveSettings" value="default" data-i18n="action.save">Save settings</button>
+        <span class="settings-autosave" data-i18n="settings.savedAutomatically">Changes are saved automatically.</span>
+        <button class="primary-button" value="cancel" data-i18n="action.close">Close</button>
       </div>
     </form>
   </dialog>

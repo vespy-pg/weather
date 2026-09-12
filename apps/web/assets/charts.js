@@ -5,26 +5,25 @@ import {
   installChartTooltip,
   measurement,
   numericValue,
+  shortTemperature,
   temperature
 } from './components.js';
 import {temperatureRange} from './forecast-view.js';
 import {t} from './i18n.js';
+import {temperatureColorStops} from './temperature-scale.js';
 
 const HOME_LATITUDE = 46.81;
 const HOME_LONGITUDE = 9.84;
 
-const TEMPERATURE_COLOR_STOPS = [
-  {temperature: -20, color: '#ffffff'},
-  {temperature: -12, color: '#ffffff'},
-  {temperature: -10, color: '#7f8996'},
-  {temperature: -.001, color: '#7f8996'},
-  {temperature: 0, color: '#2358c7'},
-  {temperature: 12, color: '#3b9ee5'},
-  {temperature: 18, color: '#45cf88'},
-  {temperature: 27, color: '#45cf88'},
-  {temperature: 32, color: '#f28e3e'},
-  {temperature: 40, color: '#ff263f'}
-];
+let temperatureThresholds = null;
+
+export function setTemperatureColorThresholds(value) {
+  temperatureThresholds = value;
+}
+
+function activeTemperatureColorStops() {
+  return temperatureColorStops(temperatureThresholds || undefined);
+}
 
 function chartColor(property, fallback) {
   return getComputedStyle(document.documentElement).getPropertyValue(property).trim() || fallback;
@@ -53,13 +52,14 @@ function interpolateHexColor(start, end, progress) {
 }
 
 function temperatureColor(value) {
+  const stops = activeTemperatureColorStops();
   const numeric = numericValue(value);
-  if (numeric === null || numeric <= TEMPERATURE_COLOR_STOPS[0].temperature) return TEMPERATURE_COLOR_STOPS[0].color;
-  const finalStop = TEMPERATURE_COLOR_STOPS[TEMPERATURE_COLOR_STOPS.length - 1];
+  if (numeric === null || numeric <= stops[0].temperature) return stops[0].color;
+  const finalStop = stops[stops.length - 1];
   if (numeric >= finalStop.temperature) return finalStop.color;
-  const upperIndex = TEMPERATURE_COLOR_STOPS.findIndex(stop => stop.temperature >= numeric);
-  const lower = TEMPERATURE_COLOR_STOPS[upperIndex - 1];
-  const upper = TEMPERATURE_COLOR_STOPS[upperIndex];
+  const upperIndex = stops.findIndex(stop => stop.temperature >= numeric);
+  const lower = stops[upperIndex - 1];
+  const upper = stops[upperIndex];
   const progress = (numeric - lower.temperature) / (upper.temperature - lower.temperature);
   return interpolateHexColor(lower.color, upper.color, progress);
 }
@@ -457,7 +457,7 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
     if (options.showHourlyTemperatures !== false && numericTemperature !== null) {
       context.fillStyle = temperatureColor(numericTemperature);
       context.font = `700 ${temperatureFontSize}px ui-monospace, monospace`;
-      context.fillText(`${Math.round(numericTemperature)}°`, x, 36);
+      context.fillText(shortTemperature(numericTemperature), x, 36);
       context.font = `700 ${hourFontSize}px ui-monospace, monospace`;
     }
     const date = String(point.timestamp).slice(0, 10);
@@ -859,7 +859,7 @@ export function drawWeatherChart(canvas, points, days = [], options = {}) {
   if (options.timeline) {
     const temperatureGradient = context.createLinearGradient(0, padding.top, 0, padding.top + plotHeight);
     temperatureGradient.addColorStop(0, temperatureColor(range.maximum));
-    [...TEMPERATURE_COLOR_STOPS].reverse().filter(stop => stop.temperature < range.maximum && stop.temperature > range.minimum).forEach(stop => {
+    [...activeTemperatureColorStops()].reverse().filter(stop => stop.temperature < range.maximum && stop.temperature > range.minimum).forEach(stop => {
       temperatureGradient.addColorStop((range.maximum - stop.temperature) / temperatureSpan, stop.color);
     });
     temperatureGradient.addColorStop(1, temperatureColor(range.minimum));

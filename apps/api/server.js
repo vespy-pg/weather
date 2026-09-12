@@ -119,21 +119,31 @@ export function forecastUrl({latitude, longitude, timezone}) {
   return `https://api.open-meteo.com/v1/forecast?${parameters}`;
 }
 
+export function locationSearchUrl(query, language = 'en') {
+  const supportedLanguage = ['en', 'pl'].includes(language) ? language : 'en';
+  const parameters = new URLSearchParams({name: query, count: '8', language: supportedLanguage, format: 'json'});
+  return `https://geocoding-api.open-meteo.com/v1/search?${parameters}`;
+}
+
 async function locations(requestUrl, response) {
   const query = requestUrl.searchParams.get('q')?.trim();
   if (!query || query.length < 2) return json(response, 400, {error: 'Enter at least two characters.'});
-  const parameters = new URLSearchParams({name: query, count: '8', language: 'en', format: 'json'});
-  const source = await cachedFetch(`https://geocoding-api.open-meteo.com/v1/search?${parameters}`);
+  const source = await cachedFetch(locationSearchUrl(query, requestUrl.searchParams.get('language')));
   const results = (source.results || []).map(item => ({
     id: item.id,
     name: item.name,
     country: item.country,
     admin1: item.admin1 || null,
+    postalCode: item.postcodes?.[0] || null,
     latitude: item.latitude,
     longitude: item.longitude,
     timezone: item.timezone
   }));
   return json(response, 200, {results});
+}
+
+export function preferredLanguageForCountry(countryCode) {
+  return String(countryCode || '').toUpperCase() === 'PL' ? 'pl' : 'en';
 }
 
 export function selectCapitalResult(results, countryCode) {
@@ -152,7 +162,7 @@ async function bootstrapLocation(request, response) {
   const source = await cachedFetch(`https://geocoding-api.open-meteo.com/v1/search?${parameters}`);
   const capital = selectCapitalResult(source.results, countryCode);
   if (!capital) return json(response, 200, {location: null});
-  return json(response, 200, {location: {
+  return json(response, 200, {countryCode, language: preferredLanguageForCountry(countryCode), location: {
     id: `capital-${countryCode}`,
     name: capital.name,
     country: country.name,

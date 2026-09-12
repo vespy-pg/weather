@@ -1,9 +1,17 @@
-import {drawForecastSky, drawWeatherChart, drawWindFlow} from './charts.js';
+import {drawForecastSky, drawWeatherChart, drawWindFlow, setTemperatureColorThresholds} from './charts.js';
 import {createWeatherDemo} from './weather-demo.js';
-import {escapeHtml, formatForecastDate, formatTime, measurement, numericValue, temperature} from './components.js';
+import {escapeHtml, formatForecastDate, formatTime, measurement, numericValue, shortTemperature, temperature} from './components.js';
 import {groupHourlyForecast, hoursPerGroup, temperatureRange} from './forecast-view.js';
 import {setLanguage, t} from './i18n.js';
 import {replacingLocation, sameLocation, withLocation} from './location-state.js';
+import {
+  celsiusToDisplay,
+  DEFAULT_THRESHOLDS,
+  displayToCelsius,
+  normalizeTemperatureThresholds,
+  setTemperatureUnit,
+  temperatureUnit
+} from './temperature-scale.js';
 
 const SETTINGS_KEY = 'weather.settings.v1';
 const DEFAULT_ZOOM = .5;
@@ -23,6 +31,8 @@ const DEFAULT_SETTINGS = {
   layoutVersion: LAYOUT_VERSION,
   theme: 'dark',
   language: 'en',
+  temperatureUnit: 'C',
+  temperatureThresholds: DEFAULT_THRESHOLDS,
   showHourlyTemperatures: true,
   showApparentTemperature: true,
   showPrecipitation: true,
@@ -83,6 +93,8 @@ let weather = null;
 let weatherRequest = 0;
 let zoomIndex = Math.max(0, ZOOM_LEVELS.indexOf(Number(settings.zoom)));
 let forecastDrawFrame = 0;
+let locationSearchTimer = 0;
+let locationSearchRequest = 0;
 
 function locationLabel(item) {
   return `${item.name}${item.country ? `, ${item.country}` : ''}`;
@@ -120,11 +132,19 @@ function loadSettings() {
     }
     if (['dark', 'light'].includes(QUERY.get('theme'))) stored.theme = QUERY.get('theme');
     if (['en', 'pl'].includes(QUERY.get('lang'))) stored.language = QUERY.get('lang');
+    if (['C', 'F'].includes(QUERY.get('unit'))) stored.temperatureUnit = QUERY.get('unit');
+    stored.temperatureUnit = stored.temperatureUnit === 'F' ? 'F' : 'C';
+    stored.temperatureThresholds = normalizeTemperatureThresholds(stored.temperatureThresholds);
     if (ZOOM_LEVELS.includes(Number(QUERY.get('zoom')))) stored.zoom = Number(QUERY.get('zoom'));
     return stored;
   } catch {
     return {...DEFAULT_SETTINGS, location: {...DEFAULT_LOCATION}, locations: [{...DEFAULT_LOCATION}]};
   }
+}
+
+function applyTemperatureSettings() {
+  setTemperatureUnit(settings.temperatureUnit);
+  setTemperatureColorThresholds(settings.temperatureThresholds);
 }
 
 function saveSettings() {
@@ -155,6 +175,7 @@ function embedCode(locationOverride = settings.location, theme = settings.theme,
   url.searchParams.set('timezone', locationOverride.timezone || 'auto');
   url.searchParams.set('theme', theme);
   url.searchParams.set('lang', languageOverride);
+  url.searchParams.set('unit', settings.temperatureUnit);
   url.searchParams.set('zoom', settings.zoom);
   if (IS_DEMO) url.searchParams.set('demo', '1');
   return `<iframe src="${url}" title="${t('embed.title')}" width="100%" height="680" loading="lazy" style="border:0;border-radius:12px" allow="geolocation"></iframe>`;
@@ -253,7 +274,8 @@ function updateTemperatureAxis(range) {
   document.querySelector('.forecast-chart-y-axis-temperature').innerHTML = values.map((value, index) => {
     const position = plotTop + index / 2 * plotHeight;
     const className = value > 27 ? 'hot' : value <= -12 ? 'deep-frost' : value <= 0 ? 'zero' : '';
-    const rounded = Math.round(value);
+    const displayed = celsiusToDisplay(value);
+    const rounded = Math.round(displayed);
     return `<span class="${className}" style="--axis-position:${position}px">${rounded > 0 ? '+' : ''}${rounded}°</span>`;
   }).join('');
 }
@@ -269,6 +291,13 @@ function renderDayDividers(hourly) {
 }
 
 function drawLegendPreviews() {
+  document.querySelector('[data-i18n="legend.temperatureText"]').textContent = t('legend.temperatureText', {
+    deepFrost: temperature(settings.temperatureThresholds.deepFrost),
+    freezing: temperature(0),
+    mild: temperature(settings.temperatureThresholds.mild),
+    warm: temperature(settings.temperatureThresholds.warm),
+    hot: temperature(settings.temperatureThresholds.hot)
+  });
   drawWeatherChart(document.getElementById('legendTemperatureCanvas'), LEGEND_TEMPERATURE_POINTS, [], {timeline: true, showApparentTemperature: false, interactive: false});
   drawWeatherChart(document.getElementById('legendFeelsCanvas'), LEGEND_FEELS_POINTS, [], {timeline: true, showApparentTemperature: true, apparentAreaOpacity: .46, interactive: false});
   drawForecastSky(document.getElementById('legendSkyCanvas'), LEGEND_SKY_POINTS, LEGEND_SKY_DAYS, {showHourlyTemperatures: false});
@@ -366,6 +395,8 @@ function fillSettingsForm() {
   document.getElementById('defaultZoom').value = String(settings.zoom);
   document.getElementById('colorTheme').value = settings.theme;
   document.getElementById('languageSetting').value = settings.language;
+  document.getElementById('temperatureUnit').checked = settings.temperatureUnit === 'F';
+  renderTemperatureScale();
   document.getElementById('showHourlyTemperatures').checked = settings.showHourlyTemperatures;
   document.getElementById('showApparentTemperature').checked = settings.showApparentTemperature;
   document.getElementById('showPrecipitation').checked = settings.showPrecipitation;
@@ -379,6 +410,86 @@ function fillSettingsForm() {
   document.getElementById('embedCode').value = embedCode(pendingLocation, settings.theme, settings.language);
 }
 
+function temperatureScaleBounds() {
+  return temperatureUnit() === 'F' ? {minimum: -40, maximum: 122, freezing: 32} : {minimum: -40, maximum: 50, freezing: 0};
+}
+
+function renderTemperatureScale() {
+  const bounds = temperatureScaleBounds();
+  const thresholds = settings.temperatureThresholds;
+  const values = {
+    deepFrost: celsiusToDisplay(thresholds.deepFrost),
+    freezing: bounds.freezing,
+    mild: celsiusToDisplay(thresholds.mild),
+    warm: celsiusToDisplay(thresholds.warm),
+    hot: celsiusToDisplay(thresholds.hot)
+  };
+  document.querySelectorAll('[data-temperature-threshold]').forEach(input => {
+    input.min = String(bounds.minimum);
+    input.max = String(bounds.maximum);
+    input.step = temperatureUnit() === 'F' ? '1' : '.5';
+    input.value = String(values[input.dataset.temperatureThreshold]);
+  });
+  const range = bounds.maximum - bounds.minimum;
+  const position = value => (value - bounds.minimum) / range * 100;
+  const deepFrostPosition = position(values.deepFrost);
+  const freezingPosition = position(values.freezing);
+  const mildPosition = position(values.mild);
+  const warmPosition = position(values.warm);
+  const hotPosition = position(values.hot);
+  document.querySelector('.temperature-scale-gradient').style.background = `linear-gradient(90deg,
+    #fff 0 ${deepFrostPosition}%, #7f8996 ${deepFrostPosition}% ${freezingPosition}%,
+    #2358c7 ${freezingPosition}% ${mildPosition}%, #45cf88 ${mildPosition}% ${warmPosition}%,
+    #f28e3e ${warmPosition}% ${hotPosition}%, #ff263f ${hotPosition}% 100%)`;
+  document.getElementById('temperatureScaleValues').innerHTML = Object.entries(values).map(([name, value]) => {
+    const labelPosition = position(value);
+    return `<span style="left:${labelPosition}%" data-scale-value="${name}">${shortTemperature(displayToCelsius(value))}</span>`;
+  }).join('');
+  document.querySelectorAll('[data-scale-value]').forEach(label => {
+    const position = Number.parseFloat(label.style.left);
+    label.style.transform = `translateX(${position < 8 ? 0 : position > 92 ? -100 : -50}%)`;
+  });
+}
+
+function settingsFromForm() {
+  return {
+    ...settings,
+    location: pendingLocation,
+    locations: pendingLocations,
+    configured: true,
+    zoom: Number(document.getElementById('defaultZoom').value),
+    theme: document.getElementById('colorTheme').value,
+    language: document.getElementById('languageSetting').value,
+    temperatureUnit: document.getElementById('temperatureUnit').checked ? 'F' : 'C',
+    showHourlyTemperatures: document.getElementById('showHourlyTemperatures').checked,
+    showApparentTemperature: document.getElementById('showApparentTemperature').checked,
+    showPrecipitation: document.getElementById('showPrecipitation').checked,
+    showWind: document.getElementById('showWind').checked,
+    showWindArrows: document.getElementById('showWindArrows').checked,
+    layoutVersion: LAYOUT_VERSION
+  };
+}
+
+function saveFormChanges({reloadWeather = false} = {}) {
+  const previousLanguage = settings.language;
+  const previousUnit = settings.temperatureUnit;
+  settings = settingsFromForm();
+  settings.language = setLanguage(settings.language);
+  applyTemperatureSettings();
+  saveSettings();
+  document.getElementById('languageSelect').value = settings.language;
+  applyTheme(settings.theme);
+  zoomIndex = ZOOM_LEVELS.indexOf(settings.zoom);
+  renderLocationMenu();
+  updateEmbedPreview();
+  if (previousLanguage !== settings.language) fillSettingsForm();
+  else if (previousUnit !== settings.temperatureUnit) renderTemperatureScale();
+  applyZoom(zoomIndex, false);
+  drawLegendPreviews();
+  if (weather) renderForecast();
+  if (reloadWeather) loadWeather();
+}
+
 function renderPendingLocations() {
   document.getElementById('selectedLocation').textContent = `${t('settings.activeLocation')}: ${locationLabel(pendingLocation)}`;
   const container = document.getElementById('savedLocations');
@@ -389,7 +500,7 @@ function renderPendingLocations() {
   container.querySelectorAll('[data-saved-location]').forEach(button => button.addEventListener('click', () => {
     pendingLocation = pendingLocations[Number(button.dataset.savedLocation)];
     renderPendingLocations();
-    updateEmbedPreview();
+    saveFormChanges({reloadWeather: true});
   }));
   container.querySelectorAll('[data-remove-location]').forEach(button => button.addEventListener('click', () => {
     if (pendingLocations.length === 1) return;
@@ -397,7 +508,7 @@ function renderPendingLocations() {
     pendingLocations = pendingLocations.filter(item => !sameLocation(item, removed));
     if (sameLocation(removed, pendingLocation)) pendingLocation = pendingLocations[0];
     renderPendingLocations();
-    updateEmbedPreview();
+    saveFormChanges({reloadWeather: true});
   }));
 }
 
@@ -435,36 +546,46 @@ function activateLocation(item, locations = settings.locations) {
 }
 
 async function searchLocations() {
+  clearTimeout(locationSearchTimer);
   const query = document.getElementById('locationQuery').value.trim();
   const resultsElement = document.getElementById('locationResults');
-  if (query.length < 2) return document.getElementById('settingsError').textContent = t('error.shortQuery');
+  if (query.length < 2) return;
+  const requestId = ++locationSearchRequest;
   resultsElement.textContent = t('status.searching');
   resultsElement.hidden = false;
   document.getElementById('locationStatus').textContent = '';
   document.getElementById('settingsError').textContent = '';
   try {
     if (IS_GITHUB_PAGES) throw new Error(t('error.locationApi'));
-    const response = await fetch(new URL(`locations?q=${encodeURIComponent(query)}`, API_ROOT));
+    const parameters = new URLSearchParams({q: query, language: settings.language});
+    const response = await fetch(new URL(`locations?${parameters}`, API_ROOT));
     const payload = await response.json();
+    if (requestId !== locationSearchRequest) return;
     if (!response.ok) throw new Error(payload.error);
-    resultsElement.innerHTML = payload.results.length ? payload.results.map((item, index) => `<button type="button" class="location-result" data-location-index="${index}"><strong>${escapeHtml(item.name)}</strong> - ${escapeHtml([item.admin1, item.country].filter(Boolean).join(', '))}</button>`).join('') : `<p class="muted">${t('error.noLocations')}</p>`;
+    resultsElement.innerHTML = payload.results.length ? payload.results.map((item, index) => `<button type="button" class="location-result" data-location-index="${index}"><strong>${escapeHtml(item.name)}</strong> - ${escapeHtml([item.postalCode, item.admin1, item.country].filter(Boolean).join(', '))}</button>`).join('') : `<p class="muted">${t('error.noLocations')}</p>`;
     resultsElement.querySelectorAll('[data-location-index]').forEach(button => button.addEventListener('click', () => {
       pendingLocation = payload.results[Number(button.dataset.locationIndex)];
       pendingLocations = withLocation(pendingLocations, pendingLocation);
-      document.getElementById('locationQuery').value = locationLabel(pendingLocation);
+      document.getElementById('locationQuery').value = '';
       resultsElement.innerHTML = '';
       resultsElement.hidden = true;
       document.getElementById('locationStatus').textContent = t('status.locationAdded');
       renderPendingLocations();
-      updateEmbedPreview();
+      saveFormChanges({reloadWeather: true});
     }));
   } catch (error) {
+    if (requestId !== locationSearchRequest) return;
     resultsElement.innerHTML = '';
     document.getElementById('settingsError').textContent = error.message;
+  } finally {
+    if (requestId === locationSearchRequest && document.getElementById('locationQuery').value.trim() === query) {
+      document.getElementById('locationQuery').value = '';
+    }
   }
 }
 
 document.getElementById('openSettings').addEventListener('click', openSettingsDialog);
+document.getElementById('settingsButton').addEventListener('click', openSettingsDialog);
 document.getElementById('editLocation').addEventListener('click', () => {
   if (settings.locations.length === 1) return openSettingsDialog();
   const menu = document.getElementById('locationMenu');
@@ -478,21 +599,38 @@ document.addEventListener('click', event => {
 });
 document.getElementById('themeToggle').addEventListener('click', () => {
   applyTheme(settings.theme === 'dark' ? 'light' : 'dark', true);
+  document.getElementById('colorTheme').value = settings.theme;
   drawForecast();
   drawLegendPreviews();
 });
 document.getElementById('languageSelect').addEventListener('change', event => {
   settings.language = setLanguage(event.target.value);
   saveSettings();
+  document.getElementById('languageSetting').value = settings.language;
   applyTheme(settings.theme);
   renderForecast();
   drawLegendPreviews();
 });
-document.getElementById('colorTheme').addEventListener('change', event => {
-  updateEmbedPreview();
+document.getElementById('settingsForm').addEventListener('change', event => {
+  if (event.target.matches('[data-temperature-threshold]')) return;
+  saveFormChanges();
 });
-document.getElementById('languageSetting').addEventListener('change', event => {
-  updateEmbedPreview();
+document.querySelectorAll('[data-temperature-threshold]:not(:disabled)').forEach(input => {
+  input.addEventListener('input', event => {
+    const name = event.currentTarget.dataset.temperatureThreshold;
+    settings.temperatureThresholds = normalizeTemperatureThresholds({
+      ...settings.temperatureThresholds,
+      [name]: displayToCelsius(Number(event.currentTarget.value))
+    });
+    setTemperatureColorThresholds(settings.temperatureThresholds);
+    renderTemperatureScale();
+    drawForecast();
+    drawLegendPreviews();
+  });
+  input.addEventListener('change', () => {
+    saveSettings();
+    updateEmbedPreview();
+  });
 });
 document.getElementById('copyEmbedCode').addEventListener('click', async () => {
   try {
@@ -504,6 +642,17 @@ document.getElementById('copyEmbedCode').addEventListener('click', async () => {
   }
 });
 document.getElementById('searchLocation').addEventListener('click', searchLocations);
+document.getElementById('locationQuery').addEventListener('input', event => {
+  clearTimeout(locationSearchTimer);
+  const query = event.currentTarget.value.trim();
+  if (query.length < 2) {
+    locationSearchRequest += 1;
+    document.getElementById('locationResults').hidden = true;
+    document.getElementById('settingsError').textContent = '';
+    return;
+  }
+  locationSearchTimer = setTimeout(searchLocations, 350);
+});
 document.getElementById('locationQuery').addEventListener('keydown', event => {
   if (event.key === 'Enter') { event.preventDefault(); searchLocations(); }
 });
@@ -514,37 +663,15 @@ document.getElementById('useDeviceLocation').addEventListener('click', () => {
     const deviceLocation = await locationFromPosition(position);
     pendingLocations = replacingLocation(pendingLocations, pendingLocation, deviceLocation);
     pendingLocation = deviceLocation;
-    document.getElementById('locationQuery').value = locationLabel(pendingLocation);
+    document.getElementById('locationQuery').value = '';
     renderPendingLocations();
-    updateEmbedPreview();
+    saveFormChanges({reloadWeather: true});
     document.getElementById('settingsError').textContent = '';
   }, error => { document.getElementById('settingsError').textContent = error.message; }, {enableHighAccuracy: false, timeout: 10000});
 });
 document.getElementById('settingsForm').addEventListener('submit', event => {
   event.preventDefault();
-  if (event.submitter?.value === 'cancel') return document.getElementById('settingsDialog').close();
-  settings = {
-    location: pendingLocation,
-    locations: pendingLocations,
-    configured: true,
-    zoom: Number(document.getElementById('defaultZoom').value),
-    theme: document.getElementById('colorTheme').value,
-    language: document.getElementById('languageSetting').value,
-    showHourlyTemperatures: document.getElementById('showHourlyTemperatures').checked,
-    showApparentTemperature: document.getElementById('showApparentTemperature').checked,
-    showPrecipitation: document.getElementById('showPrecipitation').checked,
-    showWind: document.getElementById('showWind').checked,
-    showWindArrows: document.getElementById('showWindArrows').checked,
-    layoutVersion: LAYOUT_VERSION
-  };
-  saveSettings();
-  settings.language = setLanguage(settings.language);
-  document.getElementById('languageSelect').value = settings.language;
-  applyTheme(settings.theme);
-  zoomIndex = ZOOM_LEVELS.indexOf(settings.zoom);
   document.getElementById('settingsDialog').close();
-  applyZoom(zoomIndex, false);
-  loadWeather();
 });
 
 document.getElementById('forecastZoomOut').addEventListener('click', () => applyZoom(zoomIndex - 1));
@@ -564,6 +691,7 @@ window.addEventListener('resize', () => {
 
 document.body.classList.toggle('embedded', IS_EMBEDDED);
 settings.language = setLanguage(settings.language);
+applyTemperatureSettings();
 document.getElementById('languageSelect').value = settings.language;
 applyTheme(settings.theme);
 drawLegendPreviews();
@@ -623,6 +751,13 @@ async function initialize() {
     const response = await fetch(new URL('bootstrap-location', API_ROOT));
     const payload = await response.json();
     if (response.ok && payload.location) {
+      if (!QUERY.has('lang') && ['en', 'pl'].includes(payload.language)) {
+        settings.language = setLanguage(payload.language);
+        document.getElementById('languageSelect').value = settings.language;
+        document.getElementById('languageSetting').value = settings.language;
+        applyTheme(settings.theme);
+        drawLegendPreviews();
+      }
       settings.location = payload.location;
       settings.locations = [payload.location];
     }

@@ -1,6 +1,7 @@
 'use strict';
 
 import {locale, t} from './i18n.js';
+import {celsiusToDisplay, temperatureUnit} from './temperature-scale.js';
 
 export function escapeHtml(value) {
   return String(value ?? '')
@@ -19,7 +20,12 @@ export function numericValue(value) {
 
 export function temperature(value) {
   const parsed = numericValue(value);
-  return parsed === null ? t('error.unavailable') : `${parsed.toFixed(1)}°C`;
+  return parsed === null ? t('error.unavailable') : `${celsiusToDisplay(parsed).toFixed(1)}°${temperatureUnit()}`;
+}
+
+export function shortTemperature(value, digits = 0) {
+  const parsed = numericValue(value);
+  return parsed === null ? t('error.unavailable') : `${celsiusToDisplay(parsed).toFixed(digits)}°`;
 }
 
 export function measurement(value, suffix, digits = 0) {
