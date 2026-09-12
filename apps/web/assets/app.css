@@ -14,7 +14,8 @@
   --chart-night-band: rgba(0, 0, 0, .68);
   --chart-night-cutout: #080c12;
   --chart-hour-grid: rgba(154, 164, 178, .1);
-  --chart-day-separator: rgba(154, 164, 178, .48);
+  --chart-day-separator: rgba(154, 164, 178, .72);
+  --chart-alternate-day: rgba(88, 166, 255, .07);
   --chart-axis-background: rgba(13, 17, 24, .86);
   --chart-wind: #0f151e;
   --chart-wind-flow: #9bc7d7;
@@ -48,7 +49,8 @@
   --chart-night-band: rgba(56, 77, 108, .14);
   --chart-night-cutout: #d9e1eb;
   --chart-hour-grid: rgba(70, 91, 120, .14);
-  --chart-day-separator: rgba(70, 91, 120, .34);
+  --chart-day-separator: rgba(70, 91, 120, .58);
+  --chart-alternate-day: rgba(23, 111, 193, .055);
   --chart-axis-background: rgba(247, 250, 255, .9);
   --chart-wind: #eef4fa;
   --chart-wind-flow: #486d80;
@@ -116,7 +118,7 @@ h2 { margin-bottom: 2px; font-size: 18px; }
 .forecast-chart-y-axis-temperature .zero { color: #2358c7; }
 .forecast-chart-y-axis-temperature .deep-frost { color: #fff; }
 :root[data-theme="light"] .forecast-chart-y-axis-temperature .deep-frost { color: #526277; }
-.forecast-timeline { --forecast-hour-width: 18px; width: max(100%, calc(var(--forecast-hours, 240) * var(--forecast-hour-width) + 64px)); padding-bottom: 14px; }
+.forecast-timeline { --forecast-slot-width: 18px; width: max(100%, calc(var(--forecast-slots, 40) * var(--forecast-slot-width) + 64px)); padding-bottom: 14px; }
 .forecast-track-title { position: relative; height: 24px; border-bottom: 1px solid var(--chart-grid); background: var(--chart-wind); }
 .forecast-track-title span { position: sticky; z-index: 5; left: 0; display: inline-flex; height: 24px; align-items: center; gap: 7px; padding: 0 9px; background: linear-gradient(90deg, var(--chart-wind) 82%, transparent); color: var(--chart-text); font: 800 10px/1 ui-monospace, monospace; letter-spacing: .04em; text-transform: uppercase; }
 .forecast-track-marker { width: 22px; height: 4px; flex: 0 0 auto; border-radius: 99px; }
@@ -124,10 +126,10 @@ h2 { margin-bottom: 2px; font-size: 18px; }
 .forecast-track-marker.temperature { background: linear-gradient(90deg, #2358c7, #45cf88 48%, #f28e3e 72%, #ff263f); }
 .forecast-track-marker.wind { background: var(--chart-wind-flow); box-shadow: 0 0 7px color-mix(in srgb, var(--chart-wind-flow) 45%, transparent); }
 .forecast-weather-canvas { display: block; width: 100%; height: 100px; border-bottom: 1px solid var(--chart-grid); background: var(--chart-surface); touch-action: pan-x pan-y; }
-#forecastChart { display: block; width: 100%; height: 270px; background: var(--chart-surface); touch-action: pan-x pan-y; }
+#forecastChart { display: block; width: 100%; height: 140px; background: var(--chart-surface); touch-action: pan-x pan-y; }
 .forecast-wind-visual { position: relative; height: var(--forecast-wind-height, 46px); overflow: hidden; border-top: 1px solid var(--chart-grid); background: var(--chart-wind); }
 .forecast-wind-canvas { display: block; width: 100%; height: 100%; }
-.forecast-wind-strip { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(var(--forecast-hours, 240), minmax(0, 1fr)); padding-right: 34px; background: color-mix(in srgb, var(--chart-wind) 30%, transparent); }
+.forecast-wind-strip { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(var(--forecast-slots, 40), minmax(0, 1fr)); padding-right: 34px; background: color-mix(in srgb, var(--chart-wind) 30%, transparent); }
 .forecast-wind-hour { display: grid; min-width: 0; grid-template-rows: var(--forecast-wind-arrow-row, 24px) var(--forecast-wind-speed-row, 11px); place-items: center; padding: 4px 1px 3px; border-right: 1px solid rgba(154, 164, 178, .1); }
 .forecast-wind-hour.new-day { border-left: 1px solid rgba(154, 164, 178, .48); scroll-snap-align: start; }
 .forecast-wind-arrow { display: inline-block; font-size: var(--forecast-wind-arrow-size, 19px); font-weight: 900; line-height: var(--forecast-wind-arrow-line, 22px); }
@@ -207,7 +209,7 @@ body.embedded .forecast-heading-tools .muted { display: none; }
 
 @media (max-width: 760px) {
   .current-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .forecast-timeline { --forecast-hour-width: 22px; }
+  .forecast-timeline { --forecast-slot-width: 33px; }
   .legend-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 

@@ -54,10 +54,10 @@
           <h2 data-i18n="forecast.title">Temperature, clouds and precipitation</h2>
         </div>
         <div class="forecast-heading-tools">
-          <span class="muted" data-i18n="forecast.range">Temperature from -20°C to +40°C</span>
+          <span class="muted" data-i18n="forecast.range">Temperature scale follows the forecast</span>
           <div class="forecast-zoom-controls" aria-label="Timeline zoom">
             <button type="button" id="forecastZoomOut" aria-label="Zoom out timeline">-</button>
-            <button type="button" id="forecastZoomReset" aria-label="Reset timeline zoom">100%</button>
+            <button type="button" id="forecastZoomReset" aria-label="Reset timeline zoom">25%</button>
             <button type="button" id="forecastZoomIn" aria-label="Zoom in timeline">+</button>
           </div>
         </div>
@@ -65,16 +65,16 @@
       <div class="forecast-timeline-scroll" id="forecastTimelineScroll">
         <div class="forecast-chart-y-axes" aria-hidden="true">
           <div class="forecast-chart-y-axis forecast-chart-y-axis-temperature">
-            <span class="hot" style="--axis-position:162px">+40°</span>
-            <span class="zero" style="--axis-position:318px">0°</span>
-            <span class="deep-frost" style="--axis-position:396px">-20°</span>
+            <span style="--axis-position:162px">+20°</span>
+            <span style="--axis-position:214px">+10°</span>
+            <span style="--axis-position:266px">0°</span>
           </div>
         </div>
         <div class="forecast-timeline" id="forecastTimeline">
           <div class="forecast-track-title"><span><i class="forecast-track-marker sky" aria-hidden="true"></i><b data-i18n="chart.skyLabel">Sky and precipitation</b></span></div>
           <canvas class="forecast-weather-canvas" id="forecastWeatherCanvas" height="100" aria-label="Hourly temperature and continuous weather conditions"></canvas>
           <div class="forecast-track-title"><span><i class="forecast-track-marker temperature" aria-hidden="true"></i><b data-i18n="chart.temperatureLabel">Temperature and feels like</b></span></div>
-          <canvas id="forecastChart" height="300" aria-label="Temperature and apparent temperature chart"></canvas>
+          <canvas id="forecastChart" height="140" aria-label="Temperature and apparent temperature chart"></canvas>
           <div class="forecast-track-title"><span><i class="forecast-track-marker wind" aria-hidden="true"></i><b data-i18n="chart.windLabel">Wind strength</b></span></div>
           <div class="forecast-wind-visual" id="forecastWindVisual" aria-label="Hourly wind strength">
             <canvas class="forecast-wind-canvas" id="forecastWindCanvas" height="64"></canvas>
@@ -157,7 +157,7 @@
           <select id="colorTheme"><option value="dark" data-i18n="action.dark">Dark</option><option value="light" data-i18n="action.light">Light</option></select>
         </label>
         <label class="setting-row"><span data-i18n="settings.zoom">Default timeline zoom</span>
-          <select id="defaultZoom"><option value="0.5">50%</option><option value="0.75">75%</option><option value="1">100%</option><option value="1.25">125%</option><option value="1.5">150%</option><option value="2">200%</option></select>
+          <select id="defaultZoom"><option value="0.25">25% (6 h)</option><option value="0.375">38% (4 h)</option><option value="0.5">50% (3 h)</option><option value="0.75">75% (2 h)</option><option value="1">100% (1 h)</option><option value="1.25">125% (1 h)</option><option value="1.5">150% (1 h)</option><option value="2">200% (1 h)</option></select>
         </label>
         <label class="setting-row"><span data-i18n="settings.hourlyTemperature">Hourly temperature values</span><input id="showHourlyTemperatures" type="checkbox"></label>
         <label class="setting-row"><span data-i18n="settings.apparent">Apparent temperature area</span><input id="showApparentTemperature" type="checkbox"></label>

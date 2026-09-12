@@ -1,11 +1,14 @@
 import {drawForecastSky, drawWeatherChart, drawWindFlow} from './charts.js';
 import {createWeatherDemo} from './weather-demo.js';
 import {escapeHtml, formatForecastDate, formatTime, measurement, numericValue, temperature} from './components.js';
+import {groupHourlyForecast, hoursPerGroup, temperatureRange} from './forecast-view.js';
 import {setLanguage, t} from './i18n.js';
 import {replacingLocation, sameLocation, withLocation} from './location-state.js';
 
 const SETTINGS_KEY = 'weather.settings.v1';
-const ZOOM_LEVELS = [.5, .75, 1, 1.25, 1.5, 2];
+const DEFAULT_ZOOM = .25;
+const LAYOUT_VERSION = 2;
+const ZOOM_LEVELS = [.25, .375, .5, .75, 1, 1.25, 1.5, 2];
 const QUERY = new URLSearchParams(location.search);
 const IS_GITHUB_PAGES = location.hostname.endsWith('.github.io');
 const IS_DEMO = QUERY.get('demo') === '1' || IS_GITHUB_PAGES;
@@ -16,7 +19,8 @@ const DEFAULT_SETTINGS = {
   location: DEFAULT_LOCATION,
   locations: [DEFAULT_LOCATION],
   configured: false,
-  zoom: 1,
+  zoom: DEFAULT_ZOOM,
+  layoutVersion: LAYOUT_VERSION,
   theme: 'dark',
   language: 'en',
   showHourlyTemperatures: true,
@@ -78,6 +82,7 @@ let pendingLocations = settings.locations;
 let weather = null;
 let weatherRequest = 0;
 let zoomIndex = Math.max(0, ZOOM_LEVELS.indexOf(Number(settings.zoom)));
+let forecastDrawFrame = 0;
 
 function locationLabel(item) {
   return `${item.name}${item.country ? `, ${item.country}` : ''}`;
@@ -87,6 +92,10 @@ function loadSettings() {
   try {
     const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
     const stored = {...DEFAULT_SETTINGS, ...saved};
+    if (saved.layoutVersion !== LAYOUT_VERSION) {
+      stored.zoom = DEFAULT_ZOOM;
+      stored.layoutVersion = LAYOUT_VERSION;
+    }
     const legacyPlaceholder = stored.location?.name === 'Kamienica Polska'
       || (stored.location?.name === 'Aurora Vale' && stored.location?.country === 'Northland');
     if (legacyPlaceholder) {
@@ -198,8 +207,9 @@ function applyZoom(nextIndex, preserveCenter = true) {
     : 0;
   zoomIndex = Math.max(0, Math.min(ZOOM_LEVELS.length - 1, nextIndex));
   const zoom = ZOOM_LEVELS[zoomIndex];
+  const groupHours = hoursPerGroup(zoom);
   const visualScale = zoomVisualScale(zoom);
-  timeline.style.setProperty('--forecast-hour-width', `${forecastBaseHourWidth() * zoom}px`);
+  timeline.style.setProperty('--forecast-slot-width', `${forecastBaseHourWidth() * zoom * groupHours}px`);
   timeline.style.setProperty('--forecast-wind-height', `${46 * visualScale}px`);
   timeline.style.setProperty('--forecast-wind-arrow-row', `${24 * visualScale}px`);
   timeline.style.setProperty('--forecast-wind-speed-row', `${11 * visualScale}px`);
@@ -209,7 +219,8 @@ function applyZoom(nextIndex, preserveCenter = true) {
   document.getElementById('forecastZoomReset').textContent = `${Math.round(zoom * 100)}%`;
   document.getElementById('forecastZoomOut').disabled = zoomIndex === 0;
   document.getElementById('forecastZoomIn').disabled = zoomIndex === ZOOM_LEVELS.length - 1;
-  requestAnimationFrame(() => {
+  cancelAnimationFrame(forecastDrawFrame);
+  forecastDrawFrame = requestAnimationFrame(() => {
     if (preserveCenter) scroll.scrollLeft = Math.max(0, center * scroll.scrollWidth - scroll.clientWidth / 2);
     drawForecast();
   });
@@ -232,6 +243,21 @@ function renderWind(hourly) {
   }).join('');
 }
 
+function updateTemperatureAxis(range) {
+  const canvasTop = 24 + 100 + 24;
+  const chartHeight = document.getElementById('forecastChart').getBoundingClientRect().height || 140;
+  const plotTop = canvasTop + 14;
+  const plotHeight = chartHeight - 36;
+  const middle = (range.maximum + range.minimum) / 2;
+  const values = [range.maximum, middle, range.minimum];
+  document.querySelector('.forecast-chart-y-axis-temperature').innerHTML = values.map((value, index) => {
+    const position = plotTop + index / 2 * plotHeight;
+    const className = value > 27 ? 'hot' : value <= -12 ? 'deep-frost' : value <= 0 ? 'zero' : '';
+    const rounded = Math.round(value);
+    return `<span class="${className}" style="--axis-position:${position}px">${rounded > 0 ? '+' : ''}${rounded}°</span>`;
+  }).join('');
+}
+
 function drawLegendPreviews() {
   drawWeatherChart(document.getElementById('legendTemperatureCanvas'), LEGEND_TEMPERATURE_POINTS, [], {timeline: true, showApparentTemperature: false, interactive: false});
   drawWeatherChart(document.getElementById('legendFeelsCanvas'), LEGEND_FEELS_POINTS, [], {timeline: true, showApparentTemperature: true, apparentAreaOpacity: .46, interactive: false});
@@ -242,15 +268,21 @@ function drawLegendPreviews() {
 function drawForecast() {
   if (!weather?.available) return;
   const hourly = weather.hourly.slice(0, 240);
-  const visualScale = zoomVisualScale(ZOOM_LEVELS[zoomIndex]);
-  const skyHourly = settings.showPrecipitation ? hourly : hourly.map(point => ({...point, precipitation: 0, precipitationProbability: 0, snowfall: 0}));
+  const zoom = ZOOM_LEVELS[zoomIndex];
+  const groupHours = hoursPerGroup(zoom);
+  const displayedHourly = groupHourlyForecast(hourly, groupHours);
+  const visualScale = zoomVisualScale(zoom);
+  const skyHourly = settings.showPrecipitation ? displayedHourly : displayedHourly.map(point => ({...point, precipitation: 0, precipitationProbability: 0, snowfall: 0}));
+  const range = temperatureRange(displayedHourly, settings.showApparentTemperature);
+  const timeline = document.getElementById('forecastTimeline');
+  timeline.style.setProperty('--forecast-slots', displayedHourly.length);
+  updateTemperatureAxis(range);
   const windVisual = document.getElementById('forecastWindVisual');
   windVisual.hidden = !settings.showWind;
-  drawForecastSky(document.getElementById('forecastWeatherCanvas'), skyHourly, weather.daily, {showHourlyTemperatures: settings.showHourlyTemperatures, visualScale});
-  drawWeatherChart(document.getElementById('forecastChart'), hourly, weather.daily, {timeline: true, showApparentTemperature: settings.showApparentTemperature, visualScale});
-  if (settings.showWind) drawWindFlow(document.getElementById('forecastWindCanvas'), hourly, {visualScale});
-  renderWind(hourly);
-  drawLegendPreviews();
+  drawForecastSky(document.getElementById('forecastWeatherCanvas'), skyHourly, weather.daily, {showHourlyTemperatures: settings.showHourlyTemperatures, visualScale, groupHours});
+  drawWeatherChart(document.getElementById('forecastChart'), displayedHourly, weather.daily, {timeline: true, showApparentTemperature: settings.showApparentTemperature, visualScale, temperatureRange: range});
+  if (settings.showWind) drawWindFlow(document.getElementById('forecastWindCanvas'), displayedHourly, {visualScale});
+  renderWind(displayedHourly);
 }
 
 function renderForecast() {
@@ -269,8 +301,6 @@ function renderForecast() {
     [t('metric.pressure'), measurement(current.surfacePressure, ' hPa'), t('metric.surfacePressure')]
   ].map(([label, value, detail]) => `<article class="metric-card"><div class="metric-label">${escapeHtml(label)}</div><div class="metric-value">${value}</div><div class="metric-detail">${escapeHtml(detail)}</div></article>`).join('');
 
-  const hourly = weather.hourly.slice(0, 240);
-  document.getElementById('forecastTimeline').style.setProperty('--forecast-hours', hourly.length);
   document.getElementById('dailyForecast').innerHTML = weather.daily.slice(0, 10).map(day => {
     const dayCondition = weatherPresentation(day.weatherCode);
     return `<article class="forecast-day">
@@ -438,12 +468,14 @@ document.addEventListener('click', event => {
 document.getElementById('themeToggle').addEventListener('click', () => {
   applyTheme(settings.theme === 'dark' ? 'light' : 'dark', true);
   drawForecast();
+  drawLegendPreviews();
 });
 document.getElementById('languageSelect').addEventListener('change', event => {
   settings.language = setLanguage(event.target.value);
   saveSettings();
   applyTheme(settings.theme);
   renderForecast();
+  drawLegendPreviews();
 });
 document.getElementById('colorTheme').addEventListener('change', event => {
   updateEmbedPreview();
@@ -491,7 +523,8 @@ document.getElementById('settingsForm').addEventListener('submit', event => {
     showApparentTemperature: document.getElementById('showApparentTemperature').checked,
     showPrecipitation: document.getElementById('showPrecipitation').checked,
     showWind: document.getElementById('showWind').checked,
-    showWindArrows: document.getElementById('showWindArrows').checked
+    showWindArrows: document.getElementById('showWindArrows').checked,
+    layoutVersion: LAYOUT_VERSION
   };
   saveSettings();
   settings.language = setLanguage(settings.language);
@@ -504,7 +537,7 @@ document.getElementById('settingsForm').addEventListener('submit', event => {
 });
 
 document.getElementById('forecastZoomOut').addEventListener('click', () => applyZoom(zoomIndex - 1));
-document.getElementById('forecastZoomReset').addEventListener('click', () => applyZoom(ZOOM_LEVELS.indexOf(1)));
+document.getElementById('forecastZoomReset').addEventListener('click', () => applyZoom(ZOOM_LEVELS.indexOf(DEFAULT_ZOOM)));
 document.getElementById('forecastZoomIn').addEventListener('click', () => applyZoom(zoomIndex + 1));
 document.getElementById('forecastTimelineScroll').addEventListener('wheel', event => {
   if (!event.ctrlKey) return;
@@ -512,8 +545,10 @@ document.getElementById('forecastTimelineScroll').addEventListener('wheel', even
   applyZoom(zoomIndex + (event.deltaY < 0 ? 1 : -1));
 }, {passive: false});
 
+let resizeTimer = 0;
 window.addEventListener('resize', () => {
-  applyZoom(zoomIndex);
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => applyZoom(zoomIndex), 80);
 });
 
 document.body.classList.toggle('embedded', IS_EMBEDDED);
