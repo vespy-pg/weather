@@ -39,20 +39,12 @@ function canvasPixelRatio(rect) {
   return Math.max(.25, Math.min(deviceRatio, 4096 / rect.width, 2048 / rect.height));
 }
 
-function drawDayDividers(context, points, padding, columnWidth, plotHeight, fillAlternatingDays = false) {
-  let dayIndex = -1;
+function drawDayDividers(context, points, padding, columnWidth, plotHeight) {
   points.forEach((point, index) => {
     const date = String(point.timestamp || '').slice(0, 10);
     const previousDate = String(points[index - 1]?.timestamp || '').slice(0, 10);
     if (date === previousDate) return;
-    dayIndex += 1;
     const x = padding.left + index * columnWidth;
-    let endIndex = index + 1;
-    while (endIndex < points.length && String(points[endIndex].timestamp || '').slice(0, 10) === date) endIndex += 1;
-    if (fillAlternatingDays && dayIndex % 2 === 1) {
-      context.fillStyle = chartColor('--chart-alternate-day', 'rgba(88, 166, 255, .055)');
-      context.fillRect(x, padding.top, (endIndex - index) * columnWidth, plotHeight);
-    }
     context.strokeStyle = chartColor('--chart-day-separator', 'rgba(154, 164, 178, .72)');
     context.lineWidth = 2;
     context.beginPath();
@@ -60,6 +52,13 @@ function drawDayDividers(context, points, padding, columnWidth, plotHeight, fill
     context.lineTo(x, padding.top + plotHeight);
     context.stroke();
   });
+}
+
+function colorWithAlpha(color, alpha) {
+  const match = /^#([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(color);
+  if (!match) return color;
+  const channels = match.slice(1).map(value => Number.parseInt(value, 16));
+  return `rgba(${channels.join(', ')}, ${Math.max(0, Math.min(1, alpha))})`;
 }
 
 function interpolateHexColor(start, end, progress) {
@@ -614,10 +613,17 @@ export function drawWindFlow(canvas, points, options = {}) {
     context.lineTo(x, height);
     context.stroke();
   });
-  drawDayDividers(context, points, {left: 0, top: 0}, columnWidth, height, true);
+  drawDayDividers(context, points, {left: 0, top: 0}, columnWidth, height);
 
   const lineCount = strandPositions.length;
   const samplesPerHour = 8;
+  const windGradient = opacity => {
+    const gradient = context.createLinearGradient(0, 0, plotWidth, 0);
+    points.forEach((point, index) => {
+      gradient.addColorStop(index / Math.max(1, points.length - 1), colorWithAlpha(windColor, opacity(strength[index])));
+    });
+    return gradient;
+  };
   context.save();
   context.beginPath();
   for (let index = 0; index < points.length - 1; index += 1) {
@@ -635,8 +641,7 @@ export function drawWindFlow(canvas, points, options = {}) {
     context.bezierCurveTo(endX - columnWidth * .42, endBottom, startX + columnWidth * .42, startBottom, startX, startBottom);
     context.closePath();
   }
-  context.fillStyle = windColor;
-  context.globalAlpha = .025;
+  context.fillStyle = windGradient(value => .001 + Math.pow(value, 1.35) * .045);
   context.filter = `blur(${2.5 * visualScale}px)`;
   context.fill();
   context.restore();
@@ -652,8 +657,8 @@ export function drawWindFlow(canvas, points, options = {}) {
         context.lineTo((position + .5) * columnWidth, lineY(position, lineIndex));
       }
     }
-    context.strokeStyle = windColor;
-    context.globalAlpha = .08 * (.6 + strandWeight * .4);
+    context.strokeStyle = windGradient(value => .002 + Math.pow(value, 1.35) * .12);
+    context.globalAlpha = .6 + strandWeight * .4;
     context.lineWidth = 5 * strandWeight * visualScale;
     context.shadowColor = windColor;
     context.shadowBlur = 5 * visualScale;
@@ -674,8 +679,8 @@ export function drawWindFlow(canvas, points, options = {}) {
       context.save();
       traceSegment();
       context.strokeStyle = windColor;
-      context.globalAlpha = (.018 + Math.pow(averageStrength, 1.22) * .9) * (.65 + strandWeight * .35);
-      context.lineWidth = (.55 + averageStrength * 1.65) * (.82 + strandWeight * .18) * visualScale;
+      context.globalAlpha = (.001 + Math.pow(averageStrength, 1.22) * .92) * (.65 + strandWeight * .35);
+      context.lineWidth = (.35 + averageStrength * 1.85) * (.82 + strandWeight * .18) * visualScale;
       context.lineCap = 'round';
       context.stroke();
       context.restore();
@@ -729,7 +734,7 @@ export function drawWeatherChart(canvas, points, days = [], options = {}) {
 
   context.clearRect(0, 0, width, height);
   if (!options.timeline) drawForecastDayNightBands(context, points, days, padding, columnWidth, plotHeight);
-  if (options.timeline) drawDayDividers(context, points, padding, columnWidth, plotHeight, true);
+  if (options.timeline) drawDayDividers(context, points, padding, columnWidth, plotHeight);
   context.font = '9px ui-monospace, monospace';
   [0, .5, 1].forEach(ratioValue => {
     const lineY = padding.top + (1 - ratioValue) * plotHeight;

@@ -15,7 +15,6 @@
   --chart-night-cutout: #080c12;
   --chart-hour-grid: rgba(154, 164, 178, .1);
   --chart-day-separator: rgba(154, 164, 178, .72);
-  --chart-alternate-day: rgba(88, 166, 255, .07);
   --chart-axis-background: rgba(13, 17, 24, .86);
   --chart-wind: #0f151e;
   --chart-wind-flow: #9bc7d7;
@@ -50,7 +49,6 @@
   --chart-night-cutout: #d9e1eb;
   --chart-hour-grid: rgba(70, 91, 120, .14);
   --chart-day-separator: rgba(70, 91, 120, .58);
-  --chart-alternate-day: rgba(23, 111, 193, .055);
   --chart-axis-background: rgba(247, 250, 255, .9);
   --chart-wind: #eef4fa;
   --chart-wind-flow: #486d80;
