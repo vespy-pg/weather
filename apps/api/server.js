@@ -3,6 +3,13 @@ import {readFile, stat} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {findByIso2} from 'country-list-js';
+import {
+  COUNTRY_LANGUAGE,
+  DEFAULT_LOCALE,
+  LANGUAGE_ALIASES,
+  PROVIDER_LANGUAGES,
+  SUPPORTED_LOCALES
+} from './generated/i18n-config.js';
 
 const PORT = Number(process.env.PORT || 8080);
 const CACHE_TTL_MS = Number(process.env.WEATHER_CACHE_TTL_MS || 10 * 60 * 1000);
@@ -119,9 +126,15 @@ export function forecastUrl({latitude, longitude, timezone}) {
   return `https://api.open-meteo.com/v1/forecast?${parameters}`;
 }
 
-export function locationSearchUrl(query, language = 'en') {
-  const supportedLanguage = ['en', 'pl'].includes(language) ? language : 'en';
-  const parameters = new URLSearchParams({name: query, count: '8', language: supportedLanguage, format: 'json'});
+export function normalizeLocale(language) {
+  const requested = String(language || '').replaceAll('_', '-').toLowerCase();
+  const exact = SUPPORTED_LOCALES.find(locale => locale.toLowerCase() === requested);
+  return exact || LANGUAGE_ALIASES[requested] || LANGUAGE_ALIASES[requested.split('-')[0]] || DEFAULT_LOCALE;
+}
+
+export function locationSearchUrl(query, language = DEFAULT_LOCALE) {
+  const providerLanguage = PROVIDER_LANGUAGES[normalizeLocale(language)] || PROVIDER_LANGUAGES[DEFAULT_LOCALE];
+  const parameters = new URLSearchParams({name: query, count: '8', language: providerLanguage, format: 'json'});
   return `https://geocoding-api.open-meteo.com/v1/search?${parameters}`;
 }
 
@@ -143,7 +156,7 @@ async function locations(requestUrl, response) {
 }
 
 export function preferredLanguageForCountry(countryCode) {
-  return String(countryCode || '').toUpperCase() === 'PL' ? 'pl' : 'en';
+  return COUNTRY_LANGUAGE[String(countryCode || '').toUpperCase()] || DEFAULT_LOCALE;
 }
 
 export function selectCapitalResult(results, countryCode) {
@@ -197,7 +210,7 @@ async function reverseLocation(requestUrl, response) {
   if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
     return json(response, 400, {error: 'Valid latitude and longitude are required.'});
   }
-  const language = requestUrl.searchParams.get('language') === 'pl' ? 'pl' : 'en';
+  const language = PROVIDER_LANGUAGES[normalizeLocale(requestUrl.searchParams.get('language'))] || PROVIDER_LANGUAGES[DEFAULT_LOCALE];
   const fallback = {
     id: `device-${latitude.toFixed(4)}-${longitude.toFixed(4)}`,
     name: 'Current location',

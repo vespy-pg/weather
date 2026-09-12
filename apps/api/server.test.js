@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {forecastUrl, locationSearchUrl, normalizeForecast, normalizeReverseLocation, preferredLanguageForCountry, selectCapitalResult} from './server.js';
+import {forecastUrl, locationSearchUrl, normalizeForecast, normalizeLocale, normalizeReverseLocation, preferredLanguageForCountry, selectCapitalResult} from './server.js';
 
 test('forecastUrl requests the fields shared by web and Android clients', () => {
   const url = new URL(forecastUrl({latitude: 50.67, longitude: 19.12, timezone: 'Europe/Warsaw'}));
@@ -64,14 +64,16 @@ test('selectCapitalResult prefers the matching national capital', () => {
 });
 
 test('locationSearchUrl supports postal codes and the selected language', () => {
-  const url = new URL(locationSearchUrl('00-001', 'pl'));
+  const url = new URL(locationSearchUrl('00-001', 'pl-PL'));
   assert.equal(url.searchParams.get('name'), '00-001');
   assert.equal(url.searchParams.get('language'), 'pl');
 });
 
 test('preferredLanguageForCountry selects an available interface language', () => {
-  assert.equal(preferredLanguageForCountry('pl'), 'pl');
-  assert.equal(preferredLanguageForCountry('DE'), 'en');
+  assert.equal(preferredLanguageForCountry('pl'), 'pl-PL');
+  assert.equal(preferredLanguageForCountry('DE'), 'en-US');
+  assert.equal(normalizeLocale('pl'), 'pl-PL');
+  assert.equal(normalizeLocale('en_GB'), 'en-US');
 });
 
 test('normalizeReverseLocation uses the nearest named locality and country', () => {

@@ -23,7 +23,7 @@ paths:
           name: language
           schema:
             type: string
-            enum: [en, pl]
+            enum: [en-US, pl-PL]
       responses:
         '200':
           description: Matching locations
@@ -59,7 +59,7 @@ paths:
           name: language
           schema:
             type: string
-            enum: [en, pl]
+            enum: [en-US, pl-PL]
       responses:
         '200':
           description: Nearest named locality for coordinates supplied after browser permission

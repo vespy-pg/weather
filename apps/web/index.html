@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en-US">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -12,7 +12,7 @@
       const saved = JSON.parse(localStorage.getItem('weather.settings.v1') || '{}');
       const query = new URLSearchParams(location.search);
       document.documentElement.dataset.theme = query.get('theme') || saved.theme || 'dark';
-      document.documentElement.lang = query.get('lang') || saved.language || 'en';
+      document.documentElement.lang = query.get('lang') || saved.language || 'en-US';
     } catch { document.documentElement.dataset.theme = 'dark'; }
   </script>
   <link rel="stylesheet" href="assets/app.css">
@@ -37,7 +37,7 @@
       <div class="topbar-actions">
         <label class="language-control" aria-label="Language">
           <span aria-hidden="true">文</span>
-          <select id="languageSelect"><option value="en">EN</option><option value="pl">PL</option></select>
+          <select id="languageSelect"><option value="en-US">English</option><option value="pl-PL">Polski</option></select>
         </label>
         <button class="theme-button" type="button" id="themeToggle" aria-label="Switch to light mode" title="Switch to light mode">
           <span id="themeIcon" aria-hidden="true">☀</span><span id="themeLabel">Light</span>
@@ -186,7 +186,7 @@
       <fieldset>
         <legend data-i18n="settings.display">Forecast display</legend>
         <label class="setting-row"><span data-i18n="settings.language">Language</span>
-          <select id="languageSetting"><option value="en">English</option><option value="pl">Polski</option></select>
+          <select id="languageSetting"><option value="en-US">English</option><option value="pl-PL">Polski</option></select>
         </label>
         <label class="setting-row"><span data-i18n="settings.theme">Color theme</span>
           <select id="colorTheme"><option value="dark" data-i18n="action.dark">Dark</option><option value="light" data-i18n="action.light">Light</option></select>

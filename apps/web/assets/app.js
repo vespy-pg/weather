@@ -2,7 +2,7 @@ import {drawForecastSky, drawWeatherChart, drawWindFlow, setTemperatureColorThre
 import {createWeatherDemo} from './weather-demo.js';
 import {escapeHtml, formatForecastDate, formatTime, measurement, numericValue, shortTemperature, temperature} from './components.js';
 import {groupHourlyForecast, hoursPerGroup, temperatureRange} from './forecast-view.js';
-import {setLanguage, t} from './i18n.js';
+import {normalizeLanguage, preferredSupportedLanguage, setLanguage, supportedLanguages, t} from './i18n.js';
 import {replacingLocation, sameLocation, withLocation} from './location-state.js';
 import {
   celsiusToDisplay,
@@ -30,7 +30,8 @@ const DEFAULT_SETTINGS = {
   zoom: DEFAULT_ZOOM,
   layoutVersion: LAYOUT_VERSION,
   theme: 'dark',
-  language: 'en',
+  language: 'en-US',
+  languageSource: 'fallback',
   temperatureUnit: 'C',
   temperatureThresholds: DEFAULT_THRESHOLDS,
   showHourlyTemperatures: true,
@@ -131,7 +132,19 @@ function loadSettings() {
       stored.configured = true;
     }
     if (['dark', 'light'].includes(QUERY.get('theme'))) stored.theme = QUERY.get('theme');
-    if (['en', 'pl'].includes(QUERY.get('lang'))) stored.language = QUERY.get('lang');
+    if (QUERY.has('lang')) {
+      stored.language = normalizeLanguage(QUERY.get('lang'));
+      stored.languageSource = 'explicit';
+    } else if (saved.language) {
+      stored.language = normalizeLanguage(saved.language);
+      stored.languageSource = saved.languageSource || 'user';
+    } else {
+      const preferences = navigator.languages || [navigator.language];
+      const supportedBaseLanguages = new Set(supportedLanguages().map(item => item.tag.split('-')[0].toLowerCase()));
+      const hasSupportedPreference = preferences.some(item => supportedBaseLanguages.has(String(item).split('-')[0].toLowerCase()));
+      stored.language = preferredSupportedLanguage(preferences);
+      stored.languageSource = hasSupportedPreference ? 'device' : 'fallback';
+    }
     if (['C', 'F'].includes(QUERY.get('unit'))) stored.temperatureUnit = QUERY.get('unit');
     stored.temperatureUnit = stored.temperatureUnit === 'F' ? 'F' : 'C';
     stored.temperatureThresholds = normalizeTemperatureThresholds(stored.temperatureThresholds);
@@ -145,6 +158,12 @@ function loadSettings() {
 function applyTemperatureSettings() {
   setTemperatureUnit(settings.temperatureUnit);
   setTemperatureColorThresholds(settings.temperatureThresholds);
+}
+
+function renderLanguageOptions() {
+  const options = supportedLanguages().map(item => `<option value="${item.tag}">${escapeHtml(item.nativeName)}</option>`).join('');
+  document.getElementById('languageSelect').innerHTML = options;
+  document.getElementById('languageSetting').innerHTML = options;
 }
 
 function saveSettings() {
@@ -460,6 +479,7 @@ function settingsFromForm() {
     zoom: Number(document.getElementById('defaultZoom').value),
     theme: document.getElementById('colorTheme').value,
     language: document.getElementById('languageSetting').value,
+    languageSource: 'user',
     temperatureUnit: document.getElementById('temperatureUnit').checked ? 'F' : 'C',
     showHourlyTemperatures: document.getElementById('showHourlyTemperatures').checked,
     showApparentTemperature: document.getElementById('showApparentTemperature').checked,
@@ -690,6 +710,7 @@ window.addEventListener('resize', () => {
 });
 
 document.body.classList.toggle('embedded', IS_EMBEDDED);
+renderLanguageOptions();
 settings.language = setLanguage(settings.language);
 applyTemperatureSettings();
 document.getElementById('languageSelect').value = settings.language;
@@ -751,8 +772,9 @@ async function initialize() {
     const response = await fetch(new URL('bootstrap-location', API_ROOT));
     const payload = await response.json();
     if (response.ok && payload.location) {
-      if (!QUERY.has('lang') && ['en', 'pl'].includes(payload.language)) {
+      if (settings.languageSource === 'fallback' && payload.language) {
         settings.language = setLanguage(payload.language);
+        settings.languageSource = 'country';
         document.getElementById('languageSelect').value = settings.language;
         document.getElementById('languageSetting').value = settings.language;
         applyTheme(settings.theme);

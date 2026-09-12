@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vespy.pl/weather/i18n/locale.schema.json",
+  "title": "Weather locale messages",
+  "type": "object",
+  "propertyNames": {
+    "pattern": "^[a-z][a-zA-Z0-9]*(\\.[a-z][a-zA-Z0-9]*)+$"
+  },
+  "additionalProperties": {
+    "type": "string",
+    "minLength": 1
+  }
+}

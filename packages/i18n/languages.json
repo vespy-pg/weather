@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "sourceLocale": "en-US",
+  "fallbackLocale": "en-US",
+  "aliases": {
+    "en": "en-US",
+    "pl": "pl-PL"
+  },
+  "countryDefaults": {
+    "PL": "pl-PL"
+  },
+  "locales": [
+    {
+      "tag": "en-US",
+      "nativeName": "English",
+      "direction": "ltr",
+      "providerLanguage": "en"
+    },
+    {
+      "tag": "pl-PL",
+      "nativeName": "Polski",
+      "direction": "ltr",
+      "providerLanguage": "pl"
+    }
+  ]
+}
