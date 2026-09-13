@@ -10,10 +10,12 @@ import {
   PROVIDER_LANGUAGES,
   SUPPORTED_LOCALES
 } from './generated/i18n-config.js';
+import {MESSAGES} from '../web/assets/generated/i18n.js';
 
 const PORT = Number(process.env.PORT || 8080);
 const CACHE_TTL_MS = Number(process.env.WEATHER_CACHE_TTL_MS || 10 * 60 * 1000);
 const WEB_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../web');
+const WEB_ORIGIN = 'https://weather.vespy.eu';
 const cache = new Map();
 
 export function normalizeGoogleAnalyticsId(value) {
@@ -23,9 +25,9 @@ export function normalizeGoogleAnalyticsId(value) {
 
 export function isForecastRoutePath(pathname) {
   const parts = String(pathname || '').split('/').filter(Boolean);
-  return parts.length === 2
+  return (parts.length === 1 || parts.length === 2)
     && SUPPORTED_LOCALES.some(locale => locale.toLowerCase() === parts[0].toLowerCase())
-    && parts[1].length > 0;
+    && (parts.length === 1 || parts[1].length > 0);
 }
 
 const contentTypes = {
@@ -36,6 +38,8 @@ const contentTypes = {
   '.png': 'image/png',
   '.webmanifest': 'application/manifest+json; charset=utf-8',
   '.svg': 'image/svg+xml',
+  '.txt': 'text/plain; charset=utf-8',
+  '.xml': 'application/xml; charset=utf-8',
   '.webp': 'image/webp'
 };
 
@@ -184,17 +188,139 @@ export function normalizeLocale(language) {
   return exact || LANGUAGE_ALIASES[requested] || LANGUAGE_ALIASES[requested.split('-')[0]] || DEFAULT_LOCALE;
 }
 
+function localizedMessage(locale, key, replacements = {}) {
+  const template = MESSAGES[locale]?.[key] || MESSAGES[DEFAULT_LOCALE]?.[key] || key;
+  return Object.entries(replacements).reduce((value, [name, replacement]) => value.replaceAll(`{${name}}`, replacement), template);
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
+function seoLocationName(pathname) {
+  const parts = String(pathname || '').split('/').filter(Boolean);
+  if (parts.length !== 2 || !SUPPORTED_LOCALES.some(locale => locale.toLowerCase() === parts[0].toLowerCase())) return null;
+  try {
+    return decodeURIComponent(parts[1]).replaceAll('-', ' ').trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+function localizedPageUrl(locale, locationName = null, coordinates = null) {
+  const url = new URL(WEB_ORIGIN);
+  url.pathname = `/${encodeURIComponent(locale)}${locationName ? `/${encodeURIComponent(locationName.replaceAll(' ', '-'))}` : ''}`;
+  if (coordinates) url.searchParams.set('ll', coordinates);
+  return url.toString();
+}
+
+function normalizeSeoCoordinates(value) {
+  const [latitude, longitude, ...extra] = String(value || '').split(',').map(Number);
+  if (extra.length || !Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) return null;
+  return `${latitude.toFixed(5)},${longitude.toFixed(5)}`;
+}
+
+export function seoPageMetadata(requestUrl) {
+  const parts = String(requestUrl.pathname || '').split('/').filter(Boolean);
+  const locale = normalizeLocale(parts[0]);
+  const locationName = seoLocationName(requestUrl.pathname);
+  const coordinates = normalizeSeoCoordinates(requestUrl.searchParams.get('ll'));
+  const replacements = locationName ? {location: locationName} : {};
+  const title = localizedMessage(locale, locationName ? 'seo.locationTitle' : 'seo.title', replacements);
+  const description = localizedMessage(locale, locationName ? 'seo.locationDescription' : 'seo.description', replacements);
+  const canonical = localizedPageUrl(locale, locationName, coordinates);
+  const alternateUrls = Object.fromEntries(SUPPORTED_LOCALES.map(language => [language, localizedPageUrl(language, locationName, coordinates)]));
+  return {
+    locale,
+    locationName,
+    title,
+    description,
+    canonical,
+    alternateUrls,
+    robots: requestUrl.searchParams.get('embed') === '1' || requestUrl.searchParams.get('demo') === '1'
+      ? 'noindex, follow'
+      : 'index, follow, max-image-preview:large'
+  };
+}
+
+export function renderIndexHtml(template, requestUrl) {
+  const metadata = seoPageMetadata(requestUrl);
+  const alternateLocale = metadata.locale === 'pl-PL' ? 'en_US' : 'pl_PL';
+  const structuredData = JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    name: 'Vespy Weather',
+    url: metadata.canonical,
+    applicationCategory: 'WeatherApplication',
+    operatingSystem: 'Any',
+    inLanguage: metadata.locale,
+    description: metadata.description,
+    isAccessibleForFree: true
+  }).replaceAll('<', '\\u003c');
+  const replacements = [
+    [/<html lang="[^"]+">/, `<html lang="${metadata.locale}">`],
+    [/<title>[^<]*<\/title>/, `<title>${escapeHtml(metadata.title)}</title>`],
+    [/<meta name="description" content="[^"]*">/, `<meta name="description" content="${escapeHtml(metadata.description)}">`],
+    [/<meta name="robots" content="[^"]*">/, `<meta name="robots" content="${metadata.robots}">`],
+    [/<meta property="og:title" content="[^"]*">/, `<meta property="og:title" content="${escapeHtml(metadata.title)}">`],
+    [/<meta property="og:description" content="[^"]*">/, `<meta property="og:description" content="${escapeHtml(metadata.description)}">`],
+    [/<meta property="og:url" content="[^"]*">/, `<meta property="og:url" content="${escapeHtml(metadata.canonical)}">`],
+    [/<meta property="og:locale" content="[^"]*">/, `<meta property="og:locale" content="${metadata.locale.replace('-', '_')}">\n  <meta property="og:locale:alternate" content="${alternateLocale}">`],
+    [/<meta name="twitter:title" content="[^"]*">/, `<meta name="twitter:title" content="${escapeHtml(metadata.title)}">`],
+    [/<meta name="twitter:description" content="[^"]*">/, `<meta name="twitter:description" content="${escapeHtml(metadata.description)}">`],
+    [/<link rel="canonical" href="[^"]*">/, `<link rel="canonical" href="${escapeHtml(metadata.canonical)}">`],
+    [/<link rel="alternate" hreflang="en-US" href="[^"]*">/, `<link rel="alternate" hreflang="en-US" href="${escapeHtml(metadata.alternateUrls['en-US'])}">`],
+    [/<link rel="alternate" hreflang="pl-PL" href="[^"]*">/, `<link rel="alternate" hreflang="pl-PL" href="${escapeHtml(metadata.alternateUrls['pl-PL'])}">`],
+    [/<link rel="alternate" hreflang="x-default" href="[^"]*">/, `<link rel="alternate" hreflang="x-default" href="${escapeHtml(metadata.alternateUrls['en-US'])}">`],
+    [/<script id="seoStructuredData" type="application\/ld\+json">[^<]*<\/script>/, `<script id="seoStructuredData" type="application/ld+json">${structuredData}</script>`]
+  ];
+  let html = replacements.reduce((value, [pattern, replacement]) => value.replace(pattern, replacement), template);
+  html = html.replace(/(<([a-z][\w-]*)\b[^>]*\bdata-i18n="([^"]+)"[^>]*>)([^<]*)(<\/\2>)/gi, (match, opening, tag, key, content, closing) => (
+    MESSAGES[metadata.locale]?.[key] ? `${opening}${escapeHtml(MESSAGES[metadata.locale][key])}${closing}` : match
+  ));
+  if (metadata.locationName) html = html.replace(/<h1 id="locationTitle">[^<]*<\/h1>/, `<h1 id="locationTitle">${escapeHtml(metadata.locationName)}</h1>`);
+  return html;
+}
+
 export function locationSearchUrl(query, language = DEFAULT_LOCALE) {
   const providerLanguage = PROVIDER_LANGUAGES[normalizeLocale(language)] || PROVIDER_LANGUAGES[DEFAULT_LOCALE];
   const parameters = new URLSearchParams({name: query, count: '8', language: providerLanguage, format: 'json'});
   return `https://geocoding-api.open-meteo.com/v1/search?${parameters}`;
 }
 
+export function postalCodeSearchUrl(query, language = DEFAULT_LOCALE) {
+  const locale = normalizeLocale(language);
+  const country = locale === 'pl-PL' ? 'PL' : locale === 'en-US' ? 'US' : null;
+  const postalCode = String(query || '').trim();
+  const valid = country === 'PL'
+    ? /^\d{2}-?\d{3}$/.test(postalCode)
+    : country === 'US' && /^\d{5}(?:-\d{4})?$/.test(postalCode);
+  return valid ? `https://api.zippopotam.us/${country}/${encodeURIComponent(postalCode)}` : null;
+}
+
+export function normalizePostalLocations(source) {
+  return (source?.places || []).map((item, index) => ({
+    id: `postal-${source['country abbreviation']}-${source['post code']}-${index}`,
+    name: item['place name'],
+    country: source.country,
+    admin1: item.state || null,
+    postalCode: source['post code'] || null,
+    latitude: Number(item.latitude),
+    longitude: Number(item.longitude),
+    timezone: 'auto'
+  })).filter(item => item.name && Number.isFinite(item.latitude) && Number.isFinite(item.longitude));
+}
+
 async function locations(requestUrl, response) {
   const query = requestUrl.searchParams.get('q')?.trim();
   if (!query || query.length < 2) return json(response, 400, {error: 'Enter at least two characters.'});
   const source = await cachedFetch(locationSearchUrl(query, requestUrl.searchParams.get('language')));
-  const results = (source.results || []).map(item => ({
+  let results = (source.results || []).map(item => ({
     id: item.id,
     name: item.name,
     country: item.country,
@@ -204,6 +330,14 @@ async function locations(requestUrl, response) {
     longitude: item.longitude,
     timezone: item.timezone
   }));
+  const postalUrl = results.length ? null : postalCodeSearchUrl(query, requestUrl.searchParams.get('language'));
+  if (postalUrl) {
+    try {
+      results = normalizePostalLocations(await cachedFetch(postalUrl));
+    } catch (error) {
+      if (error.message !== 'Upstream returned 404') throw error;
+    }
+  }
   return json(response, 200, {results});
 }
 
@@ -239,13 +373,14 @@ async function bootstrapLocation(request, response) {
 
 export function normalizeReverseLocation(source, fallback) {
   const address = source?.address || {};
-  const namedPlace = ['city', 'town', 'village', 'hamlet', 'suburb'].includes(source?.addresstype) ? source.name : null;
-  const name = namedPlace
-    || address.city
+  const namedLocality = ['city', 'town', 'village', 'hamlet'].includes(source?.addresstype) ? source.name : null;
+  const city = address.city
     || address.town
     || address.village
     || address.hamlet
-    || address.municipality
+    || address.municipality;
+  const name = namedLocality
+    || city
     || address.suburb
     || source?.name
     || fallback.name;
@@ -307,6 +442,15 @@ function promotions(requestUrl, response) {
 }
 
 async function staticFile(requestUrl, response) {
+  if (requestUrl.pathname === '/' || requestUrl.pathname === '/index.html' || isForecastRoutePath(requestUrl.pathname)) {
+    const template = await readFile(path.join(WEB_ROOT, 'index.html'), 'utf8');
+    response.writeHead(200, {
+      'Cache-Control': 'no-cache',
+      'Content-Language': seoPageMetadata(requestUrl).locale,
+      'Content-Type': contentTypes['.html']
+    });
+    return response.end(renderIndexHtml(template, requestUrl));
+  }
   const requestedPath = decodeURIComponent(requestUrl.pathname === '/' ? '/index.html' : requestUrl.pathname);
   const filePath = path.resolve(WEB_ROOT, `.${requestedPath}`);
   if (!filePath.startsWith(`${WEB_ROOT}${path.sep}`)) return json(response, 403, {error: 'Forbidden.'});
@@ -317,11 +461,6 @@ async function staticFile(requestUrl, response) {
     response.writeHead(200, {'Content-Type': contentTypes[path.extname(filePath)] || 'application/octet-stream'});
     response.end(body);
   } catch {
-    if (isForecastRoutePath(requestUrl.pathname)) {
-      const body = await readFile(path.join(WEB_ROOT, 'index.html'));
-      response.writeHead(200, {'Content-Type': contentTypes['.html']});
-      return response.end(body);
-    }
     json(response, 404, {error: 'Not found.'});
   }
 }

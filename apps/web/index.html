@@ -4,10 +4,25 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0a0e14">
-  <title>Weather</title>
+  <title>Weather forecast - Vespy Weather</title>
+  <meta name="description" content="Check a clear 10-day weather forecast with hourly temperature, clouds, precipitation and wind.">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Vespy Weather">
+  <meta property="og:title" content="Weather forecast - Vespy Weather">
+  <meta property="og:description" content="Check a clear 10-day weather forecast with hourly temperature, clouds, precipitation and wind.">
+  <meta property="og:url" content="https://weather.vespy.eu/en-US">
+  <meta property="og:locale" content="en_US">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Weather forecast - Vespy Weather">
+  <meta name="twitter:description" content="Check a clear 10-day weather forecast with hourly temperature, clouds, precipitation and wind.">
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="canonical" href="https://pogoda.vespy.eu/">
+  <link rel="canonical" href="https://weather.vespy.eu/en-US">
+  <link rel="alternate" hreflang="en-US" href="https://weather.vespy.eu/en-US">
+  <link rel="alternate" hreflang="pl-PL" href="https://weather.vespy.eu/pl-PL">
+  <link rel="alternate" hreflang="x-default" href="https://weather.vespy.eu/en-US">
+  <script id="seoStructuredData" type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Vespy Weather","url":"https://weather.vespy.eu/en-US","applicationCategory":"WeatherApplication","operatingSystem":"Any","inLanguage":"en-US","description":"Check a clear 10-day weather forecast with hourly temperature, clouds, precipitation and wind.","isAccessibleForFree":true}</script>
   <script>
     try {
       const saved = JSON.parse(localStorage.getItem('weather.settings.v1') || '{}');
@@ -291,7 +306,13 @@
 
       <fieldset>
         <legend data-i18n="settings.location">Location</legend>
-        <p class="selected-location" id="selectedLocation"></p>
+        <div class="selected-location-row">
+          <p class="selected-location" id="selectedLocation"></p>
+          <button class="location-share-button" type="button" id="shareActiveLocation">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="2.5"></circle><circle cx="6" cy="12" r="2.5"></circle><circle cx="18" cy="19" r="2.5"></circle><path d="m8.2 10.8 7.6-4.5M8.2 13.2l7.6 4.5"></path></svg>
+            <span data-i18n="action.shareLocation">Share location</span>
+          </button>
+        </div>
         <div class="saved-locations" id="savedLocations"></div>
         <div class="location-search-row">
           <input id="locationQuery" type="search" minlength="2" autocomplete="off" placeholder="Search city, place or postal code" data-i18n-placeholder="settings.searchPlaceholder">

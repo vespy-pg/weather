@@ -10,7 +10,7 @@ import {
 } from './components.js';
 import {temperatureRange} from './forecast-view.js';
 import {t} from './i18n.js';
-import {temperatureColorStops} from './temperature-scale.js';
+import {roundedTemperatureCelsius, temperatureColorStops} from './temperature-scale.js';
 
 const HOME_LATITUDE = 46.81;
 const HOME_LONGITUDE = 9.84;
@@ -53,7 +53,8 @@ function interpolateHexColor(start, end, progress) {
 
 function temperatureColor(value) {
   const stops = activeTemperatureColorStops();
-  const numeric = numericValue(value);
+  const source = numericValue(value);
+  const numeric = source === null ? null : roundedTemperatureCelsius(source);
   if (numeric === null || numeric <= stops[0].temperature) return stops[0].color;
   const finalStop = stops[stops.length - 1];
   if (numeric >= finalStop.temperature) return finalStop.color;
@@ -484,7 +485,7 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
       context.font = `700 ${temperatureFontSize}px ui-monospace, monospace`;
       context.save();
       context.lineJoin = 'round';
-      const whiteTemperature = numericTemperature <= (temperatureThresholds?.deepFrost ?? -12);
+      const whiteTemperature = roundedTemperatureCelsius(numericTemperature) <= (temperatureThresholds?.deepFrost ?? -12);
       if (!isLightTheme() || whiteTemperature) {
         context.miterLimit = 2;
         context.strokeStyle = chartColor('--chart-temperature-label-outline', 'rgba(5, 9, 15, .92)');

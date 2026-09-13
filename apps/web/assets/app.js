@@ -5,7 +5,7 @@ import {escapeHtml, formatForecastDate, formatTime, measurement, numericValue, s
 import {groupHourlyForecast, hoursPerGroup, temperatureRange} from './forecast-view.js';
 import {normalizeLanguage, preferredSupportedLanguage, setLanguage, supportedLanguages, t} from './i18n.js';
 import {replacingLocation, sameLocation, withLocation} from './location-state.js';
-import {forecastRouteUrl, parseCoordinatePair, parseForecastRoute} from './route-state.js';
+import {applicationRouteUrl, forecastRouteUrl, parseCoordinatePair, parseForecastRoute} from './route-state.js';
 import {
   celsiusToDisplay,
   DEFAULT_THRESHOLDS,
@@ -30,6 +30,7 @@ const IS_EMBEDDED = QUERY.get('embed') === '1';
 const API_ROOT = ['localhost', '127.0.0.1'].includes(location.hostname)
   ? new URL('/', location.href)
   : new URL('https://api.weather.vespy.eu/');
+const PUBLIC_WEB_ROOT = 'https://weather.vespy.eu/';
 const DEFAULT_LOCATION = {id: 'capital-GB', name: 'London', country: 'United Kingdom', latitude: 51.5074, longitude: -0.1278, timezone: 'Europe/London'};
 const DEFAULT_SETTINGS = {
   location: DEFAULT_LOCATION,
@@ -136,6 +137,11 @@ let forecastDrawFrame = 0;
 let locationSearchTimer = 0;
 let locationSearchRequest = 0;
 let promotionRequest = 0;
+let activeShareData = null;
+let settingsPreviewTimer = 0;
+let pendingFullForecastRender = false;
+let pendingForecastDraw = false;
+let pendingLegendDraw = false;
 const promotionImpressions = new Set();
 let forecastWelcomeDisplayed = false;
 
@@ -271,7 +277,7 @@ function loadSettings() {
     if (!stored.locations.some(item => sameLocation(item, stored.location))) stored.locations.push(stored.location);
     const latitude = Number(QUERY.get('lat'));
     const longitude = Number(QUERY.get('lon'));
-    if (FORECAST_ROUTE && ROUTE_COORDINATES) {
+    if (FORECAST_ROUTE?.locationName && ROUTE_COORDINATES) {
       stored.location = {
         id: `route-${ROUTE_COORDINATES.latitude.toFixed(5)}-${ROUTE_COORDINATES.longitude.toFixed(5)}`,
         name: FORECAST_ROUTE.locationName,
@@ -364,12 +370,50 @@ function embedCode(locationOverride = settings.location, theme = settings.theme,
   return `<iframe src="${url}" title="${t('embed.title')}" width="100%" height="680" loading="lazy" style="border:0;border-radius:12px" allow="geolocation"></iframe>`;
 }
 
-function forecastShareUrl() {
-  return forecastRouteUrl('https://pogoda.vespy.eu/', {
+function forecastShareUrl(locationOverride = settings.location) {
+  return forecastRouteUrl(PUBLIC_WEB_ROOT, {
     language: settings.language,
-    location: settings.location,
+    location: locationOverride,
     query: {demo: IS_DEMO ? 1 : null}
   }).toString();
+}
+
+function applicationShareUrl() {
+  const url = applicationRouteUrl(PUBLIC_WEB_ROOT, settings.language);
+  if (IS_DEMO) url.searchParams.set('demo', '1');
+  return url.toString();
+}
+
+function updateSeoMetadata(locationOverride = settings.location) {
+  const label = locationLabel(locationOverride);
+  const title = t('seo.locationTitle', {location: label});
+  const description = t('seo.locationDescription', {location: label});
+  const canonicalUrl = forecastRouteUrl(PUBLIC_WEB_ROOT, {language: settings.language, location: locationOverride});
+  const alternateUrl = language => forecastRouteUrl(PUBLIC_WEB_ROOT, {language, location: locationOverride}).toString();
+  document.title = title;
+  document.querySelector('meta[name="description"]').content = description;
+  document.querySelector('meta[property="og:title"]').content = title;
+  document.querySelector('meta[property="og:description"]').content = description;
+  document.querySelector('meta[property="og:url"]').content = canonicalUrl.toString();
+  document.querySelector('meta[property="og:locale"]').content = settings.language.replace('-', '_');
+  document.querySelector('meta[property="og:locale:alternate"]')?.setAttribute('content', settings.language === 'pl-PL' ? 'en_US' : 'pl_PL');
+  document.querySelector('meta[name="twitter:title"]').content = title;
+  document.querySelector('meta[name="twitter:description"]').content = description;
+  document.querySelector('link[rel="canonical"]').href = canonicalUrl.toString();
+  document.querySelector('link[rel="alternate"][hreflang="en-US"]').href = alternateUrl('en-US');
+  document.querySelector('link[rel="alternate"][hreflang="pl-PL"]').href = alternateUrl('pl-PL');
+  document.querySelector('link[rel="alternate"][hreflang="x-default"]').href = alternateUrl('en-US');
+  document.getElementById('seoStructuredData').textContent = JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    name: 'Vespy Weather',
+    url: canonicalUrl.toString(),
+    applicationCategory: 'WeatherApplication',
+    operatingSystem: 'Any',
+    inLanguage: settings.language,
+    description,
+    isAccessibleForFree: true
+  });
 }
 
 function updateBrowserRoute() {
@@ -380,8 +424,7 @@ function updateBrowserRoute() {
   });
   const url = forecastRouteUrl(location.origin, {language: settings.language, location: settings.location, query});
   history.replaceState(null, '', `${url.pathname}${url.search}`);
-  const canonical = document.querySelector('link[rel="canonical"]');
-  if (canonical) canonical.href = forecastRouteUrl('https://pogoda.vespy.eu/', {language: settings.language, location: settings.location});
+  updateSeoMetadata();
 }
 
 function collapseSharePrompt(persist = true) {
@@ -393,31 +436,39 @@ function collapseSharePrompt(persist = true) {
   }
 }
 
-function currentShareData() {
+function currentShareData(locationOverride = null) {
+  if (!locationOverride) {
+    return {
+      title: t('share.dialogTitle'),
+      text: t('share.appMessage'),
+      url: applicationShareUrl()
+    };
+  }
   return {
-    title: `${t('share.title')} - ${locationLabel(settings.location)}`,
-    text: t('share.message', {location: locationLabel(settings.location)}),
-    url: forecastShareUrl()
+    title: `${t('share.dialogTitle')} - ${locationLabel(locationOverride)}`,
+    text: t('share.message', {location: locationLabel(locationOverride)}),
+    url: forecastShareUrl(locationOverride)
   };
 }
 
-function openShareDialog() {
+function openShareDialog(locationOverride = null) {
   collapseSharePrompt();
-  const shareData = currentShareData();
-  const sharedText = `${shareData.text}\n${shareData.url}`;
+  if (document.getElementById('settingsDialog').open) document.getElementById('settingsDialog').close();
+  activeShareData = currentShareData(locationOverride);
+  const sharedText = `${activeShareData.text}\n${activeShareData.url}`;
   const hasNativeShare = Boolean(navigator.share);
   document.getElementById('shareNative').hidden = !hasNativeShare;
   document.querySelector('.share-options').classList.toggle('has-native-share', hasNativeShare);
   document.getElementById('shareWhatsApp').href = `https://wa.me/?text=${encodeURIComponent(sharedText)}`;
-  document.getElementById('shareFacebook').href = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareData.url)}`;
-  document.getElementById('shareEmail').href = `mailto:?subject=${encodeURIComponent(shareData.title)}&body=${encodeURIComponent(sharedText)}`;
+  document.getElementById('shareFacebook').href = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(activeShareData.url)}`;
+  document.getElementById('shareEmail').href = `mailto:?subject=${encodeURIComponent(activeShareData.title)}&body=${encodeURIComponent(sharedText)}`;
   document.getElementById('shareDialogStatus').textContent = '';
   document.getElementById('shareDialog').showModal();
   trackEvent('share_dialog_opened');
 }
 
 async function copyShareLink() {
-  const shareUrl = forecastShareUrl();
+  const shareUrl = activeShareData?.url || applicationShareUrl();
   if (navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(shareUrl);
     return;
@@ -635,6 +686,21 @@ function drawForecast() {
   renderWind(displayedHourly);
 }
 
+function scheduleSettingsPreview({fullForecast = false, forecast = true, legend = false} = {}) {
+  pendingFullForecastRender ||= fullForecast;
+  pendingForecastDraw ||= forecast;
+  pendingLegendDraw ||= legend;
+  clearTimeout(settingsPreviewTimer);
+  settingsPreviewTimer = setTimeout(() => {
+    if (pendingFullForecastRender) renderForecast();
+    else if (pendingForecastDraw) drawForecast();
+    if (pendingLegendDraw) drawLegendPreviews();
+    pendingFullForecastRender = false;
+    pendingForecastDraw = false;
+    pendingLegendDraw = false;
+  }, 0);
+}
+
 function renderForecast() {
   const current = weather?.current;
   if (!weather?.available || !current) return;
@@ -692,6 +758,9 @@ async function loadWeather() {
       document.getElementById('forecastRangeLabel').textContent = t('forecast.next');
     }
     if (requestId !== weatherRequest) return;
+    if (sameLocation(settings.location, requestedLocation)) {
+      nextWeather.location = {...nextWeather.location, ...settings.location};
+    }
     weather = nextWeather;
     renderForecast();
     showForecastWelcomeOnce();
@@ -789,25 +858,43 @@ function settingsFromForm() {
 }
 
 function saveFormChanges({reloadWeather = false} = {}) {
+  const previousLocation = settings.location;
   const previousLanguage = settings.language;
   const previousTheme = settings.theme;
   const previousUnit = settings.temperatureUnit;
+  const previousZoom = settings.zoom;
+  const previousHourlyTemperatures = settings.showHourlyTemperatures;
+  const previousApparentTemperature = settings.showApparentTemperature;
+  const previousPrecipitation = settings.showPrecipitation;
+  const previousWind = settings.showWind;
+  const previousWindArrows = settings.showWindArrows;
   settings = settingsFromForm();
-  settings.language = setLanguage(settings.language);
+  const locationChanged = !sameLocation(previousLocation, settings.location);
+  const languageChanged = previousLanguage !== settings.language;
+  const themeChanged = previousTheme !== settings.theme;
+  const unitChanged = previousUnit !== settings.temperatureUnit;
+  const zoomChanged = previousZoom !== settings.zoom;
+  const forecastDisplayChanged = previousHourlyTemperatures !== settings.showHourlyTemperatures
+    || previousApparentTemperature !== settings.showApparentTemperature
+    || previousPrecipitation !== settings.showPrecipitation
+    || previousWind !== settings.showWind
+    || previousWindArrows !== settings.showWindArrows;
+  settings.language = languageChanged ? setLanguage(settings.language) : normalizeLanguage(settings.language);
   applyTemperatureSettings();
   saveSettings();
-  updateBrowserRoute();
+  if (locationChanged || languageChanged) updateBrowserRoute();
   document.getElementById('languageSelect').value = settings.language;
-  applyTheme(settings.theme);
+  if (themeChanged) applyTheme(settings.theme);
   zoomIndex = ZOOM_LEVELS.indexOf(settings.zoom);
-  renderLocationMenu();
-  updateEmbedPreview();
-  if (previousLanguage !== settings.language) fillSettingsForm();
-  else if (previousUnit !== settings.temperatureUnit) renderTemperatureScale();
-  applyZoom(zoomIndex, false);
-  drawLegendPreviews();
-  if (weather) renderForecast();
-  if (previousLanguage !== settings.language || previousTheme !== settings.theme) loadPromotion();
+  if (locationChanged) renderLocationMenu();
+  if (locationChanged || languageChanged || themeChanged || unitChanged || zoomChanged) updateEmbedPreview();
+  if (languageChanged) fillSettingsForm();
+  else if (unitChanged) renderTemperatureScale();
+  if (zoomChanged) applyZoom(zoomIndex, false);
+  else if (weather && (languageChanged || unitChanged)) scheduleSettingsPreview({fullForecast: true, legend: true});
+  else if (weather && (themeChanged || forecastDisplayChanged)) scheduleSettingsPreview({legend: themeChanged});
+  else if (languageChanged || unitChanged || themeChanged) scheduleSettingsPreview({forecast: false, legend: true});
+  if (languageChanged || themeChanged) loadPromotion();
   if (reloadWeather) loadWeather();
 }
 
@@ -816,6 +903,7 @@ function renderPendingLocations() {
   const container = document.getElementById('savedLocations');
   container.innerHTML = pendingLocations.map((item, index) => `<div class="saved-location">
     <button type="button" class="saved-location-select" data-saved-location="${index}" aria-pressed="${sameLocation(item, pendingLocation)}">${escapeHtml(locationLabel(item))}</button>
+    <button type="button" class="saved-location-share" data-share-location="${index}" aria-label="${escapeHtml(t('action.shareLocation'))}" title="${escapeHtml(t('action.shareLocation'))}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="2.5"></circle><circle cx="6" cy="12" r="2.5"></circle><circle cx="18" cy="19" r="2.5"></circle><path d="m8.2 10.8 7.6-4.5M8.2 13.2l7.6 4.5"></path></svg></button>
     <button type="button" class="saved-location-remove" data-remove-location="${index}" aria-label="${escapeHtml(t('action.removeLocation'))}" title="${escapeHtml(t('action.removeLocation'))}" ${pendingLocations.length === 1 ? 'disabled' : ''}>×</button>
   </div>`).join('');
   container.querySelectorAll('[data-saved-location]').forEach(button => button.addEventListener('click', () => {
@@ -830,6 +918,9 @@ function renderPendingLocations() {
     if (sameLocation(removed, pendingLocation)) pendingLocation = pendingLocations[0];
     renderPendingLocations();
     saveFormChanges({reloadWeather: true});
+  }));
+  container.querySelectorAll('[data-share-location]').forEach(button => button.addEventListener('click', () => {
+    openShareDialog(pendingLocations[Number(button.dataset.shareLocation)]);
   }));
 }
 
@@ -900,10 +991,6 @@ async function searchLocations() {
     if (requestId !== locationSearchRequest) return;
     resultsElement.innerHTML = '';
     document.getElementById('settingsError').textContent = error.message;
-  } finally {
-    if (requestId === locationSearchRequest && document.getElementById('locationQuery').value.trim() === query) {
-      document.getElementById('locationQuery').value = '';
-    }
   }
 }
 
@@ -953,8 +1040,7 @@ document.querySelectorAll('[data-temperature-threshold]:not(:disabled)').forEach
     });
     setTemperatureColorThresholds(settings.temperatureThresholds);
     renderTemperatureScale();
-    drawForecast();
-    drawLegendPreviews();
+    scheduleSettingsPreview({legend: true});
   });
   input.addEventListener('change', () => {
     saveSettings();
@@ -971,11 +1057,12 @@ document.getElementById('copyEmbedCode').addEventListener('click', async () => {
     document.getElementById('copyStatus').textContent = t('status.copyManual');
   }
 });
-document.querySelectorAll('[data-share-forecast]').forEach(button => button.addEventListener('click', openShareDialog));
+document.querySelectorAll('[data-share-forecast]').forEach(button => button.addEventListener('click', () => openShareDialog()));
+document.getElementById('shareActiveLocation').addEventListener('click', () => openShareDialog(pendingLocation));
 document.getElementById('shareNative').addEventListener('click', async () => {
   if (!navigator.share) return;
   try {
-    await navigator.share(currentShareData());
+    await navigator.share(activeShareData || currentShareData());
     document.getElementById('shareDialogStatus').textContent = t('share.thanks');
     trackEvent('forecast_shared', {method: 'native'});
   } catch (error) {
@@ -1019,20 +1106,18 @@ document.getElementById('useDeviceLocation').addEventListener('click', event => 
   button.disabled = true;
   button.setAttribute('aria-busy', 'true');
   document.getElementById('settingsError').textContent = t('status.waitingLocation');
-  navigator.geolocation.getCurrentPosition(async position => {
-    try {
-      const deviceLocation = await locationFromPosition(position);
-      pendingLocations = replacingLocation(pendingLocations, pendingLocation, deviceLocation);
-      pendingLocation = deviceLocation;
-      document.getElementById('locationQuery').value = '';
-      renderPendingLocations();
-      saveFormChanges({reloadWeather: true});
-      document.getElementById('settingsError').textContent = '';
-      document.getElementById('settingsDialog').close();
-    } finally {
-      button.disabled = false;
-      button.removeAttribute('aria-busy');
-    }
+  navigator.geolocation.getCurrentPosition(position => {
+    const deviceLocation = deviceLocationFromPosition(position);
+    pendingLocations = replacingLocation(pendingLocations, pendingLocation, deviceLocation);
+    pendingLocation = deviceLocation;
+    document.getElementById('locationQuery').value = '';
+    renderPendingLocations();
+    saveFormChanges({reloadWeather: true});
+    document.getElementById('settingsError').textContent = '';
+    document.getElementById('settingsDialog').close();
+    button.disabled = false;
+    button.removeAttribute('aria-busy');
+    resolveAndApplyDeviceLocation(deviceLocation);
   }, error => {
     document.getElementById('settingsError').textContent = error.message;
     button.disabled = false;
@@ -1123,8 +1208,17 @@ function devicePosition() {
   });
 }
 
-async function locationFromPosition(position) {
-  const fallback = {
+async function geolocationPermissionGranted() {
+  if (!navigator.permissions?.query) return false;
+  try {
+    return (await navigator.permissions.query({name: 'geolocation'})).state === 'granted';
+  } catch {
+    return false;
+  }
+}
+
+function deviceLocationFromPosition(position) {
+  return {
     id: `device-${position.coords.latitude.toFixed(4)}-${position.coords.longitude.toFixed(4)}`,
     name: t('location.current'),
     country: '',
@@ -1132,7 +1226,68 @@ async function locationFromPosition(position) {
     longitude: Number(position.coords.longitude.toFixed(5)),
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'auto'
   };
+}
+
+async function locationFromPosition(position) {
+  const fallback = deviceLocationFromPosition(position);
   return resolveDeviceLocation(fallback);
+}
+
+function applyResolvedDeviceLocation(fallback, resolved) {
+  if (!sameLocation(settings.location, fallback)) return;
+  settings.locations = replacingLocation(settings.locations, fallback, resolved);
+  settings.location = resolved;
+  pendingLocations = replacingLocation(pendingLocations, fallback, resolved);
+  if (sameLocation(pendingLocation, fallback)) pendingLocation = resolved;
+  if (weather && Number(weather.location?.latitude) === fallback.latitude && Number(weather.location?.longitude) === fallback.longitude) {
+    weather.location = resolved;
+    document.getElementById('locationTitle').textContent = resolved.name;
+  }
+  saveSettings();
+  updateBrowserRoute();
+  renderLocationMenu();
+  if (document.getElementById('settingsDialog').open) renderPendingLocations();
+}
+
+async function resolveAndApplyDeviceLocation(fallback) {
+  const resolved = await resolveDeviceLocation(fallback);
+  applyResolvedDeviceLocation(fallback, resolved);
+}
+
+function usesAutomaticLocation(item = settings.location) {
+  const id = String(item?.id || '');
+  return id.startsWith('device-') || id.startsWith('capital-');
+}
+
+async function refreshAutomaticDeviceLocation({reloadWeather = true} = {}) {
+  if (IS_DEMO || IS_EMBEDDED || !usesAutomaticLocation()) return false;
+  const position = await devicePosition();
+  if (!position) return false;
+  const previousLocation = settings.location;
+  const deviceLocation = deviceLocationFromPosition(position);
+  settings.locations = replacingLocation(settings.locations, previousLocation, deviceLocation);
+  settings.location = deviceLocation;
+  settings.configured = true;
+  pendingLocations = [...settings.locations];
+  pendingLocation = deviceLocation;
+  saveSettings();
+  updateBrowserRoute();
+  renderLocationMenu();
+  document.getElementById('locationTitle').textContent = deviceLocation.name;
+  document.getElementById('updatedAt').textContent = t('status.loading');
+  if (reloadWeather) loadWeather();
+  resolveAndApplyDeviceLocation(deviceLocation);
+  return true;
+}
+
+async function monitorGeolocationPermission() {
+  if (!navigator.permissions?.query || !navigator.geolocation) return;
+  try {
+    const permission = await navigator.permissions.query({name: 'geolocation'});
+    permission.addEventListener('change', () => {
+      if (permission.state === 'granted') refreshAutomaticDeviceLocation();
+    });
+  } catch {}
 }
 
 async function resolveDeviceLocation(fallback) {
@@ -1152,7 +1307,7 @@ async function resolveDeviceLocation(fallback) {
 }
 
 async function resolveForecastRouteLocation() {
-  if (!FORECAST_ROUTE || ROUTE_COORDINATES) return;
+  if (!FORECAST_ROUTE?.locationName || ROUTE_COORDINATES) return;
   try {
     const parameters = new URLSearchParams({q: FORECAST_ROUTE.locationName, language: settings.language});
     const response = await fetch(new URL(`locations?${parameters}`, API_ROOT));
@@ -1170,6 +1325,10 @@ async function resolveForecastRouteLocation() {
 async function initialize() {
   await resolveForecastRouteLocation();
   if (settings.configured || IS_DEMO || IS_EMBEDDED) {
+    if (usesAutomaticLocation() && await geolocationPermissionGranted()) {
+      const refreshed = await refreshAutomaticDeviceLocation({reloadWeather: false});
+      if (refreshed) return loadWeather();
+    }
     const unresolvedDeviceLocation = String(settings.location.id || '').startsWith('device-')
       && ['Current location', 'Bieżąca lokalizacja'].includes(settings.location.name);
     if (unresolvedDeviceLocation && !IS_DEMO && !IS_EMBEDDED) {
@@ -1214,7 +1373,10 @@ async function initialize() {
 }
 
 initializeAnalytics(API_ROOT);
-initialize().finally(loadPromotion);
+initialize().finally(() => {
+  loadPromotion();
+  monitorGeolocationPermission();
+});
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));

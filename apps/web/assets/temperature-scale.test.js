@@ -5,6 +5,7 @@ import {
   celsiusToDisplay,
   displayToCelsius,
   normalizeTemperatureThresholds,
+  roundedTemperatureCelsius,
   temperatureColorStops
 } from './temperature-scale.js';
 
@@ -12,6 +13,13 @@ test('converts temperature values between Celsius and Fahrenheit', () => {
   assert.equal(celsiusToDisplay(0, 'F'), 32);
   assert.equal(celsiusToDisplay(100, 'F'), 212);
   assert.equal(displayToCelsius(32, 'F'), 0);
+});
+
+test('uses the displayed rounded temperature for color decisions', () => {
+  assert.equal(roundedTemperatureCelsius(null), null);
+  assert.equal(roundedTemperatureCelsius(17.51), 18);
+  assert.equal(roundedTemperatureCelsius(18.49), 18);
+  assert.equal(roundedTemperatureCelsius(17.6, 0, 'F'), 160 / 9);
 });
 
 test('keeps temperature color thresholds ordered', () => {

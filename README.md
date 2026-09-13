@@ -50,7 +50,7 @@ Open **Settings** in Weather and use **Embed on a website** to copy an iframe co
 
 ```html
 <iframe
-  src="https://pogoda.vespy.eu/pl-PL/Katowice?ll=50.26489%2C19.02378&embed=1&theme=dark"
+  src="https://weather.vespy.eu/pl-PL/Katowice?ll=50.26489%2C19.02378&embed=1&theme=dark"
   title="10-day weather forecast"
   width="100%"
   height="680"
@@ -61,7 +61,7 @@ Open **Settings** in Weather and use **Embed on a website** to copy an iframe co
 
 The embedded view contains the forecast timeline and its legend without the dashboard header or daily cards. It is responsive and can be placed in a page, dashboard, kiosk, or web-based desktop panel.
 
-Public forecast URLs use `/{language}/{location}` paths and keep exact coordinates in `ll`, for example `https://pogoda.vespy.eu/pl-PL/London?ll=51.50740%2C-0.12780`. The readable location segment is used for display while `ll` prevents ambiguity between places with the same name.
+Public forecast URLs use `/{language}/{location}` paths and keep exact coordinates in `ll`, for example `https://weather.vespy.eu/pl-PL/London?ll=51.50740%2C-0.12780`. The readable location segment is used for display while `ll` prevents ambiguity between places with the same name.
 
 Supported URL parameters:
 
@@ -142,7 +142,9 @@ docker run --rm -p 127.0.0.1:8080:8080 weather
 
 The application uses root-relative asset and API URLs so localized forecast paths can be opened directly.
 
-The production templates for `vespy.eu`, its `www`, the canonical `pogoda.vespy.eu` web host, the redirecting `weather.vespy.eu` alias, and `api.weather.vespy.eu` are stored in `deploy/`. The Apache virtual hosts proxy to a container bound only to `127.0.0.1:18080`, while the systemd unit keeps that container running after reboots. The virtual hosts use the local GeoIP database and `mod_geoip` to pass only the visitor's country code to the application, so visitor IP addresses are not sent to an external location service.
+The production templates for `vespy.eu`, its `www`, the canonical `weather.vespy.eu` web host, the Polish `pogoda.vespy.eu` redirect, and `api.weather.vespy.eu` are stored in `deploy/`. The Apache virtual hosts proxy to a container bound only to `127.0.0.1:18080`, while the systemd unit keeps that container running after reboots. The virtual hosts use the local GeoIP database and `mod_geoip` to pass only the visitor's country code to the application, so visitor IP addresses are not sent to an external location service.
+
+Search engines receive server-rendered localized titles, descriptions, canonical URLs, `hreflang` alternatives, and WebApplication structured data. `robots.txt` points to the XML sitemap, while demo and embedded URLs are marked `noindex` to keep duplicate or fictional forecast pages out of search results.
 
 ## Akacjowa integration
 

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {forecastUrl, isForecastRoutePath, locationSearchUrl, normalizeForecast, normalizeGoogleAnalyticsId, normalizeLocale, normalizeReverseLocation, preferredLanguageForCountry, promotionFeed, selectCapitalResult} from './server.js';
+import {forecastUrl, isForecastRoutePath, locationSearchUrl, normalizeForecast, normalizeGoogleAnalyticsId, normalizeLocale, normalizePostalLocations, normalizeReverseLocation, postalCodeSearchUrl, preferredLanguageForCountry, promotionFeed, renderIndexHtml, selectCapitalResult, seoPageMetadata} from './server.js';
 
 test('normalizeGoogleAnalyticsId accepts only GA4 measurement IDs', () => {
   assert.equal(normalizeGoogleAnalyticsId(' g-ab12cd34 '), 'G-AB12CD34');
@@ -9,10 +9,31 @@ test('normalizeGoogleAnalyticsId accepts only GA4 measurement IDs', () => {
 });
 
 test('recognizes localized forecast application routes', () => {
+  assert.equal(isForecastRoutePath('/pl-PL'), true);
   assert.equal(isForecastRoutePath('/pl-PL/London'), true);
   assert.equal(isForecastRoutePath('/en-US/New-York'), true);
   assert.equal(isForecastRoutePath('/assets/app.js'), false);
-  assert.equal(isForecastRoutePath('/pl-PL'), false);
+  assert.equal(isForecastRoutePath('/pl-PL/London/extra'), false);
+});
+
+test('creates localized canonical metadata for forecast routes', () => {
+  const polish = seoPageMetadata(new URL('https://weather.vespy.eu/pl-PL/Warszawa?ll=52.23,21.01&theme=dark'));
+  assert.equal(polish.title, 'Warszawa - prognoza pogody | Vespy Weather');
+  assert.match(polish.description, /prognozę pogody dla lokalizacji Warszawa/);
+  assert.equal(polish.canonical, 'https://weather.vespy.eu/pl-PL/Warszawa?ll=52.23000%2C21.01000');
+  assert.equal(polish.alternateUrls['en-US'], 'https://weather.vespy.eu/en-US/Warszawa?ll=52.23000%2C21.01000');
+  assert.equal(polish.robots, 'index, follow, max-image-preview:large');
+  assert.equal(seoPageMetadata(new URL('https://weather.vespy.eu/en-US?embed=1')).robots, 'noindex, follow');
+});
+
+test('renders localized metadata and visible HTML before JavaScript runs', () => {
+  const template = '<html lang="en-US"><head><title>Old</title><meta name="description" content="Old"><meta name="robots" content="index"><meta property="og:title" content="Old"><meta property="og:description" content="Old"><meta property="og:url" content="Old"><meta property="og:locale" content="en_US"><meta name="twitter:title" content="Old"><meta name="twitter:description" content="Old"><link rel="canonical" href="Old"><link rel="alternate" hreflang="en-US" href="Old"><link rel="alternate" hreflang="pl-PL" href="Old"><link rel="alternate" hreflang="x-default" href="Old"><script id="seoStructuredData" type="application/ld+json">{}</script></head><body><h1 id="locationTitle">London</h1><h2 data-i18n="forecast.title">Weather</h2></body></html>';
+  const html = renderIndexHtml(template, new URL('https://weather.vespy.eu/pl-PL/Warszawa?ll=52.23,21.01'));
+  assert.match(html, /<html lang="pl-PL">/);
+  assert.match(html, /<title>Warszawa - prognoza pogody \| Vespy Weather<\/title>/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/weather\.vespy\.eu\/pl-PL\/Warszawa\?ll=52\.23000%2C21\.01000">/);
+  assert.match(html, /<h1 id="locationTitle">Warszawa<\/h1>/);
+  assert.match(html, /<h2 data-i18n="forecast.title">Temperatura, zachmurzenie i opady<\/h2>/);
 });
 
 test('forecastUrl requests the fields shared by web and Android clients', () => {
@@ -82,6 +103,27 @@ test('locationSearchUrl supports postal codes and the selected language', () => 
   assert.equal(url.searchParams.get('language'), 'pl');
 });
 
+test('postal code fallback supports localized Polish and US formats', () => {
+  assert.equal(postalCodeSearchUrl('00-001', 'pl-PL'), 'https://api.zippopotam.us/PL/00-001');
+  assert.equal(postalCodeSearchUrl('94016', 'en-US'), 'https://api.zippopotam.us/US/94016');
+  assert.equal(postalCodeSearchUrl('London', 'pl-PL'), null);
+  assert.deepEqual(normalizePostalLocations({
+    country: 'Poland',
+    'country abbreviation': 'PL',
+    'post code': '00-001',
+    places: [{'place name': 'Warszawa', state: 'Mazowieckie', latitude: '52.25', longitude: '21'}]
+  }), [{
+    id: 'postal-PL-00-001-0',
+    name: 'Warszawa',
+    country: 'Poland',
+    admin1: 'Mazowieckie',
+    postalCode: '00-001',
+    latitude: 52.25,
+    longitude: 21,
+    timezone: 'auto'
+  }]);
+});
+
 test('preferredLanguageForCountry selects an available interface language', () => {
   assert.equal(preferredLanguageForCountry('pl'), 'pl-PL');
   assert.equal(preferredLanguageForCountry('DE'), 'en-US');
@@ -107,6 +149,15 @@ test('normalizeReverseLocation uses the nearest named locality and country', () 
     name: 'Jastrząb Rozparcelowany',
     country: 'Poland'
   });
+});
+
+test('normalizeReverseLocation prefers a city over its district', () => {
+  const fallback = {id: 'device', name: 'Current location', country: '', latitude: 52.23, longitude: 21.01, timezone: 'Europe/Warsaw'};
+  assert.equal(normalizeReverseLocation({
+    addresstype: 'suburb',
+    name: 'Śródmieście',
+    address: {suburb: 'Śródmieście', city: 'Warszawa', country: 'Polska'}
+  }, fallback).name, 'Warszawa');
 });
 
 test('promotionFeed returns a localized native card without executable content', () => {

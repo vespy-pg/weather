@@ -15,15 +15,22 @@ export function locationSlug(name) {
 
 export function parseForecastRoute(pathname, locales) {
   const parts = String(pathname || '').split('/').filter(Boolean);
-  if (parts.length !== 2) return null;
+  if (parts.length < 1 || parts.length > 2) return null;
   const language = locales.find(locale => locale.toLowerCase() === parts[0].toLowerCase());
   if (!language) return null;
+  if (parts.length === 1) return {language, locationName: null};
   try {
     const locationName = decodeURIComponent(parts[1]).replaceAll('-', ' ').trim();
     return locationName ? {language, locationName} : null;
   } catch {
     return null;
   }
+}
+
+export function applicationRouteUrl(base, language) {
+  const url = new URL('/', base);
+  url.pathname = `/${encodeURIComponent(language)}`;
+  return url;
 }
 
 export function forecastRouteUrl(base, {language, location, query = {}}) {

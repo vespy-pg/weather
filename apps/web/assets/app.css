@@ -255,15 +255,15 @@ html[data-share-prompt="collapsed"] .share-forecast { display: none; }
 .forecast-welcome-heading h2 { font-size: clamp(20px, 3vw, 28px); }
 .forecast-welcome-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
 .forecast-welcome-card { min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
-.forecast-welcome-card strong { display: block; font-size: 14px; }
+.forecast-welcome-card strong { display: block; font-size: 16px; }
 .forecast-welcome-card canvas { display: block; width: 100%; border: 1px solid var(--line); border-radius: 6px; background: var(--chart-surface); }
 .forecast-welcome-examples { display: grid; gap: 7px; margin-top: 9px; }
 .forecast-welcome-example { display: grid; grid-template-columns: minmax(0, 1fr) 86px; align-items: center; gap: 8px; margin: 0; }
 .forecast-welcome-example canvas { height: 58px; }
 .forecast-welcome-example canvas[id*="welcomeWind"] { background: var(--chart-wind); }
-.forecast-welcome-example figcaption { color: var(--muted); font-size: 11px; font-weight: 750; line-height: 1.2; }
+.forecast-welcome-example figcaption { color: var(--muted); font-size: 13px; font-weight: 750; line-height: 1.3; }
 .forecast-welcome-temperature #welcomeTemperatureCanvas { height: 116px; margin-top: 9px; }
-.forecast-welcome-temperature-labels { display: grid; gap: 7px; margin-top: 12px; font-size: 13px; font-weight: 850; }
+.forecast-welcome-temperature-labels { display: grid; gap: 7px; margin-top: 12px; font-size: 14px; font-weight: 850; }
 .forecast-welcome-temperature-labels .cool { color: #3987ee; }
 .forecast-welcome-temperature-labels .pleasant { color: #45cf88; }
 .forecast-welcome-temperature-labels .hot { color: #ff4b5f; }
@@ -280,13 +280,19 @@ html[data-share-prompt="collapsed"] .share-forecast { display: none; }
 .settings-content { padding: 18px; }
 .settings-content fieldset { margin: 16px 0 0; border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
 .settings-content legend { padding: 0 6px; color: var(--muted); font-size: 11px; font-weight: 800; }
-.selected-location { margin-bottom: 10px; font-weight: 800; }
+.selected-location-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.selected-location { min-width: 0; margin: 0; font-weight: 800; }
 .saved-locations { display: grid; gap: 5px; margin-bottom: 10px; }
-.saved-location { display: grid; grid-template-columns: 1fr auto; gap: 5px; }
-.saved-location-select, .saved-location-remove { border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--text); cursor: pointer; }
+.saved-location { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 5px; }
+.saved-location-select, .saved-location-share, .saved-location-remove, .location-share-button { border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--text); cursor: pointer; }
 .saved-location-select { padding: 8px 10px; text-align: left; }
 .saved-location-select[aria-pressed="true"] { border-color: var(--blue); background: var(--control-hover); }
-.saved-location-remove { width: 38px; color: var(--muted); font-size: 19px; }
+.saved-location-share, .saved-location-remove { display: grid; width: 38px; place-items: center; }
+.saved-location-share, .location-share-button { color: var(--blue); }
+.saved-location-share svg, .location-share-button svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.location-share-button { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 7px; padding: 8px 10px; font-size: 11px; font-weight: 800; }
+.saved-location-remove { color: var(--muted); font-size: 19px; }
+.saved-location-share:hover, .location-share-button:hover { border-color: var(--blue); background: var(--control-hover); }
 .saved-location-remove:hover { border-color: var(--red); color: var(--red); }
 .saved-location-remove:disabled { opacity: .35; cursor: not-allowed; }
 .location-search-row { display: grid; grid-template-columns: 1fr auto auto; gap: 7px; }
@@ -357,13 +363,13 @@ body.embedded .forecast-heading-tools .muted { display: none; }
   .forecast-welcome-content { padding: 12px; }
   .forecast-welcome-grid { grid-template-columns: 1fr; margin-top: 9px; }
   .forecast-welcome-card { padding: 8px; }
-  .forecast-welcome-card strong { font-size: 12px; }
+  .forecast-welcome-card strong { font-size: 15px; }
   .forecast-welcome-examples { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
   .forecast-welcome-example { grid-template-columns: 1fr; gap: 3px; }
-  .forecast-welcome-example canvas { height: 42px; }
-  .forecast-welcome-example figcaption { font-size: 9px; text-align: center; }
-  .forecast-welcome-temperature #welcomeTemperatureCanvas { height: 76px; margin-top: 6px; }
-  .forecast-welcome-temperature-labels { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; margin-top: 6px; font-size: 9px; text-align: center; }
+  .forecast-welcome-example canvas { height: 54px; }
+  .forecast-welcome-example figcaption { font-size: 12px; line-height: 1.25; text-align: center; }
+  .forecast-welcome-temperature #welcomeTemperatureCanvas { height: 96px; margin-top: 6px; }
+  .forecast-welcome-temperature-labels { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 8px; font-size: 12px; line-height: 1.25; text-align: center; }
   .forecast-welcome-actions { margin-top: 9px; }
   .web-promotion-link { grid-template-columns: 126px minmax(0, 1fr) auto; gap: 10px; }
   .web-promotion-preview { display: none; }

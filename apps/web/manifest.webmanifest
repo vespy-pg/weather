@@ -2,11 +2,13 @@
   "name": "Weather Forecast",
   "short_name": "Weather",
   "description": "A detailed ten-day weather forecast with a continuous hourly timeline.",
+  "id": "/",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#080c12",
   "theme_color": "#0a0e14",
+  "categories": ["weather", "utilities"],
   "icons": [
     {
       "src": "/assets/favicon.svg",

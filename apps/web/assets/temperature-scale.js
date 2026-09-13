@@ -26,6 +26,14 @@ export function displayToCelsius(value, unit = activeUnit) {
   return unit === 'F' ? (value - 32) * 5 / 9 : value;
 }
 
+export function roundedTemperatureCelsius(value, digits = 0, unit = activeUnit) {
+  if (value === null || value === undefined || value === '') return null;
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return null;
+  const roundedDisplayValue = Number(celsiusToDisplay(numeric, unit).toFixed(digits));
+  return displayToCelsius(roundedDisplayValue, unit);
+}
+
 export function normalizeTemperatureThresholds(value = {}) {
   const deepFrost = Math.max(-30, Math.min(-1, Number(value.deepFrost) || DEFAULT_THRESHOLDS.deepFrost));
   const mild = Math.max(1, Math.min(25, Number(value.mild) || DEFAULT_THRESHOLDS.mild));
