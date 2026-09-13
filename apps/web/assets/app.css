@@ -289,6 +289,28 @@ body.embedded .forecast-heading-tools .muted { display: none; }
   .forecast-welcome-actions { margin-top: 9px; }
 }
 
+@media (orientation: landscape) and (max-height: 620px) {
+  .shell { width: min(100% - 12px, 1440px); margin: 6px auto 24px; }
+  .topbar { min-height: 36px; margin-bottom: 4px; gap: 8px; }
+  .topbar .eyebrow { display: none; }
+  .location-title-row { gap: 4px; }
+  .location-title-row h1 { margin: 0; font-size: 21px; line-height: 1.05; }
+  .location-edit-button { width: 27px; height: 27px; }
+  .location-heading .muted { font-size: 9px; line-height: 1.15; }
+  .topbar-actions { gap: 4px; }
+  .topbar-actions .theme-button, .topbar-actions .settings-button { display: grid; width: 30px; height: 30px; place-items: center; padding: 0; }
+  .topbar-actions .theme-button #themeLabel, .topbar-actions .settings-button span { display: none; }
+  .language-control { height: 30px; padding: 2px 5px; }
+  .language-control select { max-width: 76px; font-size: 10px; }
+  .forecast-panel { margin-top: 0; padding: 6px; }
+  .forecast-panel .section-heading { min-height: 25px; justify-content: flex-end; }
+  .forecast-panel .section-heading > div:first-child, .forecast-heading-tools > .muted { display: none; }
+  .forecast-timeline-scroll { margin-top: 4px; }
+  .forecast-weather-canvas { height: 68px; }
+  .forecast-sky-symbols { height: 55px; }
+  .forecast-temperature-symbol svg { height: 105px; }
+}
+
 @media (max-width: 540px) {
   .shell { width: min(100% - 20px, 1440px); margin-top: 10px; }
   .topbar { align-items: flex-start; }
