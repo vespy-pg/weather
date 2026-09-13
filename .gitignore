@@ -2,4 +2,10 @@ node_modules/
 .env
 .DS_Store
 coverage/
-
+.android-sdk/
+.gradle/
+apps/android/.idea/
+apps/android/.kotlin/
+apps/android/app/build/
+apps/android/build/
+apps/android/local.properties

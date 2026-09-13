@@ -96,6 +96,7 @@ Optional environment variables:
 - `PORT` changes the HTTP port from `8080`.
 - `WEATHER_CACHE_TTL_MS` changes the upstream cache duration.
 - `WEATHER_ALLOWED_ORIGIN` restricts cross-origin API access. It defaults to `*`.
+- `GOOGLE_ANALYTICS_ID` enables consent-gated Google Analytics 4 when set to a valid `G-...` measurement ID.
 
 ## Project structure
 
@@ -111,11 +112,11 @@ packages/
 
 The server exposes:
 
-- `GET /api/health`
-- `GET /api/locations?q=...`
-- `GET /api/reverse-location?latitude=...&longitude=...&timezone=...&language=...`
-- `GET /api/promotions?platform=...&placement=...&language=...&theme=...`
-- `GET /api/weather?latitude=...&longitude=...&timezone=...&name=...`
+- `GET /health`
+- `GET /locations?q=...`
+- `GET /reverse-location?latitude=...&longitude=...&timezone=...&language=...`
+- `GET /promotions?platform=...&placement=...&language=...&theme=...`
+- `GET /weather?latitude=...&longitude=...&timezone=...&name=...`
 
 The API contract is available in [`packages/weather-contract/openapi.yaml`](packages/weather-contract/openapi.yaml).
 Promotion delivery rules are documented in [`docs/promotion-feed.md`](docs/promotion-feed.md).
@@ -140,8 +141,8 @@ docker run --rm -p 127.0.0.1:8080:8080 weather
 
 The application uses relative API URLs, so the same image can be reverse-proxied from a domain root or a path such as `/pogoda/`.
 
-The production templates used for `vespy.pl/pogoda/` are stored in `deploy/`. The HTTP and HTTPS Apache virtual hosts proxy the path to a container bound only to `127.0.0.1:18080`, while the systemd unit keeps that container running after reboots. Both virtual hosts use the local GeoIP database and `mod_geoip` to pass only the visitor's country code to the application, so visitor IP addresses are not sent to an external location service.
+The production templates for `vespy.eu`, its `www`, `weather`, and `pogoda` aliases, and `api.weather.vespy.eu` are stored in `deploy/`. The Apache virtual hosts proxy to a container bound only to `127.0.0.1:18080`, while the systemd unit keeps that container running after reboots. The virtual hosts use the local GeoIP database and `mod_geoip` to pass only the visitor's country code to the application, so visitor IP addresses are not sent to an external location service.
 
 ## Akacjowa integration
 
-Akacjowa will eventually consume `/api/weather` from this service instead of maintaining its own provider integration. Its existing forecast remains intact until the standalone service has a stable live API URL.
+Akacjowa will eventually consume `/weather` from this service instead of maintaining its own provider integration. Its existing forecast remains intact until the standalone service has a stable live API URL.

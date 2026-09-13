@@ -11,7 +11,7 @@
     "start": "node apps/api/server.js",
     "i18n:generate": "node packages/i18n/scripts/generate.mjs",
     "i18n:check": "node packages/i18n/scripts/generate.mjs --check",
-    "check": "node --check apps/api/server.js && node --check apps/web/assets/android-preview.js && node --check apps/web/assets/app.js && node --check apps/web/assets/charts.js && node --check apps/web/assets/components.js && node --check apps/web/assets/forecast-view.js && node --check apps/web/assets/i18n.js && node --check apps/web/assets/location-state.js && node --check apps/web/assets/weather-demo.js && node --check apps/web/assets/widget-preview.js && node --check apps/web/sw.js",
+    "check": "node --check apps/api/server.js && node --check apps/web/assets/analytics.js && node --check apps/web/assets/android-preview.js && node --check apps/web/assets/app.js && node --check apps/web/assets/charts.js && node --check apps/web/assets/components.js && node --check apps/web/assets/forecast-view.js && node --check apps/web/assets/i18n.js && node --check apps/web/assets/location-state.js && node --check apps/web/assets/weather-demo.js && node --check apps/web/assets/widget-preview.js && node --check apps/web/sw.js",
     "test": "npm run i18n:check && node --test"
   },
   "dependencies": {

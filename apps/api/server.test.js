@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {forecastUrl, locationSearchUrl, normalizeForecast, normalizeLocale, normalizeReverseLocation, preferredLanguageForCountry, promotionFeed, selectCapitalResult} from './server.js';
+import {forecastUrl, locationSearchUrl, normalizeForecast, normalizeGoogleAnalyticsId, normalizeLocale, normalizeReverseLocation, preferredLanguageForCountry, promotionFeed, selectCapitalResult} from './server.js';
+
+test('normalizeGoogleAnalyticsId accepts only GA4 measurement IDs', () => {
+  assert.equal(normalizeGoogleAnalyticsId(' g-ab12cd34 '), 'G-AB12CD34');
+  assert.equal(normalizeGoogleAnalyticsId('UA-123-4'), null);
+  assert.equal(normalizeGoogleAnalyticsId('G-ABC<script>'), null);
+});
 
 test('forecastUrl requests the fields shared by web and Android clients', () => {
   const url = new URL(forecastUrl({latitude: 50.67, longitude: 19.12, timezone: 'Europe/Warsaw'}));
@@ -110,4 +116,10 @@ test('promotionFeed returns a localized native card without executable content',
 test('promotionFeed returns no campaign for an unsupported placement', () => {
   const feed = promotionFeed({platform: 'android', placement: 'unknown'});
   assert.deepEqual(feed.campaigns, []);
+});
+
+test('promotionFeed serves the same safe campaign contract to Android', () => {
+  const feed = promotionFeed({platform: 'android', placement: 'forecast_landscape'});
+  assert.equal(feed.platform, 'android');
+  assert.equal(feed.campaigns[0].type, 'native-card');
 });

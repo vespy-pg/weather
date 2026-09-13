@@ -53,7 +53,9 @@ WebP is the preferred raster format. PNG is the fallback when lossless transpare
 ## Endpoint
 
 ```http
-GET /api/promotions?platform=web&placement=web_forecast&language=en&theme=dark
+GET https://api.weather.vespy.eu/promotions?platform=web&placement=web_forecast&language=en&theme=dark
 ```
 
-The initial implementation serves a DINPanel native card. Additional campaigns and an administrative editor can be added without changing the client contract.
+Supported placements are `web_forecast`, `forecast_landscape`, and `forecast_portrait`. The initial implementation serves a DINPanel native card. Additional campaigns and an administrative editor can be added without changing the client contract.
+
+When analytics consent has been granted, the web client records `promotion_impression` once per campaign and page session, plus `promotion_click` for each click. Both events contain only `campaign_id`; they do not contain location or weather-search data.

@@ -2,14 +2,22 @@ openapi: 3.1.0
 info:
   title: Weather API
   version: 0.2.0
+servers:
+  - url: https://api.weather.vespy.eu
 paths:
-  /api/health:
+  /health:
     get:
       operationId: health
       responses:
         '200':
           description: Service health
-  /api/locations:
+  /client-config:
+    get:
+      operationId: getClientConfig
+      responses:
+        '200':
+          description: Public runtime configuration for the web client
+  /locations:
     get:
       operationId: searchLocations
       parameters:
@@ -27,13 +35,13 @@ paths:
       responses:
         '200':
           description: Matching locations
-  /api/bootstrap-location:
+  /bootstrap-location:
     get:
       operationId: getBootstrapLocation
       responses:
         '200':
           description: Capital location selected from the country code supplied by the trusted reverse proxy
-  /api/reverse-location:
+  /reverse-location:
     get:
       operationId: reverseLocation
       parameters:
@@ -65,7 +73,7 @@ paths:
           description: Nearest named locality for coordinates supplied after browser permission
         '400':
           description: Invalid coordinates
-  /api/promotions:
+  /promotions:
     get:
       operationId: getPromotions
       parameters:
@@ -94,7 +102,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PromotionFeed'
-  /api/weather:
+  /weather:
     get:
       operationId: getWeather
       parameters:

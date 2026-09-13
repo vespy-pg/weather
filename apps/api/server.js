@@ -16,6 +16,11 @@ const CACHE_TTL_MS = Number(process.env.WEATHER_CACHE_TTL_MS || 10 * 60 * 1000);
 const WEB_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../web');
 const cache = new Map();
 
+export function normalizeGoogleAnalyticsId(value) {
+  const id = String(value || '').trim().toUpperCase();
+  return /^G-[A-Z0-9]+$/.test(id) ? id : null;
+}
+
 const contentTypes = {
   '.css': 'text/css; charset=utf-8',
   '.html': 'text/html; charset=utf-8',
@@ -40,7 +45,8 @@ export function promotionFeed({platform = 'web', placement = 'web_forecast', lan
   const supportedPlatforms = ['web', 'android', 'ios'];
   const normalizedPlatform = supportedPlatforms.includes(platform) ? platform : 'web';
   const normalizedTheme = theme === 'light' ? 'light' : 'dark';
-  const campaigns = placement === 'web_forecast' ? [{
+  const supportedPlacements = ['web_forecast', 'forecast_landscape', 'forecast_portrait'];
+  const campaigns = supportedPlacements.includes(placement) ? [{
     id: 'dinpanel-web-2026-09',
     type: 'native-card',
     eyebrow: localized ? 'APLIKACJA VESPY' : 'A VESPY APP',
@@ -68,7 +74,7 @@ export function promotionFeed({platform = 'web', placement = 'web_forecast', lan
 async function cachedFetch(url) {
   const cached = cache.get(url);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
-  const response = await fetch(url, {headers: {'User-Agent': 'weather/0.1 (https://vespy.pl/pogoda/)'}});
+  const response = await fetch(url, {headers: {'User-Agent': 'weather/0.1 (https://weather.vespy.eu/)'}});
   if (!response.ok) throw new Error(`Upstream returned ${response.status}`);
   const value = await response.json();
   cache.set(url, {expiresAt: Date.now() + CACHE_TTL_MS, value});
@@ -309,12 +315,15 @@ export function createServer() {
         return response.end();
       }
       if (request.method !== 'GET') return json(response, 405, {error: 'Method not allowed.'});
-      if (requestUrl.pathname === '/api/health') return json(response, 200, {status: 'ok'});
-      if (requestUrl.pathname === '/api/bootstrap-location') return await bootstrapLocation(request, response);
-      if (requestUrl.pathname === '/api/locations') return await locations(requestUrl, response);
-      if (requestUrl.pathname === '/api/reverse-location') return await reverseLocation(requestUrl, response);
-      if (requestUrl.pathname === '/api/promotions') return promotions(requestUrl, response);
-      if (requestUrl.pathname === '/api/weather') return await weather(requestUrl, response);
+      if (requestUrl.pathname === '/health') return json(response, 200, {status: 'ok'});
+      if (requestUrl.pathname === '/client-config') return json(response, 200, {
+        googleAnalyticsId: normalizeGoogleAnalyticsId(process.env.GOOGLE_ANALYTICS_ID)
+      });
+      if (requestUrl.pathname === '/bootstrap-location') return await bootstrapLocation(request, response);
+      if (requestUrl.pathname === '/locations') return await locations(requestUrl, response);
+      if (requestUrl.pathname === '/reverse-location') return await reverseLocation(requestUrl, response);
+      if (requestUrl.pathname === '/promotions') return promotions(requestUrl, response);
+      if (requestUrl.pathname === '/weather') return await weather(requestUrl, response);
       return await staticFile(requestUrl, response);
     } catch (error) {
       console.error(error);

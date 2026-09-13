@@ -7,8 +7,10 @@ Wants=network-online.target
 [Service]
 Restart=always
 RestartSec=5
+Environment=WEATHER_ALLOWED_ORIGIN=https://weather.vespy.eu
+EnvironmentFile=-/etc/weather.env
 ExecStartPre=-/usr/bin/docker rm -f weather
-ExecStart=/usr/bin/docker run --name weather --read-only --tmpfs /tmp:rw,noexec,nosuid,size=16m -p 127.0.0.1:18080:8080 -e WEATHER_ALLOWED_ORIGIN=https://vespy.pl weather:latest
+ExecStart=/usr/bin/docker run --name weather --read-only --tmpfs /tmp:rw,noexec,nosuid,size=16m -p 127.0.0.1:18080:8080 -e WEATHER_ALLOWED_ORIGIN -e GOOGLE_ANALYTICS_ID weather:latest
 ExecStop=/usr/bin/docker stop -t 10 weather
 ExecStopPost=-/usr/bin/docker rm -f weather
 TimeoutStartSec=0

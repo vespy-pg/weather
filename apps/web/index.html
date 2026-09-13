@@ -165,6 +165,35 @@
     <footer class="data-attribution"><span data-i18n="app.dataSources">Data sources:</span> <a href="https://open-meteo.com/" rel="external">Open-Meteo</a> · <a href="https://www.openstreetmap.org/copyright" rel="external">OpenStreetMap contributors</a></footer>
   </main>
 
+  <dialog class="forecast-welcome" id="forecastWelcome" aria-labelledby="forecastWelcomeTitle">
+    <div class="forecast-welcome-content">
+      <header class="forecast-welcome-heading">
+        <p class="eyebrow" data-i18n="legend.eyebrow">FORECAST LEGEND</p>
+        <h2 id="forecastWelcomeTitle" data-i18n="legend.title">How to read this forecast</h2>
+      </header>
+      <div class="forecast-welcome-grid">
+        <article class="forecast-welcome-card">
+          <strong data-i18n="legend.skyTitle">Sun, clouds and night</strong>
+          <canvas id="welcomeSkyCanvas" height="82" aria-hidden="true"></canvas>
+          <p id="welcomeSkyText"></p>
+        </article>
+        <article class="forecast-welcome-card">
+          <strong data-i18n="legend.temperatureTitle">Temperature line</strong>
+          <canvas id="welcomeTemperatureCanvas" height="82" aria-hidden="true"></canvas>
+          <p id="welcomeTemperatureText"></p>
+        </article>
+        <article class="forecast-welcome-card">
+          <strong data-i18n="legend.windTitle">Wind</strong>
+          <canvas id="welcomeWindCanvas" height="64" aria-hidden="true"></canvas>
+          <p id="welcomeWindText"></p>
+        </article>
+      </div>
+      <footer class="forecast-welcome-actions">
+        <button class="primary-button" type="button" id="closeForecastWelcome" data-i18n="action.close">Close</button>
+      </footer>
+    </div>
+  </dialog>
+
   <dialog class="settings-dialog" id="settingsDialog">
     <form method="dialog" class="settings-content" id="settingsForm">
       <div class="dialog-heading">

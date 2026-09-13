@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "875627662784",
+    "project_id": "weather-6f377",
+    "storage_bucket": "weather-6f377.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:875627662784:android:1d41571bf88221e4b44c25",
+        "android_client_info": {
+          "package_name": "eu.vespy.weather"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAXV38hOiULMuBUE9jhH4dJszJCpyORZ6I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

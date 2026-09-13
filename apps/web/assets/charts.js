@@ -467,9 +467,17 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
     }
     const numericTemperature = numericValue(point.temperature);
     if (options.showHourlyTemperatures !== false && index % temperatureStep === 0 && numericTemperature !== null) {
+      const label = shortTemperature(numericTemperature);
       context.fillStyle = temperatureColor(numericTemperature);
       context.font = `700 ${temperatureFontSize}px ui-monospace, monospace`;
-      context.fillText(shortTemperature(numericTemperature), x, temperatureY);
+      context.save();
+      context.lineJoin = 'round';
+      context.miterLimit = 2;
+      context.strokeStyle = chartColor('--chart-temperature-label-outline', 'rgba(5, 9, 15, .92)');
+      context.lineWidth = Math.max(2, temperatureFontSize * .28);
+      context.strokeText(label, x, temperatureY);
+      context.fillText(label, x, temperatureY);
+      context.restore();
       context.font = `700 ${hourFontSize}px ui-monospace, monospace`;
     }
     const date = String(point.timestamp).slice(0, 10);

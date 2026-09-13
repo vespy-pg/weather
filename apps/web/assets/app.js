@@ -1,4 +1,5 @@
 import {drawForecastSky, drawWeatherChart, drawWindFlow, setTemperatureColorThresholds} from './charts.js';
+import {initializeAnalytics, trackEvent} from './analytics.js';
 import {createWeatherDemo} from './weather-demo.js';
 import {escapeHtml, formatForecastDate, formatTime, measurement, numericValue, shortTemperature, temperature} from './components.js';
 import {groupHourlyForecast, hoursPerGroup, temperatureRange} from './forecast-view.js';
@@ -14,6 +15,7 @@ import {
 } from './temperature-scale.js';
 
 const SETTINGS_KEY = 'weather.settings.v1';
+const FORECAST_WELCOME_KEY = 'weather.forecast-welcome.v1';
 const DEFAULT_ZOOM = .5;
 const LAYOUT_VERSION = 3;
 const ZOOM_LEVELS = [.25, .375, .5, .75, 1, 1.25, 1.5, 2];
@@ -21,7 +23,9 @@ const QUERY = new URLSearchParams(location.search);
 const IS_GITHUB_PAGES = location.hostname.endsWith('.github.io');
 const IS_DEMO = QUERY.get('demo') === '1' || IS_GITHUB_PAGES;
 const IS_EMBEDDED = QUERY.get('embed') === '1';
-const API_ROOT = new URL('./api/', location.href);
+const API_ROOT = ['localhost', '127.0.0.1'].includes(location.hostname)
+  ? new URL('./', location.href)
+  : new URL('https://api.weather.vespy.eu/');
 const DEFAULT_LOCATION = {id: 'capital-GB', name: 'London', country: 'United Kingdom', latitude: 51.5074, longitude: -0.1278, timezone: 'Europe/London'};
 const DEFAULT_SETTINGS = {
   location: DEFAULT_LOCATION,
@@ -97,6 +101,8 @@ let forecastDrawFrame = 0;
 let locationSearchTimer = 0;
 let locationSearchRequest = 0;
 let promotionRequest = 0;
+const promotionImpressions = new Set();
+let forecastWelcomeDisplayed = false;
 
 function safePromotionUrl(value, {asset = false} = {}) {
   try {
@@ -123,6 +129,7 @@ function renderPromotion(campaign) {
   link.href = targetUrl;
   link.target = '_blank';
   link.rel = 'noreferrer sponsored';
+  link.addEventListener('click', () => trackEvent('promotion_click', {campaign_id: String(campaign.id || 'unknown')}));
 
   if (campaign.type === 'image-banner') {
     const imageUrl = safePromotionUrl(campaign.imageUrl, {asset: true});
@@ -166,6 +173,11 @@ function renderPromotion(campaign) {
 
   slot.replaceChildren(link);
   slot.hidden = false;
+  const campaignId = String(campaign.id || 'unknown');
+  if (!promotionImpressions.has(campaignId)) {
+    promotionImpressions.add(campaignId);
+    trackEvent('promotion_impression', {campaign_id: campaignId});
+  }
 }
 
 async function loadPromotion() {
@@ -417,6 +429,45 @@ function drawLegendPreviews() {
   drawWindFlow(document.getElementById('legendWindCanvas'), LEGEND_WIND_POINTS);
 }
 
+function firstSentences(key, count) {
+  const sentences = t(key).match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [];
+  return sentences.slice(0, count).join(' ').trim();
+}
+
+function selectedSentences(value, start, count) {
+  const sentences = value.split('. ');
+  const selected = sentences.slice(start, start + count).join('. ').trim();
+  return selected && !/[.!?]$/.test(selected) ? `${selected}.` : selected;
+}
+
+function drawForecastWelcome() {
+  document.getElementById('welcomeSkyText').textContent = firstSentences('legend.skyText', 2);
+  const temperatureLegend = t('legend.temperatureText', {
+    deepFrost: temperature(settings.temperatureThresholds.deepFrost),
+    freezing: temperature(0),
+    mild: temperature(settings.temperatureThresholds.mild),
+    warm: temperature(settings.temperatureThresholds.warm),
+    hot: temperature(settings.temperatureThresholds.hot)
+  });
+  document.getElementById('welcomeTemperatureText').textContent = selectedSentences(temperatureLegend, 2, 3);
+  document.getElementById('welcomeWindText').textContent = firstSentences('legend.windText', 3);
+  drawForecastSky(document.getElementById('welcomeSkyCanvas'), LEGEND_SKY_POINTS, LEGEND_SKY_DAYS, {showHourlyTemperatures: false});
+  drawWeatherChart(document.getElementById('welcomeTemperatureCanvas'), LEGEND_TEMPERATURE_POINTS, [], {timeline: true, showApparentTemperature: false, interactive: false});
+  drawWindFlow(document.getElementById('welcomeWindCanvas'), LEGEND_WIND_POINTS);
+}
+
+function showForecastWelcomeOnce() {
+  if (IS_EMBEDDED || forecastWelcomeDisplayed) return;
+  try {
+    if (localStorage.getItem(FORECAST_WELCOME_KEY) === 'complete') return;
+  } catch {}
+  forecastWelcomeDisplayed = true;
+  const dialog = document.getElementById('forecastWelcome');
+  dialog.showModal();
+  requestAnimationFrame(drawForecastWelcome);
+  trackEvent('forecast_guide_shown');
+}
+
 function drawForecast() {
   if (!weather?.available) return;
   const hourly = weather.hourly.slice(0, 240);
@@ -472,19 +523,22 @@ function renderError(message) {
 
 async function loadWeather() {
   const requestId = ++weatherRequest;
+  const requestedLocation = {...settings.location};
+  document.getElementById('locationTitle').textContent = requestedLocation.name;
   document.getElementById('updatedAt').textContent = t('status.loading');
+  document.querySelector('.forecast-panel').setAttribute('aria-busy', 'true');
   try {
     let nextWeather;
     if (IS_DEMO) {
       nextWeather = createWeatherDemo();
-      nextWeather.location = {...settings.location, name: `${settings.location.name} - demo`};
+      nextWeather.location = {...requestedLocation, name: `${requestedLocation.name} - demo`};
       document.getElementById('forecastRangeLabel').textContent = t('forecast.demo');
     } else {
       const parameters = new URLSearchParams({
-        latitude: settings.location.latitude,
-        longitude: settings.location.longitude,
-        timezone: settings.location.timezone || 'auto',
-        name: settings.location.name
+        latitude: requestedLocation.latitude,
+        longitude: requestedLocation.longitude,
+        timezone: requestedLocation.timezone || 'auto',
+        name: requestedLocation.name
       });
       const response = await fetch(new URL(`weather?${parameters}`, API_ROOT));
       if (!response.ok) throw new Error((await response.json()).error || 'Forecast request failed.');
@@ -494,9 +548,13 @@ async function loadWeather() {
     if (requestId !== weatherRequest) return;
     weather = nextWeather;
     renderForecast();
+    showForecastWelcomeOnce();
+    trackEvent('forecast_loaded', {forecast_mode: IS_DEMO ? 'demo' : 'live', embedded: IS_EMBEDDED});
   } catch (error) {
     if (requestId !== weatherRequest) return;
     renderError(error.message);
+  } finally {
+    if (requestId === weatherRequest) document.querySelector('.forecast-panel').removeAttribute('aria-busy');
   }
 }
 
@@ -658,6 +716,7 @@ function activateLocation(item, locations = settings.locations) {
   settings.configured = true;
   saveSettings();
   renderLocationMenu();
+  trackEvent('location_selected');
   loadWeather();
 }
 
@@ -719,6 +778,7 @@ document.getElementById('themeToggle').addEventListener('click', () => {
   drawForecast();
   drawLegendPreviews();
   loadPromotion();
+  trackEvent('display_preference_changed', {preference: 'theme', value: settings.theme});
 });
 document.getElementById('languageSelect').addEventListener('change', event => {
   settings.language = setLanguage(event.target.value);
@@ -729,6 +789,7 @@ document.getElementById('languageSelect').addEventListener('change', event => {
   renderForecast();
   drawLegendPreviews();
   loadPromotion();
+  trackEvent('display_preference_changed', {preference: 'language', value: settings.language});
 });
 document.getElementById('settingsForm').addEventListener('change', event => {
   if (event.target.matches('[data-temperature-threshold]')) return;
@@ -755,6 +816,7 @@ document.getElementById('copyEmbedCode').addEventListener('click', async () => {
   try {
     await navigator.clipboard.writeText(document.getElementById('embedCode').value);
     document.getElementById('copyStatus').textContent = t('status.copied');
+    trackEvent('embed_code_copied');
   } catch {
     document.getElementById('embedCode').select();
     document.getElementById('copyStatus').textContent = t('status.copyManual');
@@ -775,27 +837,56 @@ document.getElementById('locationQuery').addEventListener('input', event => {
 document.getElementById('locationQuery').addEventListener('keydown', event => {
   if (event.key === 'Enter') { event.preventDefault(); searchLocations(); }
 });
-document.getElementById('useDeviceLocation').addEventListener('click', () => {
+document.getElementById('useDeviceLocation').addEventListener('click', event => {
   if (!navigator.geolocation) return document.getElementById('settingsError').textContent = t('error.geolocation');
+  const button = event.currentTarget;
+  button.disabled = true;
+  button.setAttribute('aria-busy', 'true');
   document.getElementById('settingsError').textContent = t('status.waitingLocation');
   navigator.geolocation.getCurrentPosition(async position => {
-    const deviceLocation = await locationFromPosition(position);
-    pendingLocations = replacingLocation(pendingLocations, pendingLocation, deviceLocation);
-    pendingLocation = deviceLocation;
-    document.getElementById('locationQuery').value = '';
-    renderPendingLocations();
-    saveFormChanges({reloadWeather: true});
-    document.getElementById('settingsError').textContent = '';
-  }, error => { document.getElementById('settingsError').textContent = error.message; }, {enableHighAccuracy: false, timeout: 10000});
+    try {
+      const deviceLocation = await locationFromPosition(position);
+      pendingLocations = replacingLocation(pendingLocations, pendingLocation, deviceLocation);
+      pendingLocation = deviceLocation;
+      document.getElementById('locationQuery').value = '';
+      renderPendingLocations();
+      saveFormChanges({reloadWeather: true});
+      document.getElementById('settingsError').textContent = '';
+      document.getElementById('settingsDialog').close();
+    } finally {
+      button.disabled = false;
+      button.removeAttribute('aria-busy');
+    }
+  }, error => {
+    document.getElementById('settingsError').textContent = error.message;
+    button.disabled = false;
+    button.removeAttribute('aria-busy');
+  }, {enableHighAccuracy: false, timeout: 10000});
 });
 document.getElementById('settingsForm').addEventListener('submit', event => {
   event.preventDefault();
   document.getElementById('settingsDialog').close();
 });
+document.getElementById('closeForecastWelcome').addEventListener('click', () => {
+  document.getElementById('forecastWelcome').close();
+});
+document.getElementById('forecastWelcome').addEventListener('close', () => {
+  try { localStorage.setItem(FORECAST_WELCOME_KEY, 'complete'); } catch {}
+  trackEvent('forecast_guide_completed');
+});
 
-document.getElementById('forecastZoomOut').addEventListener('click', () => applyZoom(zoomIndex - 1));
-document.getElementById('forecastZoomReset').addEventListener('click', () => applyZoom(ZOOM_LEVELS.indexOf(DEFAULT_ZOOM)));
-document.getElementById('forecastZoomIn').addEventListener('click', () => applyZoom(zoomIndex + 1));
+document.getElementById('forecastZoomOut').addEventListener('click', () => {
+  applyZoom(zoomIndex - 1);
+  trackEvent('display_preference_changed', {preference: 'timeline_zoom', value: ZOOM_LEVELS[zoomIndex]});
+});
+document.getElementById('forecastZoomReset').addEventListener('click', () => {
+  applyZoom(ZOOM_LEVELS.indexOf(DEFAULT_ZOOM));
+  trackEvent('display_preference_changed', {preference: 'timeline_zoom', value: ZOOM_LEVELS[zoomIndex]});
+});
+document.getElementById('forecastZoomIn').addEventListener('click', () => {
+  applyZoom(zoomIndex + 1);
+  trackEvent('display_preference_changed', {preference: 'timeline_zoom', value: ZOOM_LEVELS[zoomIndex]});
+});
 document.getElementById('forecastTimelineScroll').addEventListener('wheel', event => {
   if (!event.ctrlKey) return;
   event.preventDefault();
@@ -866,35 +957,37 @@ async function initialize() {
     }
     return loadWeather();
   }
-  const requestedPosition = devicePosition();
-  try {
-    const response = await fetch(new URL('bootstrap-location', API_ROOT));
-    const payload = await response.json();
-    if (response.ok && payload.location) {
-      if (settings.languageSource === 'fallback' && payload.language) {
-        settings.language = setLanguage(payload.language);
-        settings.languageSource = 'country';
-        document.getElementById('languageSelect').value = settings.language;
-        document.getElementById('languageSetting').value = settings.language;
-        applyTheme(settings.theme);
-        drawLegendPreviews();
-      }
-      settings.location = payload.location;
-      settings.locations = [payload.location];
+  document.getElementById('updatedAt').textContent = t('status.waitingLocation');
+  const bootstrapRequest = (async () => {
+    try {
+      const response = await fetch(new URL('bootstrap-location', API_ROOT));
+      const payload = await response.json();
+      return response.ok ? payload : null;
+    } catch {
+      return null;
     }
-  } catch {}
+  })();
+  const [position, payload] = await Promise.all([devicePosition(), bootstrapRequest]);
+  if (settings.languageSource === 'fallback' && payload?.language) {
+    settings.language = setLanguage(payload.language);
+    settings.languageSource = 'country';
+    document.getElementById('languageSelect').value = settings.language;
+    document.getElementById('languageSetting').value = settings.language;
+    applyTheme(settings.theme);
+    drawLegendPreviews();
+  }
+  const selectedLocation = position
+    ? await locationFromPosition(position)
+    : payload?.location || settings.location;
+  settings.location = selectedLocation;
+  settings.locations = [selectedLocation];
   settings.configured = true;
   saveSettings();
   renderLocationMenu();
   await loadWeather();
-
-  const position = await requestedPosition;
-  if (position) {
-    const deviceLocation = await locationFromPosition(position);
-    activateLocation(deviceLocation, replacingLocation(settings.locations, settings.location, deviceLocation));
-  }
 }
 
+initializeAnalytics(API_ROOT);
 initialize().finally(loadPromotion);
 
 if ('serviceWorker' in navigator) {
