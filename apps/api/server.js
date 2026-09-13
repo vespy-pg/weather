@@ -26,8 +26,10 @@ const contentTypes = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
+  '.png': 'image/png',
   '.webmanifest': 'application/manifest+json; charset=utf-8',
-  '.svg': 'image/svg+xml'
+  '.svg': 'image/svg+xml',
+  '.webp': 'image/webp'
 };
 
 function json(response, status, body, additionalHeaders = {}) {
@@ -55,7 +57,11 @@ export function promotionFeed({platform = 'web', placement = 'web_forecast', lan
       ? 'Projektuj instalacje elektryczne, rozdzielnice i dokumentację w jednym miejscu.'
       : 'Design electrical installations, distribution boards, and documentation in one place.',
     actionLabel: localized ? 'Poznaj DINPanel' : 'Explore DINPanel',
-    logoUrl: 'assets/dinpanel-promo.svg',
+    logoUrl: normalizedPlatform === 'web'
+      ? `assets/dinpanel-logo-${normalizedTheme}.png`
+      : 'assets/dinpanel-logo-square.png',
+    imageUrl: normalizedPlatform === 'web' ? 'assets/dinpanel-workbench.webp' : undefined,
+    imageAlt: 'DINPanel application preview',
     targetUrl: localized ? 'https://dinpanel.com/pl/' : 'https://dinpanel.com/',
     backgroundColor: normalizedTheme === 'light' ? '#fff8f3' : '#181513',
     accentColor: '#f47b32',

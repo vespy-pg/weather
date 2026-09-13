@@ -21,6 +21,7 @@ A native card may contain:
 - `description`
 - `actionLabel`
 - `logoUrl`
+- `imageUrl` and `imageAlt` for an optional product preview
 - `targetUrl`
 - `backgroundColor`
 - `accentColor`

@@ -454,6 +454,7 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
   const groupedHours = Math.max(1, Number(options.groupHours) || 1);
   const temperatureStep = Math.max(1, Math.round(Number(options.temperatureStep) || 1));
   const hourFontSize = Math.max(9, 9 * visualScale);
+  const dayFontSize = Math.min(16, Math.max(14, 14 * visualScale));
   const temperatureFontSize = groupedHours > 1 ? Math.max(11, 10 * visualScale) : Math.max(8, 8 * visualScale);
   const hourY = configuredNumber(options.hourY, 24);
   const temperatureY = configuredNumber(options.temperatureY, 36);
@@ -493,8 +494,10 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
     context.textAlign = 'left';
     const dayLabel = index === 0
       ? t('forecast.today')
-      : formatForecastDate(point.timestamp, {weekday: 'short', day: 'numeric', month: 'short'});
-    context.fillText(dayLabel.toUpperCase(), padding.left + index * columnWidth + 4, Math.max(10, hourFontSize));
+      : formatForecastDate(point.timestamp, {weekday: 'short'});
+    context.font = `900 ${dayFontSize}px ui-monospace, monospace`;
+    context.fillText(dayLabel.toUpperCase(), padding.left + index * columnWidth + 4, dayFontSize);
+    context.font = `700 ${hourFontSize}px ui-monospace, monospace`;
     context.textAlign = 'center';
   });
 }

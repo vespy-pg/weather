@@ -150,6 +150,14 @@ function renderPromotion(campaign) {
     logo.src = logoUrl;
     logo.alt = '';
 
+    const previewUrl = safePromotionUrl(campaign.imageUrl, {asset: true});
+    const preview = document.createElement('img');
+    preview.className = 'web-promotion-preview';
+    preview.src = previewUrl || '';
+    preview.alt = String(campaign.imageAlt || '');
+    preview.loading = 'lazy';
+    preview.hidden = !previewUrl;
+
     const copy = document.createElement('span');
     copy.className = 'web-promotion-copy';
     const eyebrow = document.createElement('span');
@@ -166,7 +174,7 @@ function renderPromotion(campaign) {
     const action = document.createElement('span');
     action.className = 'web-promotion-action';
     action.textContent = String(campaign.actionLabel || 'Open');
-    link.append(logo, copy, action);
+    link.append(logo, copy, preview, action);
     slot.style.setProperty('--promotion-background', safePromotionColor(campaign.backgroundColor, 'var(--panel)'));
     slot.style.setProperty('--promotion-accent', safePromotionColor(campaign.accentColor, 'var(--orange)'));
   }

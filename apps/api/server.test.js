@@ -110,6 +110,8 @@ test('promotionFeed returns a localized native card without executable content',
   assert.equal(feed.campaigns[0].title, 'DINPanel');
   assert.equal(feed.campaigns[0].actionLabel, 'Poznaj DINPanel');
   assert.equal(feed.campaigns[0].backgroundColor, '#fff8f3');
+  assert.equal(feed.campaigns[0].logoUrl, 'assets/dinpanel-logo-light.png');
+  assert.equal(feed.campaigns[0].imageUrl, 'assets/dinpanel-workbench.webp');
   assert.equal('html' in feed.campaigns[0], false);
 });
 
@@ -122,4 +124,6 @@ test('promotionFeed serves the same safe campaign contract to Android', () => {
   const feed = promotionFeed({platform: 'android', placement: 'forecast_landscape'});
   assert.equal(feed.platform, 'android');
   assert.equal(feed.campaigns[0].type, 'native-card');
+  assert.equal(feed.campaigns[0].logoUrl, 'assets/dinpanel-logo-square.png');
+  assert.equal(feed.campaigns[0].imageUrl, undefined);
 });
