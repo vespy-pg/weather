@@ -50,7 +50,7 @@ Open **Settings** in Weather and use **Embed on a website** to copy an iframe co
 
 ```html
 <iframe
-  src="https://vespy-pg.github.io/weather/?embed=1&demo=1&theme=dark"
+  src="https://pogoda.vespy.eu/pl-PL/Katowice?ll=50.26489%2C19.02378&embed=1&theme=dark"
   title="10-day weather forecast"
   width="100%"
   height="680"
@@ -61,19 +61,20 @@ Open **Settings** in Weather and use **Embed on a website** to copy an iframe co
 
 The embedded view contains the forecast timeline and its legend without the dashboard header or daily cards. It is responsive and can be placed in a page, dashboard, kiosk, or web-based desktop panel.
 
+Public forecast URLs use `/{language}/{location}` paths and keep exact coordinates in `ll`, for example `https://pogoda.vespy.eu/pl-PL/London?ll=51.50740%2C-0.12780`. The readable location segment is used for display while `ll` prevents ambiguity between places with the same name.
+
 Supported URL parameters:
 
 | Parameter | Purpose | Example |
 |---|---|---|
 | `embed` | Enable the compact widget layout | `embed=1` |
 | `theme` | Select a dark or light appearance | `theme=light` |
-| `lang` | Select an English or Polish interface using a BCP 47 tag | `lang=pl-PL` |
 | `unit` | Select Celsius or Fahrenheit temperature display | `unit=F` |
 | `zoom` | Set the initial timeline zoom from 25% to 200%; compact levels group values into 6, 4, 3, or 2-hour intervals | `zoom=0.5` |
-| `lat` and `lon` | Select coordinates for a live deployment | `lat=50.67&lon=19.12` |
-| `name` | Set the displayed location name | `name=Katowice` |
-| `timezone` | Set the forecast time zone | `timezone=Europe/Warsaw` |
+| `ll` | Select an exact latitude and longitude for the location path | `ll=50.67,19.12` |
 | `demo` | Use fictional demonstration data | `demo=1` |
+| `guide` | Force the first-visit forecast guide to open | `guide=1` |
+| `share` | Force the expanded share prompt to appear | `share=1` |
 
 GitHub Pages is a static demonstration, so it always shows the demo dataset. Location parameters return live data only when the Node.js API is deployed with the web application.
 
@@ -139,9 +140,9 @@ docker build -t weather .
 docker run --rm -p 127.0.0.1:8080:8080 weather
 ```
 
-The application uses relative API URLs, so the same image can be reverse-proxied from a domain root or a path such as `/pogoda/`.
+The application uses root-relative asset and API URLs so localized forecast paths can be opened directly.
 
-The production templates for `vespy.eu`, its `www`, `weather`, and `pogoda` aliases, and `api.weather.vespy.eu` are stored in `deploy/`. The Apache virtual hosts proxy to a container bound only to `127.0.0.1:18080`, while the systemd unit keeps that container running after reboots. The virtual hosts use the local GeoIP database and `mod_geoip` to pass only the visitor's country code to the application, so visitor IP addresses are not sent to an external location service.
+The production templates for `vespy.eu`, its `www`, the canonical `pogoda.vespy.eu` web host, the redirecting `weather.vespy.eu` alias, and `api.weather.vespy.eu` are stored in `deploy/`. The Apache virtual hosts proxy to a container bound only to `127.0.0.1:18080`, while the systemd unit keeps that container running after reboots. The virtual hosts use the local GeoIP database and `mod_geoip` to pass only the visitor's country code to the application, so visitor IP addresses are not sent to an external location service.
 
 ## Akacjowa integration
 

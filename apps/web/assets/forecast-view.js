@@ -1,10 +1,12 @@
 import {numericValue} from './components.js';
 
 const HOUR_GROUPS = new Map([
-  [.25, 6],
-  [.375, 4],
-  [.5, 3],
-  [.75, 2]
+  [.25, 12],
+  [.3, 6],
+  [.5, 4],
+  [.75, 3],
+  [1, 2],
+  [2, 1]
 ]);
 
 const WEATHER_SEVERITY = new Map([

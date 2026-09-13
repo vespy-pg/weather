@@ -5,17 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0a0e14">
   <title>Weather</title>
-  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="canonical" href="https://pogoda.vespy.eu/">
   <script>
     try {
       const saved = JSON.parse(localStorage.getItem('weather.settings.v1') || '{}');
       const query = new URLSearchParams(location.search);
+      const routeLanguage = location.pathname.split('/').filter(Boolean)[0];
       document.documentElement.dataset.theme = query.get('theme') || saved.theme || 'dark';
-      document.documentElement.lang = query.get('lang') || saved.language || 'en-US';
+      document.documentElement.lang = ['en-US', 'pl-PL'].includes(routeLanguage) ? routeLanguage : query.get('lang') || saved.language || 'en-US';
+      if (query.get('share') !== '1' && localStorage.getItem('weather.share-prompt.v1') === 'collapsed') document.documentElement.dataset.sharePrompt = 'collapsed';
     } catch { document.documentElement.dataset.theme = 'dark'; }
   </script>
-  <link rel="stylesheet" href="assets/app.css">
+  <link rel="stylesheet" href="/assets/app.css">
 </head>
 <body>
   <main class="shell">
@@ -34,7 +37,23 @@
         </div>
         <p class="muted" id="updatedAt" data-i18n="app.waiting">Waiting for forecast</p>
       </div>
+      <aside class="share-forecast" aria-labelledby="shareForecastTitle">
+        <div>
+          <h2 id="shareForecastTitle" data-i18n="share.title">Share this weather with others</h2>
+          <p data-i18n="share.description">Help this forecast reach more people who may find it useful today.</p>
+        </div>
+        <div class="share-forecast-action">
+          <button class="share-forecast-button" type="button" id="shareForecast" data-share-forecast>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="2.5"></circle><circle cx="6" cy="12" r="2.5"></circle><circle cx="18" cy="19" r="2.5"></circle><path d="m8.2 10.8 7.6-4.5M8.2 13.2l7.6 4.5"></path></svg>
+            <span data-i18n="action.shareForecast">Share forecast</span>
+          </button>
+        </div>
+      </aside>
       <div class="topbar-actions">
+        <button class="icon-button share-forecast-compact" type="button" id="shareForecastCompact" data-share-forecast hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="2.5"></circle><circle cx="6" cy="12" r="2.5"></circle><circle cx="18" cy="19" r="2.5"></circle><path d="m8.2 10.8 7.6-4.5M8.2 13.2l7.6 4.5"></path></svg>
+          <span class="visually-hidden" data-i18n="action.shareForecast">Share forecast</span>
+        </button>
         <label class="language-control" aria-label="Language">
           <span aria-hidden="true">文</span>
           <select id="languageSelect"><option value="en-US">English</option><option value="pl-PL">Polski</option></select>
@@ -123,33 +142,50 @@
       <p class="eyebrow" data-i18n="legend.eyebrow">FORECAST LEGEND</p>
       <h2 id="forecastGuideTitle" data-i18n="legend.title">How to read this forecast</h2>
       <div class="legend-grid">
-        <article class="legend-card legend-temperature">
-          <strong data-i18n="legend.temperatureTitle">Temperature line</strong>
-          <canvas class="legend-preview legend-temperature-preview" id="legendTemperatureCanvas" height="110" aria-hidden="true"></canvas>
-          <p data-i18n="legend.temperatureText">White: deep frost at -12°C or below. Gray: frost below 0°C. Blue: cold from 0°C to 18°C. Green: comfortable from 18°C to 27°C. Orange: hot from 27°C to 32°C. Red: extreme heat above 32°C.</p>
-        </article>
-        <article class="legend-card">
-          <strong data-i18n="legend.feelsTitle">Feels-like area</strong>
-          <canvas class="legend-preview legend-feels-preview" id="legendFeelsCanvas" height="110" aria-hidden="true"></canvas>
-          <p data-i18n="legend.feelsText">The shaded area shows how different the weather feels: blue below means it feels colder, while orange above means it feels warmer. The colored line is measured temperature and serves as the reference.</p>
-        </article>
-        <article class="legend-card">
-          <strong data-i18n="legend.skyTitle">Sun, clouds and night</strong>
+        <article class="legend-card legend-sky-card">
+          <strong data-i18n="legend.skyTitle">Sun, clouds and precipitation</strong>
           <canvas class="legend-preview legend-sky-preview" id="legendSkyCanvas" height="100" aria-hidden="true"></canvas>
-          <p data-i18n="legend.skyText">Yellow glow is exposed sunlight and fades as cloud cover grows. The gray band becomes larger with more cloud. A moon marks nighttime.</p>
+          <ul class="legend-details">
+            <li><span class="legend-mark sunlight" aria-hidden="true"></span><b data-i18n="legend.detailSun">Yellow glow</b><span data-i18n="legend.detailSunMeaning">Visible sunshine</span></li>
+            <li><span class="legend-mark clouds" aria-hidden="true"></span><b data-i18n="legend.detailClouds">Gray band</b><span data-i18n="legend.detailCloudsMeaning">Thicker means cloudier</span></li>
+            <li><span class="legend-mark moon" aria-hidden="true">☾</span><b data-i18n="legend.detailNight">Moon</b><span data-i18n="legend.detailNightMeaning">Nighttime</span></li>
+            <li><span class="legend-mark weather" aria-hidden="true">💧</span><b data-i18n="legend.rain">rain</b><span data-i18n="legend.detailRainMeaning">Drop size is amount</span></li>
+            <li><span class="legend-mark weather" aria-hidden="true">❄</span><b data-i18n="legend.snow">snow</b><span data-i18n="legend.detailSnowMeaning">Flake size is amount</span></li>
+            <li><span class="legend-mark hail" aria-hidden="true">◆</span><b data-i18n="legend.hail">hail</b><span data-i18n="legend.detailHailMeaning">Diamond size is amount</span></li>
+            <li><span class="legend-mark lightning" aria-hidden="true">⚡</span><b data-i18n="legend.stormTitle">Thunderstorm</b><span data-i18n="legend.detailStormMeaning">Larger means stronger</span></li>
+            <li><span class="legend-mark opacity" aria-hidden="true"></span><b data-i18n="legend.detailOpacity">Symbol opacity</b><span data-i18n="legend.detailOpacityMeaning">Precipitation probability</span></li>
+          </ul>
         </article>
-        <article class="legend-card legend-symbols">
-          <strong data-i18n="legend.precipitationTitle">Precipitation - one symbol per hour</strong>
-          <p><span class="legend-weather-icon" aria-hidden="true">💧</span> <b data-i18n="legend.rain">rain</b>, <span class="legend-weather-icon" aria-hidden="true">❄</span> <b data-i18n="legend.snow">snow</b>, <span class="legend-weather-icon hail-symbol" aria-hidden="true">◆</span> <b data-i18n="legend.hail">hail</b>. <span data-i18n="legend.precipitationText">Symbol size shows the amount. Opacity shows probability.</span></p>
+        <article class="legend-card legend-temperature-card">
+          <strong data-i18n="legend.temperatureTitle">Temperature line</strong>
+          <span class="legend-preview-label" data-i18n="legend.detailMeasuredTemperature">Measured temperature</span>
+          <canvas class="legend-preview legend-temperature-preview" id="legendTemperatureCanvas" height="100" aria-hidden="true"></canvas>
+          <ul class="legend-details legend-temperature-ranges">
+            <li><span class="legend-mark temperature deep-frost" aria-hidden="true"></span><b data-i18n="legend.detailDeepFrost">Deep frost</b><span id="legendDeepFrostRange"></span></li>
+            <li><span class="legend-mark temperature frost" aria-hidden="true"></span><b data-i18n="legend.detailFrost">Frost</b><span id="legendFrostRange"></span></li>
+            <li><span class="legend-mark temperature cool" aria-hidden="true"></span><b data-i18n="legend.detailCool">Cool</b><span id="legendCoolRange"></span></li>
+            <li><span class="legend-mark temperature pleasant" aria-hidden="true"></span><b data-i18n="legend.detailPleasant">Pleasant</b><span id="legendPleasantRange"></span></li>
+            <li><span class="legend-mark temperature hot" aria-hidden="true"></span><b data-i18n="legend.detailHot">Hot</b><span id="legendHotRange"></span></li>
+            <li><span class="legend-mark temperature extreme" aria-hidden="true"></span><b data-i18n="legend.detailExtremeHeat">Extreme heat</b><span id="legendExtremeHeatRange"></span></li>
+          </ul>
+          <span class="legend-preview-label" data-i18n="legend.feelsTitle">Feels-like area</span>
+          <canvas class="legend-preview legend-feels-preview" id="legendFeelsCanvas" height="82" aria-hidden="true"></canvas>
+          <ul class="legend-details">
+            <li><span class="legend-mark feels-cool" aria-hidden="true"></span><b data-i18n="legend.detailBlueArea">Blue area</b><span data-i18n="legend.detailFeelsCooler">Feels colder</span></li>
+            <li><span class="legend-mark feels-warm" aria-hidden="true"></span><b data-i18n="legend.detailOrangeArea">Orange area</b><span data-i18n="legend.detailFeelsWarmer">Feels warmer</span></li>
+          </ul>
         </article>
-        <article class="legend-card">
-          <strong><span class="lightning-symbol" aria-hidden="true">⚡</span><span data-i18n="legend.stormTitle">Thunderstorm</span></strong>
-          <p data-i18n="legend.stormText">Lightning appears on the temperature chart. A larger, brighter bolt means a more probable and stronger storm.</p>
-        </article>
-        <article class="legend-card">
+        <article class="legend-card legend-wind-card">
           <strong data-i18n="legend.windTitle">Wind</strong>
-          <canvas class="legend-preview legend-wind-preview" id="legendWindCanvas" height="68" aria-hidden="true"></canvas>
-          <p data-i18n="legend.windText">The streams use one color. Calm conditions are nearly straight and faded. As wind strengthens, the parallel bands become thicker, spread farther apart, and form waves with increasing amplitude; their ends taper as the wind rises or fades. A narrowing vertical funnel marks an explicitly forecast tornado. Optional arrows show direction together with speed in km/h.</p>
+          <canvas class="legend-preview legend-wind-preview" id="legendWindCanvas" height="100" aria-hidden="true"></canvas>
+          <ul class="legend-details">
+            <li><span class="legend-mark wind calm" aria-hidden="true"></span><b data-i18n="legend.welcomeWindCalm">Calm wind</b><span data-i18n="legend.detailWindCalm">Faint, nearly straight</span></li>
+            <li><span class="legend-mark wind moderate" aria-hidden="true"></span><b data-i18n="legend.welcomeWindModerate">Moderate wind</b><span data-i18n="legend.detailWindModerate">Visible waves</span></li>
+            <li><span class="legend-mark wind strong" aria-hidden="true"></span><b data-i18n="legend.welcomeWindStrong">Strong, gusty wind</b><span data-i18n="legend.detailWindStrong">Thick, wide waves</span></li>
+            <li><span class="legend-mark wind-change" aria-hidden="true">↔</span><b data-i18n="legend.detailWindChange">Tapered stream</b><span data-i18n="legend.detailWindChangeMeaning">Wind rises or fades</span></li>
+            <li><span class="legend-mark tornado" aria-hidden="true">⌁</span><b data-i18n="legend.detailTornado">Vertical funnel</b><span data-i18n="legend.detailTornadoMeaning">Forecast tornado</span></li>
+            <li><span class="legend-mark direction" aria-hidden="true">↑</span><b data-i18n="legend.detailDirection">Optional arrow</b><span data-i18n="legend.detailDirectionMeaning">Direction and km/h</span></li>
+          </ul>
         </article>
       </div>
     </section>
@@ -165,6 +201,46 @@
     <footer class="data-attribution"><span data-i18n="app.dataSources">Data sources:</span> <a href="https://open-meteo.com/" rel="external">Open-Meteo</a> · <a href="https://www.openstreetmap.org/copyright" rel="external">OpenStreetMap contributors</a></footer>
   </main>
 
+  <dialog class="share-dialog" id="shareDialog" aria-labelledby="shareDialogTitle">
+    <div class="share-dialog-content">
+      <header class="dialog-heading">
+        <div>
+          <p class="eyebrow" data-i18n="share.eyebrow">SHARE WEATHER</p>
+          <h2 id="shareDialogTitle" data-i18n="share.dialogTitle">Share forecast</h2>
+        </div>
+        <button class="icon-button" type="button" id="closeShareDialog" aria-label="Close">×</button>
+      </header>
+      <p class="share-dialog-description" data-i18n="share.dialogDescription">Choose how you want to send this forecast.</p>
+      <div class="share-options">
+        <button class="share-option" type="button" id="shareNative">
+          <span class="share-option-icon" aria-hidden="true">↗</span>
+          <span data-i18n="share.system">Share with an app</span>
+        </button>
+        <button class="share-option" type="button" id="shareCopy">
+          <span class="share-option-icon" aria-hidden="true">⧉</span>
+          <span data-i18n="share.copyLink">Copy link</span>
+        </button>
+        <a class="share-option" id="shareWhatsApp" data-share-method="whatsapp" target="_blank" rel="noopener noreferrer">
+          <span class="share-option-icon whatsapp" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M20 11.7a8 8 0 0 1-11.8 7l-4.2 1.1 1.1-4.1A8 8 0 1 1 20 11.7Z"></path><path d="M8.1 7.7c.2-.5.5-.5.8-.5h.5l1 2.3c.1.3.1.5-.1.7l-.7.9c.9 1.8 2.1 2.9 3.9 3.7l.8-1c.2-.3.5-.3.8-.2l2.2 1c.3.2.5.4.4.7-.2 1.2-1 2.1-2.2 2.3-1.5.2-4.2-.7-6.4-2.8-2.2-2.1-3.2-4.8-3-6.2.1-.4.5-.7 1-.9Z"></path></svg>
+          </span>
+          <span>WhatsApp</span>
+        </a>
+        <a class="share-option" id="shareFacebook" data-share-method="facebook" target="_blank" rel="noopener noreferrer">
+          <span class="share-option-icon facebook" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M13.5 21v-8h2.8l.4-3.2h-3.2V7.7c0-.9.3-1.6 1.7-1.6h1.7V3.2c-.3 0-1.3-.2-2.5-.2-2.5 0-4.2 1.5-4.2 4.4v2.4H7.4V13h2.8v8h3.3Z"></path></svg>
+          </span>
+          <span>Facebook</span>
+        </a>
+        <a class="share-option" id="shareEmail" data-share-method="email">
+          <span class="share-option-icon" aria-hidden="true">@</span>
+          <span data-i18n="share.email">Email</span>
+        </a>
+      </div>
+      <p class="share-dialog-status" id="shareDialogStatus" role="status" aria-live="polite"></p>
+    </div>
+  </dialog>
+
   <dialog class="forecast-welcome" id="forecastWelcome" aria-labelledby="forecastWelcomeTitle">
     <div class="forecast-welcome-content">
       <header class="forecast-welcome-heading">
@@ -173,19 +249,31 @@
       </header>
       <div class="forecast-welcome-grid">
         <article class="forecast-welcome-card">
-          <strong data-i18n="legend.skyTitle">Sun, clouds and night</strong>
-          <canvas id="welcomeSkyCanvas" height="82" aria-hidden="true"></canvas>
-          <p id="welcomeSkyText"></p>
+          <strong data-i18n="legend.skyTitle">Sun, clouds and precipitation</strong>
+          <div class="forecast-welcome-examples">
+            <figure class="forecast-welcome-example"><canvas id="welcomeSkyClearCanvas" height="58" aria-hidden="true"></canvas><figcaption data-i18n="legend.welcomeSkyClear">Clear and sunny</figcaption></figure>
+            <figure class="forecast-welcome-example"><canvas id="welcomeSkyMixedCanvas" height="58" aria-hidden="true"></canvas><figcaption data-i18n="legend.welcomeSkyMixed">Clouds and sunshine</figcaption></figure>
+            <figure class="forecast-welcome-example"><canvas id="welcomeSkyRainCanvas" height="58" aria-hidden="true"></canvas><figcaption data-i18n="legend.welcomeSkyRain">Cloudy with rain</figcaption></figure>
+          </div>
         </article>
-        <article class="forecast-welcome-card">
+        <article class="forecast-welcome-card forecast-welcome-temperature">
           <strong data-i18n="legend.temperatureTitle">Temperature line</strong>
-          <canvas id="welcomeTemperatureCanvas" height="82" aria-hidden="true"></canvas>
-          <p id="welcomeTemperatureText"></p>
+          <canvas id="welcomeTemperatureCanvas" height="116" aria-hidden="true"></canvas>
+          <div class="forecast-welcome-temperature-labels">
+            <span class="cool" data-i18n="legend.welcomeTemperatureCool">Blue: cool</span>
+            <span class="pleasant" data-i18n="legend.welcomeTemperaturePleasant">Green: pleasant</span>
+            <span class="hot" data-i18n="legend.welcomeTemperatureHot">Red: hot</span>
+            <span class="frost" data-i18n="legend.welcomeTemperatureFrost">Gray: frost</span>
+            <span class="deep-frost" data-i18n="legend.welcomeTemperatureDeepFrost">White: deep frost</span>
+          </div>
         </article>
         <article class="forecast-welcome-card">
           <strong data-i18n="legend.windTitle">Wind</strong>
-          <canvas id="welcomeWindCanvas" height="64" aria-hidden="true"></canvas>
-          <p id="welcomeWindText"></p>
+          <div class="forecast-welcome-examples">
+            <figure class="forecast-welcome-example"><canvas id="welcomeWindCalmCanvas" height="58" aria-hidden="true"></canvas><figcaption data-i18n="legend.welcomeWindCalm">Calm wind</figcaption></figure>
+            <figure class="forecast-welcome-example"><canvas id="welcomeWindModerateCanvas" height="58" aria-hidden="true"></canvas><figcaption data-i18n="legend.welcomeWindModerate">Moderate wind</figcaption></figure>
+            <figure class="forecast-welcome-example"><canvas id="welcomeWindStrongCanvas" height="58" aria-hidden="true"></canvas><figcaption data-i18n="legend.welcomeWindStrong">Strong, gusty wind</figcaption></figure>
+          </div>
         </article>
       </div>
       <footer class="forecast-welcome-actions">
@@ -238,7 +326,7 @@
           <div class="temperature-scale-values" id="temperatureScaleValues"></div>
         </div>
         <label class="setting-row"><span data-i18n="settings.zoom">Default timeline zoom</span>
-          <select id="defaultZoom"><option value="0.25">25% (6 h)</option><option value="0.375">38% (4 h)</option><option value="0.5">50% (3 h)</option><option value="0.75">75% (2 h)</option><option value="1">100% (1 h)</option><option value="1.25">125% (1 h)</option><option value="1.5">150% (1 h)</option><option value="2">200% (1 h)</option></select>
+          <select id="defaultZoom"><option value="0.25">25% (2/day)</option><option value="0.3">30% (4/day)</option><option value="0.5">50% (6/day)</option><option value="0.75">75% (8/day)</option><option value="1">100% (12/day)</option><option value="2">200% (24/day)</option></select>
         </label>
         <label class="setting-row"><span data-i18n="settings.hourlyTemperature">Hourly temperature values</span><input id="showHourlyTemperatures" type="checkbox"></label>
         <label class="setting-row"><span data-i18n="settings.apparent">Apparent temperature area</span><input id="showApparentTemperature" type="checkbox"></label>
@@ -265,6 +353,6 @@
     </form>
   </dialog>
 
-  <script src="assets/app.js" type="module"></script>
+  <script src="/assets/app.js" type="module"></script>
 </body>
 </html>

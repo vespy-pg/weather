@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {groupHourlyForecast, hoursPerGroup, temperatureRange} from './forecast-view.js';
 
 test('selects progressively finer time groups as the timeline is enlarged', () => {
-  assert.deepEqual([.25, .375, .5, .75, 1, 2].map(hoursPerGroup), [6, 4, 3, 2, 1, 1]);
+  assert.deepEqual([.25, .3, .5, .75, 1, 2].map(hoursPerGroup), [12, 6, 4, 3, 2, 1]);
 });
 
 test('groups forecast values without hiding severe weather', () => {

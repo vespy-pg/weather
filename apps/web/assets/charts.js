@@ -35,7 +35,7 @@ function isLightTheme() {
 
 function canvasPixelRatio(rect) {
   const deviceRatio = window.devicePixelRatio || 1;
-  return Math.max(.25, Math.min(deviceRatio, 4096 / rect.width, 2048 / rect.height));
+  return Math.max(.25, Math.min(deviceRatio, 16384 / rect.width, 4096 / rect.height));
 }
 
 function colorWithAlpha(color, alpha) {
@@ -218,9 +218,11 @@ function drawLightning(context, x, y, opacity, scale = 1) {
   context.restore();
 }
 
-function drawTornadoFunnel(context, centerX, height, width, color, visualScale) {
-  const top = 4 * visualScale;
-  const bottom = height - 4 * visualScale;
+function drawTornadoFunnel(context, centerX, height, width, color, visualScale, verticalScale = 1) {
+  const availableHeight = height - 8 * visualScale;
+  const funnelHeight = availableHeight * Math.max(.35, Math.min(1, verticalScale));
+  const top = (height - funnelHeight) / 2;
+  const bottom = top + funnelHeight;
   context.save();
   context.strokeStyle = color;
   context.lineCap = 'round';
@@ -285,6 +287,7 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
   const sunlight = cloudCover.map((value, index) => value === null
     ? null
     : Math.max(0, 100 - value) * pointSunlightEdgeFactor(points[index], daylightByDate));
+  const sunlightTransitionInset = Math.min(columnWidth * .18, 10 * visualScale);
   let sunlightSegment = [];
   const paintSunlightSegment = values => {
     if (!values.length) return;
@@ -329,14 +332,22 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
   sunlight.forEach((value, index) => {
     if (value === null || value < 4) {
       if (sunlightSegment.length && value !== null) {
-        sunlightSegment.push({x: padding.left + (index + .5) * columnWidth, y: weatherLineY, glowY: weatherLineY, value: 0});
+        const entersNight = daylight[index - 1] && !daylight[index];
+        const fadeX = entersNight
+          ? padding.left + index * columnWidth - sunlightTransitionInset
+          : padding.left + (index + .5) * columnWidth;
+        sunlightSegment.push({x: fadeX, y: weatherLineY, glowY: weatherLineY, value: 0});
       }
       paintSunlightSegment(sunlightSegment);
       sunlightSegment = [];
       return;
     }
     if (!sunlightSegment.length && index > 0 && sunlight[index - 1] !== null) {
-      sunlightSegment.push({x: padding.left + (index - .5) * columnWidth, y: weatherLineY, glowY: weatherLineY, value: 0});
+      const leavesNight = !daylight[index - 1] && daylight[index];
+      const fadeX = leavesNight
+        ? padding.left + index * columnWidth + sunlightTransitionInset
+        : padding.left + (index - .5) * columnWidth;
+      sunlightSegment.push({x: fadeX, y: weatherLineY, glowY: weatherLineY, value: 0});
     }
     sunlightSegment.push({
       x: padding.left + (index + .5) * columnWidth,
@@ -455,7 +466,7 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
   const temperatureStep = Math.max(1, Math.round(Number(options.temperatureStep) || 1));
   const hourFontSize = Math.max(9, 9 * visualScale);
   const dayFontSize = Math.min(16, Math.max(14, 14 * visualScale));
-  const temperatureFontSize = groupedHours > 1 ? Math.max(11, 10 * visualScale) : Math.max(8, 8 * visualScale);
+  const temperatureFontSize = Math.min(18, Math.max(14, 12 * visualScale));
   const hourY = configuredNumber(options.hourY, 24);
   const temperatureY = configuredNumber(options.temperatureY, 36);
   context.font = `700 ${hourFontSize}px ui-monospace, monospace`;
@@ -473,10 +484,13 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
       context.font = `700 ${temperatureFontSize}px ui-monospace, monospace`;
       context.save();
       context.lineJoin = 'round';
-      context.miterLimit = 2;
-      context.strokeStyle = chartColor('--chart-temperature-label-outline', 'rgba(5, 9, 15, .92)');
-      context.lineWidth = Math.max(2, temperatureFontSize * .28);
-      context.strokeText(label, x, temperatureY);
+      const whiteTemperature = numericTemperature <= (temperatureThresholds?.deepFrost ?? -12);
+      if (!isLightTheme() || whiteTemperature) {
+        context.miterLimit = 2;
+        context.strokeStyle = chartColor('--chart-temperature-label-outline', 'rgba(5, 9, 15, .92)');
+        context.lineWidth = isLightTheme() ? Math.max(1.4, temperatureFontSize * .14) : Math.max(2, temperatureFontSize * .28);
+        context.strokeText(label, x, temperatureY);
+      }
       context.fillText(label, x, temperatureY);
       context.restore();
       context.font = `700 ${hourFontSize}px ui-monospace, monospace`;
@@ -494,9 +508,19 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
     context.textAlign = 'left';
     const dayLabel = index === 0
       ? t('forecast.today')
-      : formatForecastDate(point.timestamp, {weekday: 'short'});
+      : formatForecastDate(point.timestamp, {weekday: options.fullDayLabels ? 'long' : 'short'});
+    const nextDayIndex = points.findIndex((candidate, candidateIndex) => (
+      candidateIndex > index && String(candidate.timestamp).slice(0, 10) !== date
+    ));
+    const dayStartX = padding.left + index * columnWidth;
+    const dayEndX = padding.left + (nextDayIndex === -1 ? points.length : nextDayIndex) * columnWidth;
     context.font = `900 ${dayFontSize}px ui-monospace, monospace`;
-    context.fillText(dayLabel.toUpperCase(), padding.left + index * columnWidth + 4, dayFontSize);
+    context.save();
+    context.beginPath();
+    context.rect(dayStartX, 0, Math.max(0, dayEndX - dayStartX), dayFontSize + 3);
+    context.clip();
+    context.fillText(dayLabel.toUpperCase(), dayStartX + 5, dayFontSize);
+    context.restore();
     context.font = `700 ${hourFontSize}px ui-monospace, monospace`;
     context.textAlign = 'center';
   });
@@ -713,7 +737,7 @@ export function drawWindFlow(canvas, points, options = {}) {
     const tornadoEnd = point.tornado === true ? index : index - 1;
     const centerX = ((tornadoStart + tornadoEnd + 1) / 2) * columnWidth;
     const tornadoWidth = Math.max(22 * visualScale, Math.min(40 * visualScale, (tornadoEnd - tornadoStart + 1) * columnWidth * 1.4));
-    drawTornadoFunnel(context, centerX, height, tornadoWidth, windColor, visualScale);
+    drawTornadoFunnel(context, centerX, height, tornadoWidth, windColor, visualScale, options.tornadoVerticalScale);
     tornadoStart = null;
   });
   context.restore();

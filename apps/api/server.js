@@ -21,6 +21,13 @@ export function normalizeGoogleAnalyticsId(value) {
   return /^G-[A-Z0-9]+$/.test(id) ? id : null;
 }
 
+export function isForecastRoutePath(pathname) {
+  const parts = String(pathname || '').split('/').filter(Boolean);
+  return parts.length === 2
+    && SUPPORTED_LOCALES.some(locale => locale.toLowerCase() === parts[0].toLowerCase())
+    && parts[1].length > 0;
+}
+
 const contentTypes = {
   '.css': 'text/css; charset=utf-8',
   '.html': 'text/html; charset=utf-8',
@@ -51,11 +58,13 @@ export function promotionFeed({platform = 'web', placement = 'web_forecast', lan
   const campaigns = supportedPlacements.includes(placement) ? [{
     id: 'dinpanel-web-2026-09',
     type: 'native-card',
-    eyebrow: localized ? 'APLIKACJA VESPY' : 'A VESPY APP',
-    title: 'DINPanel',
-    description: localized
-      ? 'Projektuj instalacje elektryczne, rozdzielnice i dokumentację w jednym miejscu.'
-      : 'Design electrical installations, distribution boards, and documentation in one place.',
+    eyebrow: normalizedPlatform === 'web' ? '' : localized ? 'APLIKACJA VESPY' : 'A VESPY APP',
+    title: normalizedPlatform === 'web'
+      ? localized ? 'Projektuj instalacje elektryczne oraz budynki w 2D i 3D' : 'Design electrical installations and buildings in 2D and 3D'
+      : 'DINPanel',
+    description: normalizedPlatform === 'web'
+      ? localized ? 'Rozdzielnice i kompletna dokumentacja w jednym miejscu.' : 'Distribution boards and complete documentation in one place.'
+      : localized ? 'Projektuj instalacje elektryczne, rozdzielnice i dokumentację w jednym miejscu.' : 'Design electrical installations, distribution boards, and documentation in one place.',
     actionLabel: localized ? 'Poznaj DINPanel' : 'Explore DINPanel',
     logoUrl: normalizedPlatform === 'web'
       ? `assets/dinpanel-logo-${normalizedTheme}.png`
@@ -308,6 +317,11 @@ async function staticFile(requestUrl, response) {
     response.writeHead(200, {'Content-Type': contentTypes[path.extname(filePath)] || 'application/octet-stream'});
     response.end(body);
   } catch {
+    if (isForecastRoutePath(requestUrl.pathname)) {
+      const body = await readFile(path.join(WEB_ROOT, 'index.html'));
+      response.writeHead(200, {'Content-Type': contentTypes['.html']});
+      return response.end(body);
+    }
     json(response, 404, {error: 'Not found.'});
   }
 }

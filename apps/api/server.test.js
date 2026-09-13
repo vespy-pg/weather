@@ -1,11 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {forecastUrl, locationSearchUrl, normalizeForecast, normalizeGoogleAnalyticsId, normalizeLocale, normalizeReverseLocation, preferredLanguageForCountry, promotionFeed, selectCapitalResult} from './server.js';
+import {forecastUrl, isForecastRoutePath, locationSearchUrl, normalizeForecast, normalizeGoogleAnalyticsId, normalizeLocale, normalizeReverseLocation, preferredLanguageForCountry, promotionFeed, selectCapitalResult} from './server.js';
 
 test('normalizeGoogleAnalyticsId accepts only GA4 measurement IDs', () => {
   assert.equal(normalizeGoogleAnalyticsId(' g-ab12cd34 '), 'G-AB12CD34');
   assert.equal(normalizeGoogleAnalyticsId('UA-123-4'), null);
   assert.equal(normalizeGoogleAnalyticsId('G-ABC<script>'), null);
+});
+
+test('recognizes localized forecast application routes', () => {
+  assert.equal(isForecastRoutePath('/pl-PL/London'), true);
+  assert.equal(isForecastRoutePath('/en-US/New-York'), true);
+  assert.equal(isForecastRoutePath('/assets/app.js'), false);
+  assert.equal(isForecastRoutePath('/pl-PL'), false);
 });
 
 test('forecastUrl requests the fields shared by web and Android clients', () => {
@@ -107,7 +114,9 @@ test('promotionFeed returns a localized native card without executable content',
   assert.equal(feed.schemaVersion, 1);
   assert.equal(feed.campaigns.length, 1);
   assert.equal(feed.campaigns[0].type, 'native-card');
-  assert.equal(feed.campaigns[0].title, 'DINPanel');
+  assert.equal(feed.campaigns[0].eyebrow, '');
+  assert.equal(feed.campaigns[0].title, 'Projektuj instalacje elektryczne oraz budynki w 2D i 3D');
+  assert.equal(feed.campaigns[0].description, 'Rozdzielnice i kompletna dokumentacja w jednym miejscu.');
   assert.equal(feed.campaigns[0].actionLabel, 'Poznaj DINPanel');
   assert.equal(feed.campaigns[0].backgroundColor, '#fff8f3');
   assert.equal(feed.campaigns[0].logoUrl, 'assets/dinpanel-logo-light.png');

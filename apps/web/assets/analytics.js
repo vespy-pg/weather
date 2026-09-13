@@ -1,7 +1,7 @@
 'use strict';
 
 const CONSENT_KEY = 'weather.analytics-consent.v1';
-const ANALYTICS_HOSTS = new Set(['weather.vespy.eu']);
+const ANALYTICS_HOSTS = new Set(['pogoda.vespy.eu', 'weather.vespy.eu']);
 const pendingEvents = [];
 let analyticsEnabled = false;
 let googleTagLoaded = false;

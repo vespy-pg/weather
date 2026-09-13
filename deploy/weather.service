@@ -7,7 +7,7 @@ Wants=network-online.target
 [Service]
 Restart=always
 RestartSec=5
-Environment=WEATHER_ALLOWED_ORIGIN=https://weather.vespy.eu
+Environment=WEATHER_ALLOWED_ORIGIN=https://pogoda.vespy.eu
 EnvironmentFile=-/etc/weather.env
 ExecStartPre=-/usr/bin/docker rm -f weather
 ExecStart=/usr/bin/docker run --name weather --read-only --tmpfs /tmp:rw,noexec,nosuid,size=16m -p 127.0.0.1:18080:8080 -e WEATHER_ALLOWED_ORIGIN -e GOOGLE_ANALYTICS_ID weather:latest

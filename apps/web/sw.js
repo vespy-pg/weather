@@ -1,24 +1,25 @@
-const CACHE_NAME = 'weather-shell-v38';
+const CACHE_NAME = 'weather-shell-v40';
 const APP_SHELL = [
-  './',
-  './index.html',
-  './manifest.webmanifest',
-  './assets/app.css',
-  './assets/app.js',
-  './assets/analytics.js',
-  './assets/charts.js',
-  './assets/components.js',
-  './assets/forecast-view.js',
-  './assets/i18n.js',
-  './assets/generated/i18n.js',
-  './assets/location-state.js',
-  './assets/temperature-scale.js',
-  './assets/weather-demo.js',
-  './assets/dinpanel-logo-dark.png',
-  './assets/dinpanel-logo-light.png',
-  './assets/dinpanel-logo-square.png',
-  './assets/dinpanel-workbench.webp',
-  './assets/favicon.svg'
+  '/',
+  '/index.html',
+  '/manifest.webmanifest',
+  '/assets/app.css',
+  '/assets/app.js',
+  '/assets/analytics.js',
+  '/assets/charts.js',
+  '/assets/components.js',
+  '/assets/forecast-view.js',
+  '/assets/i18n.js',
+  '/assets/generated/i18n.js',
+  '/assets/location-state.js',
+  '/assets/route-state.js',
+  '/assets/temperature-scale.js',
+  '/assets/weather-demo.js',
+  '/assets/dinpanel-logo-dark.png',
+  '/assets/dinpanel-logo-light.png',
+  '/assets/dinpanel-logo-square.png',
+  '/assets/dinpanel-workbench.webp',
+  '/assets/favicon.svg'
 ];
 
 self.addEventListener('install', event => {
@@ -39,5 +40,5 @@ self.addEventListener('fetch', event => {
       caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
     }
     return response;
-  }).catch(() => caches.match(event.request).then(response => response || caches.match('./index.html'))));
+  }).catch(() => caches.match(event.request).then(response => response || caches.match('/index.html'))));
 });
