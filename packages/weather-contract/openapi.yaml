@@ -124,9 +124,42 @@ paths:
           name: name
           schema:
             type: string
+        - in: query
+          name: mushrooms
+          description: Include mushroom suitability data derived from seven days of weather history.
+          schema:
+            type: boolean
       responses:
         '200':
           description: Normalized current, hourly, and daily forecast
+  /mushroom-observations:
+    get:
+      operationId: getMushroomObservations
+      parameters:
+        - in: query
+          name: latitude
+          required: true
+          schema:
+            type: number
+            minimum: -90
+            maximum: 90
+        - in: query
+          name: longitude
+          required: true
+          schema:
+            type: number
+            minimum: -180
+            maximum: 180
+        - in: query
+          name: language
+          schema:
+            type: string
+            enum: [en-US, pl-PL]
+      responses:
+        '200':
+          description: Research-grade mushroom observations from the last 30 days within 30 km
+        '400':
+          description: Invalid coordinates
 components:
   schemas:
     PromotionFeed:

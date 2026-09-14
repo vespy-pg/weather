@@ -9,6 +9,7 @@ const settings = {
   showPrecipitation: true,
   showWind: true,
   showWindArrows: false,
+  showMushrooms: false,
   temperatureThresholds: {deepFrost: -12, mild: 18, warm: 27, hot: 32}
 };
 
@@ -28,6 +29,7 @@ test('applies every supported display and temperature option', () => {
     precipitation: '0',
     wind: '1',
     windArrows: '1',
+    mushrooms: '1',
     deepFrost: '-15',
     mild: '20',
     warm: '29',
@@ -39,6 +41,7 @@ test('applies every supported display and temperature option', () => {
     showPrecipitation: false,
     showWind: true,
     showWindArrows: true,
+    showMushrooms: true,
     temperatureThresholds: {deepFrost: -15, mild: 20, warm: 29, hot: 35}
   });
 });
@@ -52,6 +55,7 @@ test('serializes a self-contained widget configuration', () => {
     precipitation: 1,
     wind: 1,
     windArrows: 0,
+    mushrooms: 0,
     deepFrost: -12,
     mild: 18,
     warm: 27,

@@ -229,6 +229,8 @@ export function createWeatherDemo(now = new Date()) {
     const sunset = new Date(date); sunset.setHours(18, 45, 0, 0);
     const scenario = FUTURE_SCENARIOS[index % FUTURE_SCENARIOS.length];
     const temperatureRange = TEMPERATURE_RANGES[index];
+    const mushroomScore = [38, 52, 68, 81, 87, 74, 59, 44, 31, 63, 78, 84, 69, 48, 35][index];
+    const mushroomLevel = mushroomScore >= 75 ? 'excellent' : mushroomScore >= 50 ? 'good' : mushroomScore >= 25 ? 'fair' : 'poor';
     return {
       date: localDate(date),
       weatherCode: scenario.code,
@@ -243,7 +245,14 @@ export function createWeatherDemo(now = new Date()) {
       windSpeedMaximum: 8 + index * 2,
       windGustsMaximum: 18 + index * 2,
       windDirection: index * 31 % 360,
-      uvIndexMaximum: scenario.cloudCover < 50 ? 5 : 1
+      uvIndexMaximum: scenario.cloudCover < 50 ? 5 : 1,
+      mushroom: {
+        score: mushroomScore,
+        level: mushroomLevel,
+        recentRainfall: 4 + mushroomScore * .32,
+        relativeHumidity: Math.min(96, 52 + mushroomScore * .45),
+        soilMoisture: .1 + mushroomScore * .0022
+      }
     };
   });
 

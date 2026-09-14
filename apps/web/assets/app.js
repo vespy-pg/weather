@@ -34,9 +34,9 @@ const IS_DEMO = QUERY.get('demo') === '1' || IS_GITHUB_PAGES;
 const IS_EMBEDDED = QUERY.get('embed') === '1';
 const EMBED_DAYS = IS_EMBEDDED ? widgetDays(QUERY.get('days')) : 10;
 const EMBED_LEGEND = !IS_EMBEDDED || widgetBoolean(QUERY.get('legend'), true);
-const API_ROOT = ['localhost', '127.0.0.1'].includes(location.hostname)
-  ? new URL('/', location.href)
-  : new URL('https://api.weather.vespy.eu/');
+const API_ROOT = IS_GITHUB_PAGES
+  ? new URL('https://api.weather.vespy.eu/')
+  : new URL('/', location.href);
 const PUBLIC_WEB_ROOT = 'https://weather.vespy.eu/';
 const DEFAULT_LOCATION = {id: 'capital-GB', name: 'London', country: 'United Kingdom', latitude: 51.5074, longitude: -0.1278, timezone: 'Europe/London'};
 const DEFAULT_SETTINGS = {

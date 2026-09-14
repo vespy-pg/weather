@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {forecastUrl, isForecastRoutePath, locationSearchUrl, normalizeForecast, normalizeGoogleAnalyticsId, normalizeLocale, normalizePostalLocations, normalizeReverseLocation, postalCodeSearchUrl, preferredLanguageForCountry, promotionFeed, renderIndexHtml, selectCapitalResult, seoPageMetadata} from './server.js';
+import {forecastUrl, isForecastRoutePath, locationSearchUrl, mushroomCondition, mushroomObservationsUrl, normalizeForecast, normalizeGoogleAnalyticsId, normalizeLocale, normalizeMushroomObservations, normalizePostalLocations, normalizeReverseLocation, postalCodeSearchUrl, preferredLanguageForCountry, promotionFeed, renderIndexHtml, selectCapitalResult, seoPageMetadata} from './server.js';
 
 test('normalizeGoogleAnalyticsId accepts only GA4 measurement IDs', () => {
   assert.equal(normalizeGoogleAnalyticsId(' g-ab12cd34 '), 'G-AB12CD34');
@@ -42,8 +42,55 @@ test('forecastUrl requests the fields shared by web and Android clients', () => 
   assert.equal(url.searchParams.get('longitude'), '19.12');
   assert.equal(url.searchParams.get('timezone'), 'Europe/Warsaw');
   assert.equal(url.searchParams.get('forecast_days'), '15');
+  assert.equal(url.searchParams.has('past_days'), false);
   assert.match(url.searchParams.get('hourly'), /apparent_temperature/);
+  assert.doesNotMatch(url.searchParams.get('hourly'), /soil_moisture_0_to_1cm/);
   assert.match(url.searchParams.get('daily'), /sunrise/);
+  const mushroomUrl = new URL(forecastUrl({latitude: 50.67, longitude: 19.12, timezone: 'Europe/Warsaw', includeMushrooms: true}));
+  assert.equal(mushroomUrl.searchParams.get('past_days'), '7');
+  assert.match(mushroomUrl.searchParams.get('hourly'), /soil_moisture_0_to_1cm/);
+});
+
+test('scores mushroom conditions from recent rain, moisture, humidity, and temperature', () => {
+  const source = {
+    hourly: {
+      time: ['2026-09-10T00:00', '2026-09-10T12:00'],
+      relative_humidity_2m: [88, 82],
+      soil_moisture_0_to_1cm: [.3, .28]
+    },
+    daily: {
+      time: ['2026-09-08', '2026-09-09', '2026-09-10'],
+      precipitation_sum: [12, 10, 8],
+      temperature_2m_min: [10, 11, 12],
+      temperature_2m_max: [18, 19, 20]
+    }
+  };
+  const condition = mushroomCondition(source, 2);
+  assert.ok(condition.score >= 75);
+  assert.equal(condition.level, 'excellent');
+  assert.equal(condition.recentRainfall, 22);
+  assert.equal(condition.relativeHumidity, 85);
+  assert.equal(condition.soilMoisture, .29);
+});
+
+test('builds and normalizes localized mushroom observation requests', () => {
+  const url = new URL(mushroomObservationsUrl(
+    {latitude: 50.26489, longitude: 19.02378, language: 'pl-PL'},
+    new Date('2026-09-14T12:00:00Z')
+  ));
+  assert.equal(url.hostname, 'api.inaturalist.org');
+  assert.equal(url.searchParams.get('taxon_id'), '47170');
+  assert.equal(url.searchParams.get('radius'), '30');
+  assert.equal(url.searchParams.get('d1'), '2026-08-15');
+  assert.equal(url.searchParams.get('locale'), 'pl');
+  const normalized = normalizeMushroomObservations({
+    total_results: 2,
+    results: [{id: 123, observed_on: '2026-09-14', taxon: {preferred_common_name: 'Borowik', name: 'Boletus'}}]
+  });
+  assert.equal(normalized.count, 2);
+  assert.equal(normalized.latestDate, '2026-09-14');
+  assert.equal(normalized.observations[0].commonName, 'Borowik');
+  assert.equal(normalized.observations[0].url, 'https://www.inaturalist.org/observations/123');
 });
 
 test('normalizeForecast exposes a stable client-facing shape', () => {
@@ -71,6 +118,7 @@ test('normalizeForecast exposes a stable client-facing shape', () => {
   assert.equal(result.hourly[0].apparentTemperature, 23);
   assert.equal(result.hourly[0].precipitationProbability, 20);
   assert.equal(result.daily[0].temperatureMaximum, 25);
+  assert.equal(result.daily[0].mushroom.level, 'unavailable');
   assert.deepEqual(result.location, location);
 });
 

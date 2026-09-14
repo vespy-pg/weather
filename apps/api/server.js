@@ -16,6 +16,8 @@ const PORT = Number(process.env.PORT || 8080);
 const CACHE_TTL_MS = Number(process.env.WEATHER_CACHE_TTL_MS || 10 * 60 * 1000);
 const WEB_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../web');
 const WEB_ORIGIN = 'https://weather.vespy.eu';
+const MUSHROOM_OBSERVATION_DAYS = 30;
+const MUSHROOM_OBSERVATION_RADIUS_KM = 30;
 const cache = new Map();
 
 export function normalizeGoogleAnalyticsId(value) {
@@ -104,13 +106,69 @@ function at(source, key, index) {
   return source?.[key]?.[index] ?? null;
 }
 
+function bounded(value, minimum = 0, maximum = 1) {
+  return Math.max(minimum, Math.min(maximum, value));
+}
+
+function average(values) {
+  const available = values
+    .filter(value => value !== null && value !== undefined && value !== '')
+    .map(Number)
+    .filter(Number.isFinite);
+  return available.length ? available.reduce((sum, value) => sum + value, 0) / available.length : null;
+}
+
+function mushroomTemperatureScore(temperature) {
+  if (!Number.isFinite(temperature) || temperature <= 2 || temperature >= 30) return 0;
+  if (temperature >= 12 && temperature <= 20) return 1;
+  return temperature < 12 ? (temperature - 2) / 10 : (30 - temperature) / 10;
+}
+
+export function mushroomCondition(source, dailyIndex) {
+  const date = source.daily?.time?.[dailyIndex];
+  if (!date) return {score: null, level: 'unavailable'};
+  const rainfallValues = (source.daily?.precipitation_sum || [])
+    .slice(Math.max(0, dailyIndex - 7), dailyIndex)
+    .filter(value => value !== null && value !== undefined && value !== '')
+    .map(Number)
+    .filter(Number.isFinite);
+  const recentRainfall = rainfallValues.length ? rainfallValues.reduce((sum, value) => sum + value, 0) : null;
+  const hourlyIndices = (source.hourly?.time || []).flatMap((timestamp, index) => String(timestamp).startsWith(date) ? [index] : []);
+  const relativeHumidity = average(hourlyIndices.map(index => at(source.hourly, 'relative_humidity_2m', index)));
+  const soilMoisture = average(hourlyIndices.map(index => at(source.hourly, 'soil_moisture_0_to_1cm', index)));
+  const temperature = average([
+    at(source.daily, 'temperature_2m_min', dailyIndex),
+    at(source.daily, 'temperature_2m_max', dailyIndex)
+  ]);
+  const factors = [
+    {value: Number.isFinite(recentRainfall) ? bounded((recentRainfall - 2) / 33) : null, weight: .3},
+    {value: mushroomTemperatureScore(temperature), weight: .25},
+    {value: Number.isFinite(relativeHumidity) ? bounded((relativeHumidity - 55) / 35) : null, weight: .15},
+    {value: Number.isFinite(soilMoisture) ? bounded((soilMoisture - .1) / .22) : null, weight: .3}
+  ].filter(factor => factor.value !== null);
+  const totalWeight = factors.reduce((sum, factor) => sum + factor.weight, 0);
+  const score = totalWeight >= .5 ? Math.round(factors.reduce((sum, factor) => sum + factor.value * factor.weight, 0) / totalWeight * 100) : null;
+  const level = score === null ? 'unavailable' : score >= 75 ? 'excellent' : score >= 50 ? 'good' : score >= 25 ? 'fair' : 'poor';
+  return {
+    score,
+    level,
+    recentRainfall: recentRainfall === null ? null : Number(recentRainfall.toFixed(1)),
+    relativeHumidity: relativeHumidity === null ? null : Math.round(relativeHumidity),
+    soilMoisture: soilMoisture === null ? null : Number(soilMoisture.toFixed(3))
+  };
+}
+
 export function normalizeForecast(source, location) {
   const allHourlyTimes = source.hourly?.time || [];
   const currentHour = String(source.current?.time || '').slice(0, 13);
   const matchingHourIndex = allHourlyTimes.findIndex(timestamp => String(timestamp).slice(0, 13) === currentHour);
   const hourlyStartIndex = matchingHourIndex < 0 ? 0 : matchingHourIndex;
   const hourlyTimes = allHourlyTimes.slice(hourlyStartIndex, hourlyStartIndex + 240);
-  const dailyTimes = source.daily?.time || [];
+  const allDailyTimes = source.daily?.time || [];
+  const currentDate = String(source.current?.time || '').slice(0, 10);
+  const matchingDayIndex = allDailyTimes.findIndex(date => String(date) >= currentDate);
+  const dailyStartIndex = matchingDayIndex < 0 ? 0 : matchingDayIndex;
+  const dailyTimes = allDailyTimes.slice(dailyStartIndex, dailyStartIndex + 15);
   return {
     available: true,
     fetchedAt: new Date().toISOString(),
@@ -148,39 +206,87 @@ export function normalizeForecast(source, location) {
       uvIndex: at(source.hourly, 'uv_index', sourceIndex)
     };
     }),
-    daily: dailyTimes.map((date, index) => ({
+    daily: dailyTimes.map((date, index) => {
+      const sourceIndex = dailyStartIndex + index;
+      return {
       date,
-      weatherCode: at(source.daily, 'weather_code', index),
-      temperatureMaximum: at(source.daily, 'temperature_2m_max', index),
-      temperatureMinimum: at(source.daily, 'temperature_2m_min', index),
-      apparentTemperatureMaximum: at(source.daily, 'apparent_temperature_max', index),
-      apparentTemperatureMinimum: at(source.daily, 'apparent_temperature_min', index),
-      sunrise: at(source.daily, 'sunrise', index),
-      sunset: at(source.daily, 'sunset', index),
-      daylightDuration: at(source.daily, 'daylight_duration', index),
-      sunshineDuration: at(source.daily, 'sunshine_duration', index),
-      precipitation: at(source.daily, 'precipitation_sum', index),
-      precipitationProbability: at(source.daily, 'precipitation_probability_max', index),
-      windSpeedMaximum: at(source.daily, 'wind_speed_10m_max', index),
-      windGustsMaximum: at(source.daily, 'wind_gusts_10m_max', index),
-      windDirection: at(source.daily, 'wind_direction_10m_dominant', index),
-      uvIndexMaximum: at(source.daily, 'uv_index_max', index)
-    })),
+      weatherCode: at(source.daily, 'weather_code', sourceIndex),
+      temperatureMaximum: at(source.daily, 'temperature_2m_max', sourceIndex),
+      temperatureMinimum: at(source.daily, 'temperature_2m_min', sourceIndex),
+      apparentTemperatureMaximum: at(source.daily, 'apparent_temperature_max', sourceIndex),
+      apparentTemperatureMinimum: at(source.daily, 'apparent_temperature_min', sourceIndex),
+      sunrise: at(source.daily, 'sunrise', sourceIndex),
+      sunset: at(source.daily, 'sunset', sourceIndex),
+      daylightDuration: at(source.daily, 'daylight_duration', sourceIndex),
+      sunshineDuration: at(source.daily, 'sunshine_duration', sourceIndex),
+      precipitation: at(source.daily, 'precipitation_sum', sourceIndex),
+      precipitationProbability: at(source.daily, 'precipitation_probability_max', sourceIndex),
+      windSpeedMaximum: at(source.daily, 'wind_speed_10m_max', sourceIndex),
+      windGustsMaximum: at(source.daily, 'wind_gusts_10m_max', sourceIndex),
+      windDirection: at(source.daily, 'wind_direction_10m_dominant', sourceIndex),
+      uvIndexMaximum: at(source.daily, 'uv_index_max', sourceIndex),
+      mushroom: mushroomCondition(source, sourceIndex)
+    };
+    }),
     location
   };
 }
 
-export function forecastUrl({latitude, longitude, timezone}) {
+export function forecastUrl({latitude, longitude, timezone, includeMushrooms = false}) {
+  const hourly = [
+    'temperature_2m', 'apparent_temperature', 'relative_humidity_2m', 'precipitation_probability',
+    'precipitation', 'rain', 'snowfall', 'weather_code', 'cloud_cover', 'surface_pressure',
+    'visibility', 'wind_speed_10m', 'wind_direction_10m', 'wind_gusts_10m', 'uv_index'
+  ];
+  if (includeMushrooms) hourly.push('soil_moisture_0_to_1cm');
   const parameters = new URLSearchParams({
     latitude: String(latitude),
     longitude: String(longitude),
     timezone: timezone || 'auto',
     forecast_days: '15',
     current: 'temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,cloud_cover,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m',
-    hourly: 'temperature_2m,apparent_temperature,relative_humidity_2m,precipitation_probability,precipitation,rain,snowfall,weather_code,cloud_cover,surface_pressure,visibility,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index',
+    hourly: hourly.join(','),
     daily: 'weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,daylight_duration,sunshine_duration,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant,uv_index_max'
   });
+  if (includeMushrooms) parameters.set('past_days', '7');
   return `https://api.open-meteo.com/v1/forecast?${parameters}`;
+}
+
+export function mushroomObservationsUrl({latitude, longitude, language = DEFAULT_LOCALE}, now = new Date()) {
+  const earliest = new Date(now);
+  earliest.setUTCDate(earliest.getUTCDate() - MUSHROOM_OBSERVATION_DAYS);
+  const parameters = new URLSearchParams({
+    taxon_id: '47170',
+    lat: String(latitude),
+    lng: String(longitude),
+    radius: String(MUSHROOM_OBSERVATION_RADIUS_KM),
+    d1: earliest.toISOString().slice(0, 10),
+    quality_grade: 'research',
+    geo: 'true',
+    order_by: 'observed_on',
+    order: 'desc',
+    per_page: '6',
+    locale: normalizeLocale(language).split('-')[0]
+  });
+  return `https://api.inaturalist.org/v1/observations?${parameters}`;
+}
+
+export function normalizeMushroomObservations(source) {
+  const observations = Array.isArray(source?.results) ? source.results.slice(0, 6).map(item => ({
+    id: Number(item.id),
+    date: item.observed_on || null,
+    commonName: item.taxon?.preferred_common_name || null,
+    scientificName: item.taxon?.name || null,
+    url: Number.isFinite(Number(item.id)) ? `https://www.inaturalist.org/observations/${Number(item.id)}` : null
+  })).filter(item => item.id && item.date) : [];
+  return {
+    available: true,
+    count: Math.max(0, Number(source?.total_results) || 0),
+    radiusKm: MUSHROOM_OBSERVATION_RADIUS_KM,
+    periodDays: MUSHROOM_OBSERVATION_DAYS,
+    latestDate: observations[0]?.date || null,
+    observations
+  };
 }
 
 export function normalizeLocale(language) {
@@ -428,8 +534,25 @@ async function weather(requestUrl, response) {
   const timezone = requestUrl.searchParams.get('timezone') || 'auto';
   const name = requestUrl.searchParams.get('name') || `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`;
   const location = {name, latitude, longitude, timezone};
-  const source = await cachedFetch(forecastUrl(location));
+  const source = await cachedFetch(forecastUrl({
+    ...location,
+    includeMushrooms: ['1', 'true'].includes(requestUrl.searchParams.get('mushrooms'))
+  }));
   return json(response, 200, normalizeForecast(source, location));
+}
+
+async function mushroomObservations(requestUrl, response) {
+  const latitude = Number(requestUrl.searchParams.get('latitude'));
+  const longitude = Number(requestUrl.searchParams.get('longitude'));
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+    return json(response, 400, {error: 'Valid latitude and longitude are required.'});
+  }
+  const source = await cachedFetch(mushroomObservationsUrl({
+    latitude,
+    longitude,
+    language: requestUrl.searchParams.get('language')
+  }));
+  return json(response, 200, normalizeMushroomObservations(source), {'Cache-Control': 'public, max-age=900'});
 }
 
 function promotions(requestUrl, response) {
@@ -484,6 +607,7 @@ export function createServer() {
       if (requestUrl.pathname === '/reverse-location') return await reverseLocation(requestUrl, response);
       if (requestUrl.pathname === '/promotions') return promotions(requestUrl, response);
       if (requestUrl.pathname === '/weather') return await weather(requestUrl, response);
+      if (requestUrl.pathname === '/mushroom-observations') return await mushroomObservations(requestUrl, response);
       return await staticFile(requestUrl, response);
     } catch (error) {
       console.error(error);
