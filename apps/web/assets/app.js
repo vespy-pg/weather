@@ -1559,6 +1559,23 @@ const finishPinch = event => {
 forecastTimelineScroll.addEventListener('touchend', finishPinch);
 forecastTimelineScroll.addEventListener('touchcancel', finishPinch);
 
+function openEmbeddedForecast() {
+  if (!IS_EMBEDDED || window.parent === window) return;
+  window.parent.postMessage({type: 'weather:open-forecast'}, '*');
+}
+
+const forecastHeadingLink = document.getElementById('forecastHeadingLink');
+forecastHeadingLink.addEventListener('click', openEmbeddedForecast);
+forecastHeadingLink.addEventListener('keydown', event => {
+  if (!IS_EMBEDDED || !['Enter', ' '].includes(event.key)) return;
+  event.preventDefault();
+  openEmbeddedForecast();
+});
+if (IS_EMBEDDED) {
+  forecastHeadingLink.setAttribute('role', 'link');
+  forecastHeadingLink.setAttribute('tabindex', '0');
+}
+
 let resizeTimer = 0;
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);

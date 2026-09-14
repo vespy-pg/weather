@@ -393,8 +393,10 @@ body.embedded .forecast-guide { margin: 0; border-top: 0; border-radius: 0; }
 body.embedded .forecast-heading-tools .muted { display: none; }
 body.embedded .forecast-panel .section-heading { justify-content: space-between; }
 body.embedded .forecast-panel .section-heading > div:first-child { display: block; }
+body.embedded #forecastHeadingLink { cursor: pointer; }
+body.embedded #forecastHeadingLink:hover h2 { color: var(--blue); }
 body.embedded-without-legend .forecast-guide { display: none; }
-body.embedded .data-attribution { margin-top: 0; padding: 6px 0; line-height: 1; }
+body.embedded .data-attribution { display: none; }
 
 @media (max-width: 760px) {
   .topbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
