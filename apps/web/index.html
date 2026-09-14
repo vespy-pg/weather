@@ -83,6 +83,14 @@
       </div>
     </header>
 
+    <aside class="stale-weather-warning" id="staleWeatherWarning" role="status" aria-live="polite" hidden>
+      <span class="stale-weather-warning-icon" aria-hidden="true">!</span>
+      <div>
+        <strong data-i18n="status.staleWeatherTitle">Weather data is out of date</strong>
+        <p data-i18n="status.staleWeatherDescription">The forecast has not refreshed for over an hour. We will keep trying automatically.</p>
+      </div>
+    </aside>
+
     <section class="panel forecast-panel">
       <div class="section-heading">
         <div>
@@ -215,6 +223,11 @@
 
     <footer class="data-attribution"><span data-i18n="app.dataSources">Data sources:</span> <a href="https://open-meteo.com/" rel="external">Open-Meteo</a> · <a href="https://www.openstreetmap.org/copyright" rel="external">OpenStreetMap contributors</a></footer>
   </main>
+
+  <aside class="app-notification" id="appNotification" role="alert" aria-live="assertive" hidden>
+    <p id="appNotificationMessage"></p>
+    <button type="button" id="closeAppNotification" data-i18n="action.close">Close</button>
+  </aside>
 
   <dialog class="share-dialog" id="shareDialog" aria-labelledby="shareDialogTitle">
     <div class="share-dialog-content">
@@ -358,7 +371,11 @@
 
       <fieldset>
         <legend data-i18n="settings.embed">Embed on a website</legend>
-        <p class="settings-help" data-i18n="settings.embedHelp">Paste this iframe into any HTML page. It uses the selected location, language, and theme.</p>
+        <p class="settings-help" data-i18n="settings.embedHelp">Paste this iframe into any HTML page. It includes the selected location and every forecast display option.</p>
+        <label class="setting-row"><span data-i18n="settings.embedDays">Forecast days</span>
+          <select id="embedDays"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option></select>
+        </label>
+        <label class="setting-row"><span data-i18n="settings.embedLegend">Include the forecast legend</span><input id="embedLegend" type="checkbox"></label>
         <div class="embed-code-row">
           <textarea id="embedCode" rows="4" readonly aria-label="Embed code"></textarea>
           <button type="button" class="secondary-button" id="copyEmbedCode" data-i18n="action.copy">Copy code</button>

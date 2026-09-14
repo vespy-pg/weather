@@ -1,5 +1,7 @@
 'use strict';
 
+import {t} from './i18n.js';
+
 const CONSENT_KEY = 'weather.analytics-consent.v1';
 const ANALYTICS_HOSTS = new Set(['pogoda.vespy.eu', 'weather.vespy.eu']);
 const pendingEvents = [];
@@ -76,13 +78,14 @@ function showConsentPrompt() {
   prompt.setAttribute('aria-labelledby', 'analyticsConsentTitle');
   prompt.innerHTML = `
     <div>
-      <strong id="analyticsConsentTitle">Cookies consent</strong>
-      <p>Analytics cookies help us understand which forecast features are useful. We do not send searched place names or coordinates.</p>
+      <strong id="analyticsConsentTitle" data-i18n="privacy.cookieConsentTitle"></strong>
+      <p data-i18n="privacy.cookieConsentDescription"></p>
     </div>
     <div class="analytics-consent-actions">
-      <button class="secondary-button" type="button" data-analytics-consent="denied">Decline</button>
-      <button class="primary-button" type="button" data-analytics-consent="granted">Allow analytics cookies</button>
+      <button class="secondary-button" type="button" data-analytics-consent="denied" data-i18n="privacy.declineCookies"></button>
+      <button class="primary-button" type="button" data-analytics-consent="granted" data-i18n="privacy.allowAnalyticsCookies"></button>
     </div>`;
+  prompt.querySelectorAll('[data-i18n]').forEach(element => { element.textContent = t(element.dataset.i18n); });
   prompt.querySelectorAll('[data-analytics-consent]').forEach(button => button.addEventListener('click', () => {
     applyConsent(button.dataset.analyticsConsent);
     removeConsentPrompt();
@@ -98,7 +101,8 @@ function addPrivacyChoicesButton() {
   button.type = 'button';
   button.className = 'privacy-choices';
   button.dataset.analyticsChoices = '';
-  button.textContent = 'Cookie choices';
+  button.dataset.i18n = 'privacy.cookieChoices';
+  button.textContent = t('privacy.cookieChoices');
   button.addEventListener('click', showConsentPrompt);
   footer.append(separator, button);
 }

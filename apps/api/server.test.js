@@ -66,6 +66,7 @@ test('normalizeForecast exposes a stable client-facing shape', () => {
   };
   const location = {name: 'Test', latitude: 1, longitude: 2, timezone: 'UTC'};
   const result = normalizeForecast(source, location);
+  assert.ok(Number.isFinite(Date.parse(result.fetchedAt)));
   assert.equal(result.current.temperature, 21);
   assert.equal(result.hourly[0].apparentTemperature, 23);
   assert.equal(result.hourly[0].precipitationProbability, 20);

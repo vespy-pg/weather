@@ -113,6 +113,7 @@ export function normalizeForecast(source, location) {
   const dailyTimes = source.daily?.time || [];
   return {
     available: true,
+    fetchedAt: new Date().toISOString(),
     current: {
       timestamp: source.current?.time ?? null,
       temperature: source.current?.temperature_2m ?? null,
