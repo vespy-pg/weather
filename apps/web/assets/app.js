@@ -1565,7 +1565,10 @@ function openEmbeddedForecast() {
 }
 
 const forecastHeadingLink = document.getElementById('forecastHeadingLink');
-forecastHeadingLink.addEventListener('click', openEmbeddedForecast);
+document.querySelector('.forecast-panel').addEventListener('click', event => {
+  if (event.target.closest('button, a')) return;
+  openEmbeddedForecast();
+});
 forecastHeadingLink.addEventListener('keydown', event => {
   if (!IS_EMBEDDED || !['Enter', ' '].includes(event.key)) return;
   event.preventDefault();
