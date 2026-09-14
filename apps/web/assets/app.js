@@ -5,7 +5,15 @@ import {escapeHtml, formatForecastDate, formatTime, measurement, numericValue, s
 import {groupHourlyForecast, hoursPerGroup, temperatureRange} from './forecast-view.js';
 import {applyWidgetQuery, widgetBoolean, widgetDays, widgetQuery} from './embed-options.js';
 import {normalizeLanguage, preferredSupportedLanguage, setLanguage, supportedLanguages, t} from './i18n.js';
-import {replacingLocation, sameLocation, withLocation} from './location-state.js';
+import {
+  activeLocationCookie,
+  activeLocationFromCookies,
+  normalizeStoredLocation,
+  preferredActiveLocation,
+  replacingLocation,
+  sameLocation,
+  withLocation
+} from './location-state.js';
 import {applicationRouteUrl, forecastRouteUrl, parseCoordinatePair, parseForecastRoute} from './route-state.js';
 import {
   celsiusToDisplay,
@@ -288,8 +296,18 @@ function loadSettings() {
       stored.locations = [{...DEFAULT_LOCATION}];
       stored.configured = false;
     }
-    stored.locations = Array.isArray(saved.locations) && saved.locations.length ? saved.locations : [stored.location];
-    if (!stored.locations.some(item => sameLocation(item, stored.location))) stored.locations.push(stored.location);
+    const savedLocations = (Array.isArray(saved.locations) ? saved.locations : [])
+      .map(normalizeStoredLocation)
+      .filter(Boolean);
+    const activeLocation = preferredActiveLocation({
+      cookieLocation: legacyPlaceholder ? null : activeLocationFromCookies(document.cookie),
+      savedLocation: saved.location,
+      savedConfigured: !legacyPlaceholder && saved.configured
+    });
+    stored.location = activeLocation || {...DEFAULT_LOCATION};
+    stored.locations = savedLocations.length ? savedLocations : [{...DEFAULT_LOCATION}];
+    if (activeLocation) stored.locations = withLocation(stored.locations, activeLocation);
+    stored.configured = Boolean(activeLocation);
     const latitude = Number(QUERY.get('lat'));
     const longitude = Number(QUERY.get('lon'));
     if (FORECAST_ROUTE?.locationName && ROUTE_COORDINATES) {
@@ -300,7 +318,7 @@ function loadSettings() {
         ...ROUTE_COORDINATES,
         timezone: 'auto'
       };
-      stored.locations = [stored.location];
+      stored.locations = withLocation(stored.locations, stored.location);
       stored.configured = true;
     } else if (QUERY.has('lat') && QUERY.has('lon') && Number.isFinite(latitude) && Number.isFinite(longitude)) {
       stored.location = {
@@ -310,7 +328,7 @@ function loadSettings() {
         longitude,
         timezone: QUERY.get('timezone') || 'auto'
       };
-      stored.locations = [stored.location];
+      stored.locations = withLocation(stored.locations, stored.location);
       stored.configured = true;
     }
     if (['dark', 'light'].includes(QUERY.get('theme'))) stored.theme = QUERY.get('theme');
@@ -339,7 +357,13 @@ function loadSettings() {
     stored.zoom = ZOOM_LEVELS.reduce((closest, zoom) => Math.abs(zoom - Number(stored.zoom)) < Math.abs(closest - Number(stored.zoom)) ? zoom : closest, DEFAULT_ZOOM);
     return stored;
   } catch {
-    return {...DEFAULT_SETTINGS, location: {...DEFAULT_LOCATION}, locations: [{...DEFAULT_LOCATION}]};
+    const activeLocation = activeLocationFromCookies(document.cookie);
+    return {
+      ...DEFAULT_SETTINGS,
+      location: activeLocation || {...DEFAULT_LOCATION},
+      locations: activeLocation ? [{...DEFAULT_LOCATION}, activeLocation] : [{...DEFAULT_LOCATION}],
+      configured: Boolean(activeLocation)
+    };
   }
 }
 
@@ -355,7 +379,13 @@ function renderLanguageOptions() {
 }
 
 function saveSettings() {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  } catch {}
+  if (settings.configured && !IS_EMBEDDED) {
+    const cookie = activeLocationCookie(settings.location, {secure: location.protocol === 'https:'});
+    if (cookie) document.cookie = cookie;
+  }
 }
 
 function applyTheme(theme, persist = false) {
@@ -1057,7 +1087,7 @@ async function loadDeviceLocation(position) {
     ]);
     nextWeather.location = {...nextWeather.location, ...resolvedLocation};
     settings.location = resolvedLocation;
-    settings.locations = replacingLocation(previous.locations, previous.location, resolvedLocation);
+    settings.locations = withLocation(previous.locations, resolvedLocation);
     settings.configured = true;
     pendingLocation = resolvedLocation;
     pendingLocations = [...settings.locations];
@@ -1554,15 +1584,6 @@ function devicePosition() {
   });
 }
 
-async function geolocationPermissionGranted() {
-  if (!navigator.permissions?.query) return false;
-  try {
-    return (await navigator.permissions.query({name: 'geolocation'})).state === 'granted';
-  } catch {
-    return false;
-  }
-}
-
 function deviceLocationFromPosition(position) {
   return {
     id: `device-${position.coords.latitude.toFixed(4)}-${position.coords.longitude.toFixed(4)}`,
@@ -1572,11 +1593,6 @@ function deviceLocationFromPosition(position) {
     longitude: Number(position.coords.longitude.toFixed(5)),
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'auto'
   };
-}
-
-async function locationFromPosition(position) {
-  const fallback = deviceLocationFromPosition(position);
-  return resolveDeviceLocation(fallback);
 }
 
 function applyResolvedDeviceLocation(fallback, resolved) {
@@ -1602,16 +1618,15 @@ async function resolveAndApplyDeviceLocation(fallback) {
 
 function usesAutomaticLocation(item = settings.location) {
   const id = String(item?.id || '');
-  return id.startsWith('device-') || id.startsWith('capital-');
+  return id.startsWith('device-');
 }
 
 async function refreshAutomaticDeviceLocation({reloadWeather = true} = {}) {
   if (IS_DEMO || IS_EMBEDDED || !usesAutomaticLocation()) return false;
   const position = await devicePosition();
   if (!position) return false;
-  const previousLocation = settings.location;
   const deviceLocation = deviceLocationFromPosition(position);
-  settings.locations = replacingLocation(settings.locations, previousLocation, deviceLocation);
+  settings.locations = withLocation(settings.locations, deviceLocation);
   settings.location = deviceLocation;
   settings.configured = true;
   pendingLocations = [...settings.locations];
@@ -1664,7 +1679,7 @@ async function resolveForecastRouteLocation() {
     const routeLocation = response.ok ? payload.results?.[0] : null;
     if (!routeLocation) return;
     settings.location = routeLocation;
-    settings.locations = [routeLocation];
+    settings.locations = withLocation(settings.locations, routeLocation);
     settings.configured = true;
     saveSettings();
     renderLocationMenu();
@@ -1674,10 +1689,6 @@ async function resolveForecastRouteLocation() {
 async function initialize() {
   await resolveForecastRouteLocation();
   if (settings.configured || IS_DEMO || IS_EMBEDDED) {
-    if (usesAutomaticLocation() && await geolocationPermissionGranted()) {
-      const refreshed = await refreshAutomaticDeviceLocation({reloadWeather: false});
-      if (refreshed) return loadWeather();
-    }
     const unresolvedDeviceLocation = String(settings.location.id || '').startsWith('device-')
       && ['Current location', 'Bieżąca lokalizacja'].includes(settings.location.name);
     if (unresolvedDeviceLocation && !IS_DEMO && !IS_EMBEDDED) {
@@ -1687,12 +1698,13 @@ async function initialize() {
       saveSettings();
       renderLocationMenu();
     }
+    saveSettings();
     updateBrowserRoute();
     return loadWeather();
   }
   renderLocationLoading(t('status.waitingLocation'));
   try {
-    const bootstrapRequest = (async () => {
+    const payload = await (async () => {
       try {
         const response = await fetch(new URL('bootstrap-location', API_ROOT));
         const payload = await response.json();
@@ -1701,7 +1713,6 @@ async function initialize() {
         return null;
       }
     })();
-    const [position, payload] = await Promise.all([devicePosition(), bootstrapRequest]);
     if (settings.languageSource === 'fallback' && payload?.language) {
       settings.language = setLanguage(payload.language);
       settings.languageSource = 'country';
@@ -1711,17 +1722,14 @@ async function initialize() {
       drawLegendPreviews();
     }
     renderLocationLoading();
-    const selectedLocation = position
-      ? await locationFromPosition(position)
-      : payload?.location || settings.location;
+    const selectedLocation = payload?.location || DEFAULT_LOCATION;
     settings.location = selectedLocation;
-    settings.locations = [selectedLocation];
+    settings.locations = withLocation(settings.locations, selectedLocation);
     settings.configured = true;
     saveSettings();
     renderLocationMenu();
     updateBrowserRoute();
     await loadWeather();
-    if (!position) showNotification(t('error.deviceLocationUpdate'));
   } finally {
     clearLocationLoading();
   }

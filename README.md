@@ -97,9 +97,9 @@ cd weather
 npm start
 ```
 
-Open `http://127.0.0.1:8080/`. On the first visit, the application selects the capital of the visitor's country and requests browser location permission. When permission is granted, it uses OpenStreetMap Nominatim to resolve the coordinates to the nearest named locality and replaces the capital. Open `http://127.0.0.1:8080/?demo=1` to inspect the fictional extreme-weather dataset without contacting a weather provider.
+Open `http://127.0.0.1:8080/`. On the first visit, the application selects the capital of the visitor's country, with London as the final fallback when the country cannot be determined. Device location remains available as an explicit action in Settings. Open `http://127.0.0.1:8080/?demo=1` to inspect the fictional extreme-weather dataset without contacting a weather provider.
 
-Settings are stored immediately after each change and only in the browser. No account is required. The API caches upstream responses in memory for ten minutes by default.
+Settings are stored immediately after each change and only in the browser. The saved location list uses local storage, while the active location is also stored in a one-year, first-party, SameSite cookie so it can be restored on the next visit. Adding a location keeps all previously saved locations and makes the new location active. No account is required. The API caches upstream responses in memory for ten minutes by default.
 
 Optional environment variables:
 
