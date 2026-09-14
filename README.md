@@ -55,6 +55,7 @@ Open **Settings** in Weather and use **Embed on a website** to copy an iframe co
   width="100%"
   height="390"
   loading="lazy"
+  scrolling="no"
   style="border:0;border-radius:12px"
 ></iframe>
 ```
@@ -126,6 +127,7 @@ The server exposes:
 - `GET /reverse-location?latitude=...&longitude=...&timezone=...&language=...`
 - `GET /promotions?platform=...&placement=...&language=...&theme=...`
 - `GET /weather?latitude=...&longitude=...&timezone=...&name=...`
+- `GET /mushroom-observations?latitude=...&longitude=...&language=...`
 
 The API contract is available in [`packages/weather-contract/openapi.yaml`](packages/weather-contract/openapi.yaml).
 Promotion delivery rules are documented in [`docs/promotion-feed.md`](docs/promotion-feed.md).
@@ -153,6 +155,8 @@ The application uses root-relative asset and API URLs so localized forecast path
 The production templates for `vespy.eu`, its `www`, the canonical `weather.vespy.eu` web host, the Polish `pogoda.vespy.eu` redirect, and `api.weather.vespy.eu` are stored in `deploy/`. The Apache virtual hosts proxy to a container bound only to `127.0.0.1:18080`, while the systemd unit keeps that container running after reboots. The virtual hosts use the local GeoIP database and `mod_geoip` to pass only the visitor's country code to the application, so visitor IP addresses are not sent to an external location service.
 
 Search engines receive server-rendered localized titles, descriptions, canonical URLs, `hreflang` alternatives, and WebApplication structured data. `robots.txt` points to the XML sitemap, while demo and embedded URLs are marked `noindex` to keep duplicate or fictional forecast pages out of search results.
+
+The optional mushroom timeline combines a weather-based suitability score with recent research-grade iNaturalist observations. It is disabled by default and only requests nearby observations after the user enables it.
 
 ## Akacjowa integration
 

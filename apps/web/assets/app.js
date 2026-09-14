@@ -55,6 +55,7 @@ const DEFAULT_SETTINGS = {
   showPrecipitation: true,
   showWind: true,
   showWindArrows: false,
+  showMushrooms: false,
   embedDays: 10,
   embedLegend: false
 };
@@ -154,6 +155,8 @@ let pendingFullForecastRender = false;
 let pendingForecastDraw = false;
 let pendingLegendDraw = false;
 let notificationTimer = 0;
+let mushroomObservationRequest = 0;
+let mushroomObservations = null;
 const promotionImpressions = new Set();
 let forecastWelcomeDisplayed = false;
 
@@ -381,8 +384,8 @@ function embedCode(locationOverride = settings.location, theme = settings.theme,
       demo: IS_DEMO ? 1 : null
     }
   });
-  const height = settings.embedLegend ? 680 : 390;
-  return `<iframe src="${url}" title="${t('embed.title')}" width="100%" height="${height}" loading="lazy" style="border:0;border-radius:12px" allow="geolocation"></iframe>`;
+  const height = (settings.embedLegend ? 680 : 390) + (settings.showMushrooms ? 54 : 0);
+  return `<iframe src="${url}" title="${t('embed.title')}" width="100%" height="${height}" loading="lazy" scrolling="no" style="border:0;border-radius:12px" allow="geolocation"></iframe>`;
 }
 
 function forecastShareUrl(locationOverride = settings.location) {
@@ -560,6 +563,9 @@ function applyZoom(nextIndex, preserveCenter = true, persist = false) {
   timeline.style.setProperty('--forecast-wind-arrow-size', `${19 * visualScale}px`);
   timeline.style.setProperty('--forecast-wind-arrow-line', `${22 * visualScale}px`);
   timeline.style.setProperty('--forecast-wind-speed-size', `${8 * visualScale}px`);
+  timeline.style.setProperty('--forecast-mushroom-height', `${54 + Math.max(0, visualScale - 1) * 20}px`);
+  timeline.style.setProperty('--forecast-mushroom-icon-size', `${18 * visualScale}px`);
+  timeline.style.setProperty('--forecast-mushroom-label-size', `${9 * visualScale}px`);
   document.getElementById('forecastZoomReset').textContent = `${Math.round(zoom * 100)}%`;
   document.getElementById('forecastZoomOut').disabled = zoomIndex === 0;
   document.getElementById('forecastZoomIn').disabled = zoomIndex === ZOOM_LEVELS.length - 1;
@@ -585,6 +591,101 @@ function renderWind(hourly) {
       <span class="forecast-wind-speed">${speed === null ? '-' : Math.round(speed)}</span>
     </div>`;
   }).join('');
+}
+
+function mushroomColor(score) {
+  if (!Number.isFinite(score)) return 'color-mix(in srgb, var(--chart-muted) 28%, var(--chart-mushroom))';
+  const hue = 24 + score * 1.16;
+  const lightness = document.documentElement.dataset.theme === 'light' ? 74 - score * .2 : 24 + score * .13;
+  return `hsl(${hue.toFixed(0)} 48% ${lightness.toFixed(0)}%)`;
+}
+
+function mushroomDescription(condition) {
+  if (!condition || !Number.isFinite(condition.score)) return t('mushroom.unavailable');
+  return [
+    t(`mushroom.level.${condition.level}`),
+    t('mushroom.score', {score: condition.score}),
+    t('mushroom.factors', {
+      rain: measurement(condition.recentRainfall, ' mm', 1),
+      humidity: measurement(condition.relativeHumidity, '%'),
+      soil: measurement(Number.isFinite(condition.soilMoisture) ? condition.soilMoisture * 100 : null, '%')
+    })
+  ].join(' - ');
+}
+
+function renderMushroomObservations() {
+  const element = document.getElementById('forecastMushroomObservations');
+  const count = document.getElementById('forecastMushroomCount');
+  const summaryElement = document.getElementById('forecastMushroomSummary');
+  const observationsUrl = new URL('https://www.inaturalist.org/observations');
+  const observationStart = new Date();
+  observationStart.setDate(observationStart.getDate() - 30);
+  observationsUrl.search = new URLSearchParams({
+    taxon_id: '47170',
+    lat: settings.location.latitude,
+    lng: settings.location.longitude,
+    radius: '30',
+    d1: observationStart.toISOString().slice(0, 10),
+    quality_grade: 'research',
+    order_by: 'observed_on',
+    order: 'desc'
+  });
+  summaryElement.href = observationsUrl;
+  if (!mushroomObservations) {
+    count.textContent = '...';
+    element.title = t('mushroom.observationsLoading');
+    summaryElement.textContent = element.title;
+    summaryElement.title = element.title;
+    element.setAttribute('aria-label', element.title);
+    return;
+  }
+  if (!mushroomObservations.available) {
+    count.textContent = '?';
+    element.title = t('mushroom.observationsUnavailable');
+    summaryElement.textContent = element.title;
+    summaryElement.title = element.title;
+    element.setAttribute('aria-label', element.title);
+    return;
+  }
+  count.textContent = mushroomObservations.count > 999 ? '999+' : String(mushroomObservations.count);
+  const summary = t('mushroom.observationsSummary', {
+    count: mushroomObservations.count,
+    radius: mushroomObservations.radiusKm,
+    days: mushroomObservations.periodDays
+  });
+  const species = mushroomObservations.observations
+    .map(item => item.commonName || item.scientificName)
+    .filter((name, index, names) => name && names.indexOf(name) === index)
+    .slice(0, 3);
+  element.title = species.length ? `${summary} - ${species.join(', ')}` : summary;
+  summaryElement.textContent = t('mushroom.observationsCompact', {
+    count: mushroomObservations.count,
+    radius: mushroomObservations.radiusKm,
+    days: mushroomObservations.periodDays
+  });
+  summaryElement.title = element.title;
+  element.setAttribute('aria-label', element.title);
+}
+
+function renderMushrooms(hourly) {
+  const track = document.getElementById('forecastMushroomTrack');
+  track.hidden = !settings.showMushrooms;
+  document.getElementById('mushroomAttribution').hidden = !settings.showMushrooms;
+  if (!settings.showMushrooms) return;
+  const conditions = new Map((weather.daily || []).map(day => [day.date, day.mushroom]));
+  const strip = document.getElementById('forecastMushroomStrip');
+  strip.setAttribute('aria-label', t('chart.mushroomLabel'));
+  strip.innerHTML = hourly.map((point, index) => {
+    const date = String(point.timestamp || '').slice(0, 10);
+    const previousDate = String(hourly[index - 1]?.timestamp || '').slice(0, 10);
+    const condition = conditions.get(date);
+    const newDay = index === 0 || date !== previousDate;
+    const label = condition && Number.isFinite(condition.score) ? `${condition.score}` : '?';
+    return `<div class="forecast-mushroom-hour ${newDay ? 'new-day' : ''}" style="--mushroom-color:${mushroomColor(condition?.score)}" title="${escapeHtml(mushroomDescription(condition))}">
+      ${newDay ? `<span class="forecast-mushroom-day-label" aria-hidden="true"><svg viewBox="0 0 40 40"><path d="M5 20C6 10 12 5 20 5s14 5 15 15H5ZM15 20c1 5 0 9-3 14 5 2 11 2 16 0-3-5-4-9-3-14Z"></path></svg>${label}</span>` : ''}
+    </div>`;
+  }).join('');
+  renderMushroomObservations();
 }
 
 function updateTemperatureAxis(range) {
@@ -681,8 +782,10 @@ function drawForecast() {
   windVisual.hidden = !settings.showWind;
   const skyCanvas = document.getElementById('forecastWeatherCanvas');
   const skyHeight = skyCanvas.getBoundingClientRect().height;
+  const compactSky = skyHeight < 90;
   const enlargedLabelOffset = Math.max(0, visualScale - 1);
-  const weatherLineY = 49 + enlargedLabelOffset * 24;
+  const weatherLineY = (compactSky ? 45 : 49) + enlargedLabelOffset * 24;
+  const precipitationLaneTop = compactSky ? skyHeight - 22 : null;
   drawForecastSky(skyCanvas, skyHourly, weather.daily, {
     showHourlyTemperatures: settings.showHourlyTemperatures,
     visualScale,
@@ -691,14 +794,19 @@ function drawForecast() {
     hourY: 24 + enlargedLabelOffset * 16,
     temperatureY: 40 + enlargedLabelOffset * 26,
     weatherLineY,
-    sunlightGlowDepth: Math.min(44, Math.max(12, skyHeight - weatherLineY)),
-    moonY: Math.min(skyHeight - 18, 64 + enlargedLabelOffset * 18),
-    precipitationY: Math.min(skyHeight - 10, 84 + enlargedLabelOffset * 20),
-    fogRows: [skyHeight - 26, skyHeight - 20, skyHeight - 14]
+    maximumWeatherDepth: compactSky ? Math.max(7, precipitationLaneTop - weatherLineY - 1) : 25,
+    sunlightGlowDepth: Math.min(44, Math.max(8, (precipitationLaneTop ?? skyHeight) - weatherLineY)),
+    moonY: compactSky ? 50 : Math.min(skyHeight - 18, 64 + enlargedLabelOffset * 18),
+    precipitationLaneTop,
+    precipitationY: compactSky ? skyHeight - 11 : Math.min(skyHeight - 10, 84 + enlargedLabelOffset * 20),
+    fogRows: compactSky
+      ? [precipitationLaneTop - 12, precipitationLaneTop - 7, precipitationLaneTop - 2]
+      : [skyHeight - 26, skyHeight - 20, skyHeight - 14]
   });
   drawWeatherChart(document.getElementById('forecastChart'), displayedHourly, weather.daily, {timeline: true, showApparentTemperature: settings.showApparentTemperature, visualScale, temperatureRange: range});
   if (settings.showWind) drawWindFlow(document.getElementById('forecastWindCanvas'), displayedHourly, {visualScale});
   renderWind(displayedHourly);
+  renderMushrooms(displayedHourly);
 }
 
 function scheduleSettingsPreview({fullForecast = false, forecast = true, legend = false} = {}) {
@@ -781,7 +889,8 @@ async function requestWeather(requestedLocation, {signal} = {}) {
     latitude: requestedLocation.latitude,
     longitude: requestedLocation.longitude,
     timezone: requestedLocation.timezone || 'auto',
-    name: requestedLocation.name
+    name: requestedLocation.name,
+    mushrooms: settings.showMushrooms ? '1' : '0'
   });
   const response = await fetch(new URL(`weather?${parameters}`, API_ROOT), {signal});
   if (!response.ok) throw new Error((await response.json()).error || 'Forecast request failed.');
@@ -815,6 +924,40 @@ async function requestWeatherWithRetry(requestedLocation, {signal, onRetry} = {}
   }
 }
 
+async function loadMushroomObservations(requestedLocation = settings.location) {
+  const requestId = ++mushroomObservationRequest;
+  mushroomObservations = null;
+  if (weather?.available) drawForecast();
+  if (!settings.showMushrooms) return;
+  if (IS_DEMO) {
+    mushroomObservations = {
+      available: true,
+      count: 18,
+      radiusKm: 30,
+      periodDays: 30,
+      observations: []
+    };
+    if (weather?.available) drawForecast();
+    return;
+  }
+  try {
+    const parameters = new URLSearchParams({
+      latitude: requestedLocation.latitude,
+      longitude: requestedLocation.longitude,
+      language: settings.language
+    });
+    const response = await fetch(new URL(`mushroom-observations?${parameters}`, API_ROOT));
+    if (!response.ok) throw new Error('Mushroom observation request failed.');
+    const result = await response.json();
+    if (requestId !== mushroomObservationRequest || !settings.showMushrooms || !sameLocation(settings.location, requestedLocation)) return;
+    mushroomObservations = result;
+  } catch {
+    if (requestId !== mushroomObservationRequest) return;
+    mushroomObservations = {available: false};
+  }
+  if (weather?.available) drawForecast();
+}
+
 async function loadWeather() {
   weatherAbortController?.abort();
   const controller = new AbortController();
@@ -840,6 +983,7 @@ async function loadWeather() {
     weatherLoadedAt = weatherFetchTime(nextWeather);
     updateWeatherFreshnessWarning();
     renderForecast();
+    if (settings.showMushrooms) loadMushroomObservations(requestedLocation);
     showForecastWelcomeOnce();
     trackEvent('forecast_loaded', {forecast_mode: IS_DEMO ? 'demo' : 'live', embedded: IS_EMBEDDED});
   } catch (error) {
@@ -959,6 +1103,7 @@ function fillSettingsForm() {
   document.getElementById('showPrecipitation').checked = settings.showPrecipitation;
   document.getElementById('showWind').checked = settings.showWind;
   document.getElementById('showWindArrows').checked = settings.showWindArrows;
+  document.getElementById('showMushrooms').checked = settings.showMushrooms;
   document.getElementById('embedDays').value = String(settings.embedDays);
   document.getElementById('embedLegend').checked = settings.embedLegend;
   document.getElementById('locationResults').innerHTML = '';
@@ -1026,6 +1171,7 @@ function settingsFromForm() {
     showPrecipitation: document.getElementById('showPrecipitation').checked,
     showWind: document.getElementById('showWind').checked,
     showWindArrows: document.getElementById('showWindArrows').checked,
+    showMushrooms: document.getElementById('showMushrooms').checked,
     embedDays: widgetDays(document.getElementById('embedDays').value),
     embedLegend: document.getElementById('embedLegend').checked,
     layoutVersion: LAYOUT_VERSION
@@ -1043,6 +1189,7 @@ function saveFormChanges({reloadWeather = false} = {}) {
   const previousPrecipitation = settings.showPrecipitation;
   const previousWind = settings.showWind;
   const previousWindArrows = settings.showWindArrows;
+  const previousMushrooms = settings.showMushrooms;
   settings = settingsFromForm();
   const locationChanged = !sameLocation(previousLocation, settings.location);
   const languageChanged = previousLanguage !== settings.language;
@@ -1053,7 +1200,8 @@ function saveFormChanges({reloadWeather = false} = {}) {
     || previousApparentTemperature !== settings.showApparentTemperature
     || previousPrecipitation !== settings.showPrecipitation
     || previousWind !== settings.showWind
-    || previousWindArrows !== settings.showWindArrows;
+    || previousWindArrows !== settings.showWindArrows
+    || previousMushrooms !== settings.showMushrooms;
   settings.language = languageChanged ? setLanguage(settings.language) : normalizeLanguage(settings.language);
   applyTemperatureSettings();
   saveSettings();
@@ -1070,7 +1218,14 @@ function saveFormChanges({reloadWeather = false} = {}) {
   else if (weather && (themeChanged || forecastDisplayChanged)) scheduleSettingsPreview({legend: themeChanged});
   else if (languageChanged || unitChanged || themeChanged) scheduleSettingsPreview({forecast: false, legend: true});
   if (languageChanged || themeChanged) loadPromotion();
-  if (reloadWeather) loadWeather();
+  if (!settings.showMushrooms) {
+    mushroomObservationRequest += 1;
+    mushroomObservations = null;
+  } else if (previousMushrooms && languageChanged) {
+    loadMushroomObservations();
+  }
+  if (!previousMushrooms && settings.showMushrooms) loadWeather();
+  else if (reloadWeather) loadWeather();
 }
 
 function renderPendingLocations() {
@@ -1200,6 +1355,7 @@ document.getElementById('languageSelect').addEventListener('change', event => {
   renderForecast();
   drawLegendPreviews();
   loadPromotion();
+  if (settings.showMushrooms) loadMushroomObservations();
   trackEvent('display_preference_changed', {preference: 'language', value: settings.language});
 });
 document.getElementById('settingsForm').addEventListener('change', event => {

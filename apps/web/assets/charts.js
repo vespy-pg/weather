@@ -268,6 +268,7 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
   const sunlightGlowDepth = configuredNumber(options.sunlightGlowDepth, 44);
   const moonY = configuredNumber(options.moonY, 64);
   const precipitationY = configuredNumber(options.precipitationY, 84);
+  const precipitationLaneTop = Number(options.precipitationLaneTop);
   const fogRows = Array.isArray(options.fogRows) ? options.fogRows : [74, 80, 86];
 
   context.clearRect(0, 0, width, height);
@@ -442,6 +443,18 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
     });
     context.restore();
   });
+
+  if (Number.isFinite(precipitationLaneTop)) {
+    context.save();
+    context.fillStyle = chartColor('--chart-surface', '#0d1118');
+    context.fillRect(0, precipitationLaneTop, width, height - precipitationLaneTop);
+    context.strokeStyle = chartColor('--chart-grid', '#293141');
+    context.beginPath();
+    context.moveTo(0, precipitationLaneTop + .5);
+    context.lineTo(width, precipitationLaneTop + .5);
+    context.stroke();
+    context.restore();
+  }
 
   points.forEach((point, index) => {
     const probability = numericValue(point.precipitationProbability);

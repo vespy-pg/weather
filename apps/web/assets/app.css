@@ -19,6 +19,8 @@
   --chart-temperature-label-outline: rgba(5, 9, 15, .92);
   --chart-wind: #0f151e;
   --chart-wind-flow: #9bc7d7;
+  --chart-mushroom: #171610;
+  --chart-mushroom-text: #fff8df;
   --line: #2c3748;
   --text: #e7edf7;
   --muted: #8d98aa;
@@ -54,6 +56,8 @@
   --chart-temperature-label-outline: rgba(31, 48, 70, .68);
   --chart-wind: #eef4fa;
   --chart-wind-flow: #486d80;
+  --chart-mushroom: #f3f0e6;
+  --chart-mushroom-text: #352d1f;
 }
 
 * { box-sizing: border-box; }
@@ -178,6 +182,19 @@ html[data-share-prompt="collapsed"] .share-forecast { display: none; }
 .forecast-wind-hour.new-day { scroll-snap-align: start; }
 .forecast-wind-arrow { display: inline-block; font-size: var(--forecast-wind-arrow-size, 19px); font-weight: 900; line-height: var(--forecast-wind-arrow-line, 22px); }
 .forecast-wind-speed { color: var(--chart-muted); font: 700 var(--forecast-wind-speed-size, 8px)/1 ui-monospace, monospace; }
+.forecast-track-mushrooms[hidden] { display: none; }
+.forecast-mushroom-title { align-content: center; gap: 1px; color: #d7b879; }
+.forecast-mushroom-symbol { width: 31px; height: 31px; fill: color-mix(in srgb, currentColor 24%, transparent); stroke: currentColor; stroke-width: 1.8; filter: drop-shadow(0 0 4px color-mix(in srgb, currentColor 32%, transparent)); }
+.forecast-mushroom-count { min-width: 24px; color: var(--chart-text); font: 800 9px/1 ui-monospace, monospace; text-align: center; }
+.forecast-mushroom-visual { position: relative; display: grid; height: var(--forecast-mushroom-height, 54px); overflow: hidden; grid-template-rows: 20px minmax(0, 1fr); background: var(--chart-mushroom); }
+.forecast-mushroom-summary { overflow: hidden; padding: 5px 8px 3px; border-bottom: 1px solid rgba(154, 164, 178, .2); color: var(--chart-muted); font: 800 8px/1.2 ui-monospace, monospace; text-decoration: none; text-overflow: ellipsis; white-space: nowrap; }
+.forecast-mushroom-summary:hover { color: var(--chart-text); text-decoration: underline; }
+.forecast-mushroom-strip { display: grid; min-height: 0; grid-template-columns: repeat(var(--forecast-slots, 40), minmax(0, 1fr)); padding-right: 34px; }
+.forecast-mushroom-hour { position: relative; display: grid; min-width: 0; place-items: center; overflow: visible; border-right: 1px solid rgba(255, 255, 255, .08); background: var(--mushroom-color); color: var(--chart-mushroom-text); }
+.forecast-mushroom-hour::after { position: absolute; inset: auto 0 0; height: 7px; background: radial-gradient(circle at 3px 3px, rgba(47, 33, 17, .32) 0 1px, transparent 1.5px) 0 0 / 8px 7px; content: ""; opacity: .5; }
+.forecast-mushroom-hour.new-day { scroll-snap-align: start; }
+.forecast-mushroom-day-label { position: absolute; z-index: 1; left: 4px; display: flex; align-items: center; gap: 3px; white-space: nowrap; font: 900 var(--forecast-mushroom-label-size, 9px)/1 ui-monospace, monospace; text-shadow: 0 1px 3px rgba(0, 0, 0, .72); }
+.forecast-mushroom-day-label svg { width: var(--forecast-mushroom-icon-size, 18px); height: var(--forecast-mushroom-icon-size, 18px); fill: currentColor; stroke: rgba(30, 20, 12, .65); stroke-width: 1.3; }
 .forecast-day-dividers { position: absolute; z-index: 3; inset: 0 34px 0 52px; pointer-events: none; }
 .forecast-day-dividers i { position: absolute; top: 0; bottom: 0; border-left: 2px solid var(--chart-day-separator); }
 
@@ -368,7 +385,7 @@ html[data-share-prompt="collapsed"] .share-forecast { display: none; }
 
 [hidden] { display: none !important; }
 
-body.embedded { background: transparent; }
+body.embedded { overflow-y: hidden; background: transparent; }
 body.embedded .shell { width: 100%; margin: 0; }
 body.embedded .topbar, body.embedded .share-forecast, body.embedded .current-grid, body.embedded .daily-panel, body.embedded .web-promotion { display: none; }
 body.embedded .forecast-panel { margin: 0; border-radius: 0; }
@@ -377,6 +394,7 @@ body.embedded .forecast-heading-tools .muted { display: none; }
 body.embedded .forecast-panel .section-heading { justify-content: space-between; }
 body.embedded .forecast-panel .section-heading > div:first-child { display: block; }
 body.embedded-without-legend .forecast-guide { display: none; }
+body.embedded .data-attribution { margin-top: 0; padding: 6px 0; line-height: 1; }
 
 @media (max-width: 760px) {
   .topbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
@@ -437,6 +455,11 @@ body.embedded-without-legend .forecast-guide { display: none; }
   .forecast-weather-canvas { height: var(--forecast-sky-compact-height, 68px); }
   .forecast-sky-symbols { height: 55px; }
   .forecast-temperature-symbol svg { height: 105px; }
+  body.embedded .forecast-weather-canvas { height: 78px; }
+  body.embedded #forecastChart { height: 120px; }
+  body.embedded .forecast-wind-visual { height: 40px; }
+  body.embedded .forecast-timeline-scroll { padding-bottom: 6px; }
+  body.embedded .forecast-sky-symbols { height: 68px; }
 }
 
 @media (max-width: 540px) {
