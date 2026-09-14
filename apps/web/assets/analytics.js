@@ -4,6 +4,7 @@ import {t} from './i18n.js';
 
 const CONSENT_KEY = 'weather.analytics-consent.v1';
 const ANALYTICS_HOSTS = new Set(['pogoda.vespy.eu', 'weather.vespy.eu']);
+const IS_EMBEDDED = new URLSearchParams(location.search).get('embed') === '1';
 const pendingEvents = [];
 let analyticsEnabled = false;
 let googleTagLoaded = false;
@@ -108,6 +109,7 @@ function addPrivacyChoicesButton() {
 }
 
 export function trackEvent(name, parameters = {}) {
+  if (IS_EMBEDDED) return;
   if (consentValue() === 'denied') return;
   if (!analyticsEnabled || !measurementId || !googleTagLoaded || !window.gtag) {
     pendingEvents.push([name, parameters]);
@@ -117,6 +119,7 @@ export function trackEvent(name, parameters = {}) {
 }
 
 export async function initializeAnalytics(apiRoot) {
+  if (IS_EMBEDDED) return;
   if (!ANALYTICS_HOSTS.has(location.hostname)) return;
   try {
     const response = await fetch(new URL('client-config', apiRoot));
