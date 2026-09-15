@@ -268,7 +268,9 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
   const sunlightGlowDepth = configuredNumber(options.sunlightGlowDepth, 44);
   const moonY = configuredNumber(options.moonY, 64);
   const precipitationY = configuredNumber(options.precipitationY, 84);
-  const precipitationLaneTop = Number(options.precipitationLaneTop);
+  const precipitationLaneTop = Number.isFinite(options.precipitationLaneTop)
+    ? options.precipitationLaneTop
+    : null;
   const fogRows = Array.isArray(options.fogRows) ? options.fogRows : [74, 80, 86];
 
   context.clearRect(0, 0, width, height);
