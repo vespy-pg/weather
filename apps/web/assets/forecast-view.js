@@ -22,6 +22,20 @@ export function hoursPerGroup(zoom) {
   return HOUR_GROUPS.get(Number(zoom)) || 1;
 }
 
+export function forecastSkyLayout(skyHeight, weatherLineY) {
+  const compact = skyHeight < 90;
+  const precipitationLaneCandidate = skyHeight - 22;
+  const precipitationLaneTop = compact && precipitationLaneCandidate - weatherLineY >= 8
+    ? precipitationLaneCandidate
+    : null;
+  const weatherAreaBottom = precipitationLaneTop ?? skyHeight;
+  return {
+    precipitationLaneTop,
+    maximumWeatherDepth: compact ? Math.max(7, weatherAreaBottom - weatherLineY - 1) : 25,
+    sunlightGlowDepth: Math.min(44, Math.max(8, weatherAreaBottom - weatherLineY))
+  };
+}
+
 function average(points, property) {
   const values = points.map(point => numericValue(point[property])).filter(value => value !== null);
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;

@@ -1,9 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {groupHourlyForecast, hoursPerGroup, temperatureRange} from './forecast-view.js';
+import {forecastSkyLayout, groupHourlyForecast, hoursPerGroup, temperatureRange} from './forecast-view.js';
 
 test('selects progressively finer time groups as the timeline is enlarged', () => {
   assert.deepEqual([.25, .3, .5, .75, 1, 2].map(hoursPerGroup), [12, 6, 4, 3, 2, 1]);
+});
+
+test('keeps sunlight and clouds visible when a compact sky cannot fit a precipitation lane', () => {
+  assert.deepEqual(forecastSkyLayout(68, 45), {
+    precipitationLaneTop: null,
+    maximumWeatherDepth: 22,
+    sunlightGlowDepth: 23
+  });
+  assert.deepEqual(forecastSkyLayout(78, 45), {
+    precipitationLaneTop: 56,
+    maximumWeatherDepth: 10,
+    sunlightGlowDepth: 11
+  });
 });
 
 test('groups forecast values without hiding severe weather', () => {

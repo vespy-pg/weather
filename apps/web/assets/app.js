@@ -2,7 +2,7 @@ import {drawForecastSky, drawWeatherChart, drawWindFlow, setTemperatureColorThre
 import {initializeAnalytics, trackEvent} from './analytics.js';
 import {createWeatherDemo} from './weather-demo.js';
 import {escapeHtml, formatForecastDate, formatTime, measurement, numericValue, shortTemperature, temperature} from './components.js';
-import {groupHourlyForecast, hoursPerGroup, temperatureRange} from './forecast-view.js';
+import {forecastSkyLayout, groupHourlyForecast, hoursPerGroup, temperatureRange} from './forecast-view.js';
 import {applyWidgetQuery, widgetBoolean, widgetDays, widgetQuery} from './embed-options.js';
 import {normalizeLanguage, preferredSupportedLanguage, setLanguage, supportedLanguages, t} from './i18n.js';
 import {
@@ -818,10 +818,13 @@ function drawForecast() {
   windVisual.hidden = !settings.showWind;
   const skyCanvas = document.getElementById('forecastWeatherCanvas');
   const skyHeight = skyCanvas.getBoundingClientRect().height;
-  const compactSky = skyHeight < 90;
   const enlargedLabelOffset = Math.max(0, visualScale - 1);
+  const compactSky = skyHeight < 90;
   const weatherLineY = (compactSky ? 45 : 49) + enlargedLabelOffset * 24;
-  const precipitationLaneTop = compactSky ? skyHeight - 22 : null;
+  const skyLayout = forecastSkyLayout(skyHeight, weatherLineY);
+  const fogRows = skyLayout.precipitationLaneTop === null
+    ? [skyHeight - 26, skyHeight - 20, skyHeight - 14]
+    : [skyLayout.precipitationLaneTop - 12, skyLayout.precipitationLaneTop - 7, skyLayout.precipitationLaneTop - 2];
   drawForecastSky(skyCanvas, skyHourly, weather.daily, {
     showHourlyTemperatures: settings.showHourlyTemperatures,
     visualScale,
@@ -830,14 +833,12 @@ function drawForecast() {
     hourY: 24 + enlargedLabelOffset * 16,
     temperatureY: 40 + enlargedLabelOffset * 26,
     weatherLineY,
-    maximumWeatherDepth: compactSky ? Math.max(7, precipitationLaneTop - weatherLineY - 1) : 25,
-    sunlightGlowDepth: Math.min(44, Math.max(8, (precipitationLaneTop ?? skyHeight) - weatherLineY)),
+    maximumWeatherDepth: skyLayout.maximumWeatherDepth,
+    sunlightGlowDepth: skyLayout.sunlightGlowDepth,
     moonY: compactSky ? 50 : Math.min(skyHeight - 18, 64 + enlargedLabelOffset * 18),
-    precipitationLaneTop,
+    precipitationLaneTop: skyLayout.precipitationLaneTop,
     precipitationY: compactSky ? skyHeight - 11 : Math.min(skyHeight - 10, 84 + enlargedLabelOffset * 20),
-    fogRows: compactSky
-      ? [precipitationLaneTop - 12, precipitationLaneTop - 7, precipitationLaneTop - 2]
-      : [skyHeight - 26, skyHeight - 20, skyHeight - 14]
+    fogRows
   });
   drawWeatherChart(document.getElementById('forecastChart'), displayedHourly, weather.daily, {timeline: true, showApparentTemperature: settings.showApparentTemperature, visualScale, temperatureRange: range});
   if (settings.showWind) drawWindFlow(document.getElementById('forecastWindCanvas'), displayedHourly, {visualScale});
