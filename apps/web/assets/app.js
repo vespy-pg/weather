@@ -8,13 +8,15 @@ import {normalizeLanguage, preferredSupportedLanguage, setLanguage, supportedLan
 import {
   activeLocationCookie,
   activeLocationFromCookies,
+  isLegacyPlaceholderLocation,
   normalizeStoredLocation,
   preferredActiveLocation,
   replacingLocation,
   sameLocation,
+  uniqueLocations,
   withLocation
 } from './location-state.js';
-import {applicationRouteUrl, forecastRouteUrl, parseCoordinatePair, parseForecastRoute} from './route-state.js';
+import {applicationRouteUrl, forecastRouteUrl, parseCoordinatePair, parseForecastRoute, shouldUseRouteLocation} from './route-state.js';
 import {
   celsiusToDisplay,
   DEFAULT_THRESHOLDS,
@@ -289,20 +291,24 @@ function loadSettings() {
       stored.zoom = DEFAULT_ZOOM;
       stored.layoutVersion = LAYOUT_VERSION;
     }
-    const legacyPlaceholder = stored.location?.name === 'Kamienica Polska'
-      || (stored.location?.name === 'Aurora Vale' && stored.location?.country === 'Northland');
+    const legacyPlaceholder = isLegacyPlaceholderLocation(stored.location, saved.configured);
     if (legacyPlaceholder) {
       stored.location = {...DEFAULT_LOCATION};
       stored.locations = [{...DEFAULT_LOCATION}];
       stored.configured = false;
     }
-    const savedLocations = (Array.isArray(saved.locations) ? saved.locations : [])
+    const savedLocations = uniqueLocations((Array.isArray(saved.locations) ? saved.locations : [])
       .map(normalizeStoredLocation)
-      .filter(Boolean);
+      .filter(Boolean));
     const activeLocation = preferredActiveLocation({
       cookieLocation: legacyPlaceholder ? null : activeLocationFromCookies(document.cookie),
       savedLocation: saved.location,
       savedConfigured: !legacyPlaceholder && saved.configured
+    });
+    const useRouteLocation = shouldUseRouteLocation({
+      hasActiveLocation: Boolean(activeLocation),
+      embedded: IS_EMBEDDED,
+      shared: QUERY.get('share') === '1'
     });
     stored.location = activeLocation || {...DEFAULT_LOCATION};
     stored.locations = savedLocations.length ? savedLocations : [{...DEFAULT_LOCATION}];
@@ -310,7 +316,7 @@ function loadSettings() {
     stored.configured = Boolean(activeLocation);
     const latitude = Number(QUERY.get('lat'));
     const longitude = Number(QUERY.get('lon'));
-    if (FORECAST_ROUTE?.locationName && ROUTE_COORDINATES) {
+    if (FORECAST_ROUTE?.locationName && ROUTE_COORDINATES && useRouteLocation) {
       stored.location = {
         id: `route-${ROUTE_COORDINATES.latitude.toFixed(5)}-${ROUTE_COORDINATES.longitude.toFixed(5)}`,
         name: FORECAST_ROUTE.locationName,
@@ -422,7 +428,7 @@ function forecastShareUrl(locationOverride = settings.location) {
   return forecastRouteUrl(PUBLIC_WEB_ROOT, {
     language: settings.language,
     location: locationOverride,
-    query: {demo: IS_DEMO ? 1 : null}
+    query: {share: 1, demo: IS_DEMO ? 1 : null}
   }).toString();
 }
 
@@ -1300,6 +1306,7 @@ function renderLocationMenu() {
 function closeLocationMenu() {
   document.getElementById('locationMenu').hidden = true;
   document.getElementById('editLocation').setAttribute('aria-expanded', 'false');
+  document.getElementById('locationTitle').setAttribute('aria-expanded', 'false');
 }
 
 function openSettingsDialog() {
@@ -1356,14 +1363,17 @@ async function searchLocations() {
 
 document.getElementById('openSettings').addEventListener('click', openSettingsDialog);
 document.getElementById('settingsButton').addEventListener('click', openSettingsDialog);
-document.getElementById('editLocation').addEventListener('click', () => {
+function toggleLocationMenu() {
   if (settings.locations.length === 1) return openSettingsDialog();
   const menu = document.getElementById('locationMenu');
   const opening = menu.hidden;
   menu.hidden = !opening;
   document.getElementById('editLocation').setAttribute('aria-expanded', String(opening));
+  document.getElementById('locationTitle').setAttribute('aria-expanded', String(opening));
   if (opening) renderLocationMenu();
-});
+}
+document.getElementById('editLocation').addEventListener('click', toggleLocationMenu);
+document.getElementById('locationTitle').addEventListener('click', toggleLocationMenu);
 document.addEventListener('click', event => {
   if (!event.target.closest('.location-title-row')) closeLocationMenu();
 });
@@ -1692,6 +1702,11 @@ async function resolveDeviceLocation(fallback, {signal, strict = false} = {}) {
 
 async function resolveForecastRouteLocation() {
   if (!FORECAST_ROUTE?.locationName || ROUTE_COORDINATES) return;
+  if (!shouldUseRouteLocation({
+    hasActiveLocation: settings.configured,
+    embedded: IS_EMBEDDED,
+    shared: QUERY.get('share') === '1'
+  })) return;
   try {
     const parameters = new URLSearchParams({q: FORECAST_ROUTE.locationName, language: settings.language});
     const response = await fetch(new URL(`locations?${parameters}`, API_ROOT));

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import {applicationRouteUrl, forecastRouteUrl, locationSlug, parseCoordinatePair, parseForecastRoute} from './route-state.js';
+import {applicationRouteUrl, forecastRouteUrl, locationSlug, parseCoordinatePair, parseForecastRoute, shouldUseRouteLocation} from './route-state.js';
 
 test('parses localized forecast paths and coordinate pairs', () => {
   assert.deepEqual(parseForecastRoute('/pl-PL', ['en-US', 'pl-PL']), {language: 'pl-PL', locationName: null});
@@ -25,4 +25,11 @@ test('creates readable forecast URLs with exact coordinates', () => {
     query: {share: 1}
   });
   assert.equal(url.href, 'https://weather.vespy.eu/pl-PL/London?ll=51.50740%2C-0.12780&share=1');
+});
+
+test('restores an active location unless the route was explicitly shared or embedded', () => {
+  assert.equal(shouldUseRouteLocation({hasActiveLocation: true}), false);
+  assert.equal(shouldUseRouteLocation({hasActiveLocation: true, shared: true}), true);
+  assert.equal(shouldUseRouteLocation({hasActiveLocation: true, embedded: true}), true);
+  assert.equal(shouldUseRouteLocation({hasActiveLocation: false}), true);
 });

@@ -84,6 +84,8 @@ h2 { margin-bottom: 2px; font-size: 18px; }
 .location-heading { position: relative; min-width: 0; }
 .location-title-row { position: relative; display: flex; min-width: 0; align-items: center; gap: 8px; }
 .location-title-row h1 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.location-title-button { display: block; max-width: 100%; overflow: hidden; padding: 0; border: 0; background: none; color: inherit; cursor: pointer; font: inherit; letter-spacing: inherit; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.location-title-button:focus-visible { border-radius: 4px; outline: 2px solid var(--blue); outline-offset: 3px; }
 .location-edit-button { display: grid; width: 32px; height: 32px; place-items: center; border: 1px solid transparent; border-radius: 50%; background: transparent; color: var(--muted); font-size: 20px; cursor: pointer; }
 .location-edit-button svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .location-edit-button:hover, .location-edit-button[aria-expanded="true"] { border-color: var(--line); background: var(--control); color: var(--text); }

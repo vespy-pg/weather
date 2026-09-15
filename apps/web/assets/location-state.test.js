@@ -5,9 +5,12 @@ import {
   ACTIVE_LOCATION_COOKIE,
   activeLocationCookie,
   activeLocationFromCookies,
+  isLegacyPlaceholderLocation,
   normalizeStoredLocation,
   preferredActiveLocation,
   replacingLocation,
+  sameLocation,
+  uniqueLocations,
   withLocation
 } from './location-state.js';
 
@@ -26,6 +29,13 @@ const warsawLocation = {
 
 test('withLocation adds a new location without changing existing locations', () => {
   assert.deepEqual(withLocation([warsaw], berlin), [warsaw, berlin]);
+});
+
+test('locations with matching coordinates are not duplicated by route identifiers', () => {
+  const routeWarsaw = {...warsawLocation, id: 'route-52.23000-21.01000'};
+  assert.equal(sameLocation(warsawLocation, routeWarsaw), true);
+  assert.deepEqual(withLocation([warsawLocation], routeWarsaw), [routeWarsaw]);
+  assert.deepEqual(uniqueLocations([warsawLocation, routeWarsaw]), [routeWarsaw]);
 });
 
 test('replacingLocation replaces the active location instead of adding one', () => {
@@ -63,4 +73,10 @@ test('cookie location takes precedence over a migrated local storage location', 
   }), krakow);
   assert.deepEqual(preferredActiveLocation({savedLocation: warsawLocation, savedConfigured: true}), warsawLocation);
   assert.equal(preferredActiveLocation({savedLocation: warsawLocation, savedConfigured: false}), null);
+});
+
+test('a deliberately selected former placeholder location remains active', () => {
+  const kamienica = {name: 'Kamienica Polska', country: 'Poland', latitude: 50.6709, longitude: 19.12265};
+  assert.equal(isLegacyPlaceholderLocation(kamienica, false), true);
+  assert.equal(isLegacyPlaceholderLocation(kamienica, true), false);
 });

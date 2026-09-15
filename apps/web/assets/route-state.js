@@ -27,6 +27,10 @@ export function parseForecastRoute(pathname, locales) {
   }
 }
 
+export function shouldUseRouteLocation({hasActiveLocation = false, embedded = false, shared = false} = {}) {
+  return !hasActiveLocation || embedded || shared;
+}
+
 export function applicationRouteUrl(base, language) {
   const url = new URL('/', base);
   url.pathname = `/${encodeURIComponent(language)}`;

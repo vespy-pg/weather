@@ -42,19 +42,41 @@ export function preferredActiveLocation({cookieLocation, savedLocation, savedCon
     || (savedConfigured ? normalizeStoredLocation(savedLocation) : null);
 }
 
+export function isLegacyPlaceholderLocation(item, configured) {
+  return configured !== true && (
+    item?.name === 'Kamienica Polska'
+    || (item?.name === 'Aurora Vale' && item?.country === 'Northland')
+  );
+}
+
 export function locationKey(item) {
   if (item?.id !== undefined && item?.id !== null) return String(item.id);
   return `${Number(item?.latitude).toFixed(4)}:${Number(item?.longitude).toFixed(4)}`;
 }
 
 export function sameLocation(first, second) {
-  return locationKey(first) === locationKey(second);
+  const firstId = first?.id === undefined || first?.id === null ? null : String(first.id);
+  const secondId = second?.id === undefined || second?.id === null ? null : String(second.id);
+  if (firstId !== null && secondId !== null && firstId === secondId) return true;
+  const coordinateKey = item => {
+    const latitude = Number(item?.latitude);
+    const longitude = Number(item?.longitude);
+    return Number.isFinite(latitude) && Number.isFinite(longitude)
+      ? `${latitude.toFixed(4)}:${longitude.toFixed(4)}`
+      : null;
+  };
+  const firstCoordinates = coordinateKey(first);
+  return firstCoordinates !== null && firstCoordinates === coordinateKey(second);
 }
 
 export function withLocation(collection, item) {
   const index = collection.findIndex(location => sameLocation(location, item));
   if (index < 0) return [...collection, item];
   return collection.map((location, locationIndex) => locationIndex === index ? item : location);
+}
+
+export function uniqueLocations(collection) {
+  return collection.reduce((locations, item) => withLocation(locations, item), []);
 }
 
 export function replacingLocation(collection, current, replacement) {
