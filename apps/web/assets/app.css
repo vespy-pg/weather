@@ -151,7 +151,9 @@ html[data-share-prompt="collapsed"] .share-forecast { display: none; }
 .forecast-zoom-controls button:hover { background: var(--control-hover); color: var(--text); }
 .forecast-zoom-controls button:disabled { opacity: .28; cursor: not-allowed; }
 
-.forecast-timeline-scroll { margin-top: 10px; overflow-x: auto; padding-bottom: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--chart-surface); overscroll-behavior-inline: contain; scroll-snap-type: x proximity; scrollbar-color: #3b4a60 var(--chart-surface); touch-action: pan-x pan-y; }
+.forecast-timeline-scroll { margin-top: 10px; overflow-x: auto; padding-bottom: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--chart-surface); overscroll-behavior-inline: contain; scrollbar-color: #3b4a60 var(--chart-surface); touch-action: pan-x pan-y; }
+.forecast-timeline-scroll.now-boundary-locked { overflow-x: hidden; }
+.forecast-timeline-scroll:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .forecast-chart-y-axes { position: sticky; z-index: 4; left: 0; width: 100%; height: 0; color: var(--muted); font: 700 8px/1 ui-monospace, monospace; pointer-events: none; }
 .forecast-chart-y-axis span { position: absolute; top: var(--axis-position); padding: 2px 3px; background: var(--chart-axis-background); white-space: nowrap; transform: translateY(-50%); }
 .forecast-chart-y-axis-temperature span { right: 0; }
@@ -162,7 +164,7 @@ html[data-share-prompt="collapsed"] .share-forecast { display: none; }
 .forecast-timeline { position: relative; --forecast-slot-width: 18px; width: max(100%, calc(var(--forecast-slots, 40) * var(--forecast-slot-width) + 116px)); }
 .forecast-track { display: grid; grid-template-columns: 52px minmax(0, 1fr); }
 .forecast-track + .forecast-track { border-top: 1px solid var(--chart-grid); }
-.forecast-track-title { display: grid; min-width: 0; place-items: center; border-right: 1px solid var(--chart-day-separator); background: var(--chart-wind); color: var(--chart-text); }
+.forecast-track-title { position: relative; z-index: 6; display: grid; min-width: 0; place-items: center; border-right: 0; background: var(--chart-wind); box-shadow: -2px 0 var(--chart-wind), 0 -1px var(--chart-wind), 0 1px var(--chart-wind); color: var(--chart-text); transform: translateX(var(--forecast-legend-offset, 0px)); }
 .forecast-track-title svg { display: block; overflow: visible; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
 .visually-hidden { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; white-space: nowrap !important; }
 .forecast-sky-symbols { width: 28px; height: 78px; stroke-width: 1.7; }
@@ -199,9 +201,16 @@ html[data-share-prompt="collapsed"] .share-forecast { display: none; }
 .forecast-mushroom-day-label svg { width: var(--forecast-mushroom-icon-size, 18px); height: var(--forecast-mushroom-icon-size, 18px); fill: currentColor; stroke: rgba(30, 20, 12, .65); stroke-width: 1.3; }
 .forecast-day-dividers { position: absolute; z-index: 3; inset: 0 34px 0 52px; pointer-events: none; }
 .forecast-day-dividers i { position: absolute; top: 0; bottom: 0; border-left: 2px solid var(--chart-day-separator); }
+.forecast-history-shade { position: absolute; z-index: 2; top: 0; bottom: 0; left: 52px; background: repeating-linear-gradient(135deg, transparent 0 12px, color-mix(in srgb, var(--orange) 2%, transparent) 12px 14px), color-mix(in srgb, var(--orange) 4%, transparent); box-shadow: inset 0 2px 0 color-mix(in srgb, var(--orange) 45%, transparent); pointer-events: none; }
+.forecast-now-marker { position: absolute; z-index: 5; top: 0; bottom: 0; width: 0; border-left: 2px solid var(--orange); filter: drop-shadow(0 0 3px color-mix(in srgb, var(--orange) 60%, transparent)); pointer-events: none; }
+.forecast-now-marker span { position: absolute; top: 4px; right: 5px; padding: 3px 5px; border-radius: 4px; background: var(--orange); color: #10151d; font: 900 8px/1 ui-monospace, monospace; letter-spacing: .08em; white-space: nowrap; }
 
-.forecast-guide h2 { margin-bottom: 16px; font-size: 22px; }
-.legend-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.forecast-guide-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; }
+.forecast-guide h2 { font-size: 22px; }
+.forecast-guide-toggle { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 8px; }
+.forecast-guide-toggle-icon { font-size: 18px; line-height: .7; transition: transform .18s ease; }
+.forecast-guide-toggle[aria-expanded="true"] .forecast-guide-toggle-icon { transform: rotate(180deg); }
+.legend-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
 .legend-card { min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
 .legend-card strong { display: flex; align-items: center; gap: 10px; font-size: 15px; }
 .legend-preview { display: block; width: 100%; margin-top: 14px; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: var(--chart-surface); }

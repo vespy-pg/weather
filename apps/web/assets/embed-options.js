@@ -9,7 +9,9 @@ const DISPLAY_PARAMETERS = Object.freeze({
   precipitation: 'showPrecipitation',
   wind: 'showWind',
   windArrows: 'showWindArrows',
-  mushrooms: 'showMushrooms'
+  mushrooms: 'showMushrooms',
+  historicalData: 'showHistoricalData',
+  dates: 'showDates'
 });
 
 const THRESHOLD_PARAMETERS = Object.freeze(['deepFrost', 'mild', 'warm', 'hot']);

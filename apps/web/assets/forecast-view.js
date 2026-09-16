@@ -104,6 +104,51 @@ export function groupHourlyForecast(hourly, size) {
   });
 }
 
+export function timelineHourlyWindow(hourly, currentTimestamp, futureDays, historyDays = 3) {
+  const currentHour = String(currentTimestamp || '').slice(0, 13);
+  const currentIndex = hourly.findIndex(point => String(point.timestamp || '').slice(0, 13) === currentHour);
+  if (currentIndex < 0) return hourly.slice(0, Math.max(0, futureDays) * 24);
+  const start = Math.max(0, currentIndex - Math.max(0, historyDays) * 24);
+  const end = currentIndex + Math.max(0, futureDays) * 24;
+  return hourly.slice(start, end);
+}
+
+export function timelineCurrentIndex(hourly, currentTimestamp) {
+  const currentHour = String(currentTimestamp || '').slice(0, 13);
+  let currentIndex = -1;
+  hourly.forEach((point, index) => {
+    if (String(point.timestamp || '').slice(0, 13) <= currentHour) currentIndex = index;
+  });
+  return currentIndex;
+}
+
+export function resistedHistoryPosition(startPosition, attemptedPosition, nowScrollLeft, resistance) {
+  const start = Math.max(0, Number(startPosition) || 0);
+  const attempted = Math.max(0, Number(attemptedPosition) || 0);
+  const now = Math.max(0, Number(nowScrollLeft) || 0);
+  const threshold = Math.max(0, Number(resistance) || 0);
+  if (start < now || attempted >= now) return attempted;
+  const overflow = now - attempted;
+  return overflow <= threshold ? now : Math.max(0, now - overflow + threshold);
+}
+
+export function stopTimelineAtNow(startPosition, attemptedPosition, nowScrollLeft, tolerance = 1) {
+  const start = Math.max(0, Number(startPosition) || 0);
+  const attempted = Math.max(0, Number(attemptedPosition) || 0);
+  const now = Math.max(0, Number(nowScrollLeft) || 0);
+  const margin = Math.max(0, Number(tolerance) || 0);
+  if (start > now + margin && attempted < now) return now;
+  if (start < now - margin && attempted > now) return now;
+  return attempted;
+}
+
+export function withinTimelineMagnet(position, nowScrollLeft, magneticDistance) {
+  const current = Math.max(0, Number(position) || 0);
+  const now = Math.max(0, Number(nowScrollLeft) || 0);
+  const distance = Math.max(0, Number(magneticDistance) || 0);
+  return Math.abs(current - now) <= distance;
+}
+
 export function temperatureRange(points, includeApparent = true) {
   const properties = includeApparent ? ['temperature', 'apparentTemperature'] : ['temperature'];
   const values = points.flatMap(point => properties.map(property => numericValue(point[property]))).filter(value => value !== null);

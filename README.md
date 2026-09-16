@@ -78,6 +78,8 @@ Supported URL parameters:
 | `precipitation` | Show or hide precipitation symbols | `precipitation=1` |
 | `wind` | Show or hide the wind timeline | `wind=1` |
 | `windArrows` | Show or hide hourly wind direction and speed | `windArrows=0` |
+| `historicalData` | Include or omit the previous three days | `historicalData=1` |
+| `dates` | Show or hide dates beside timeline day names | `dates=0` |
 | `deepFrost`, `mild`, `warm`, `hot` | Set temperature color thresholds in degrees Celsius | `deepFrost=-12&mild=18&warm=27&hot=32` |
 | `legend` | Include or omit the detailed forecast legend | `legend=0` |
 | `ll` | Select an exact latitude and longitude for the location path | `ll=50.67,19.12` |

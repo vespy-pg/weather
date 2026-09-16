@@ -2,6 +2,7 @@
 
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
+const HISTORY_DAYS = 3;
 
 const TEMPERATURE_RANGES = [
   {minimum: 14, maximum: 25},
@@ -181,18 +182,19 @@ function apparentTemperatureFor({temperature, humidity, windSpeed, cloudCover, p
 export function createWeatherDemo(now = new Date()) {
   const start = new Date(now);
   start.setMinutes(0, 0, 0);
+  const historyStart = new Date(start.getTime() - HISTORY_DAYS * DAY);
   const firstDay = new Date(start);
   firstDay.setHours(0, 0, 0, 0);
 
-  const hourly = Array.from({length: 240}, (_, index) => {
-    const date = new Date(start.getTime() + index * HOUR);
+  const hourly = Array.from({length: (HISTORY_DAYS + 10) * 24}, (_, index) => {
+    const date = new Date(historyStart.getTime() + index * HOUR);
     const dayIndex = Math.floor((date - firstDay) / DAY);
     const temperatureRange = TEMPERATURE_RANGES[dayIndex];
     const naturalTemperature = 8 + Math.sin((date.getHours() - 7) / 24 * Math.PI * 2) * 8;
     const temperature = temperatureRange ? temperatureForRange(date, start, dayIndex, temperatureRange) : naturalTemperature;
     const scenario = weatherForHour(dayIndex, date.getHours());
     const humidity = Math.min(100, 45 + scenario.cloudCover * .48);
-    const wind = windForHour(index, scenario.tornado === true);
+    const wind = windForHour(index - HISTORY_DAYS * 24, scenario.tornado === true);
     const windSpeed = wind.speed;
     const apparentTemperature = apparentTemperatureFor({
       temperature,
@@ -223,13 +225,14 @@ export function createWeatherDemo(now = new Date()) {
     };
   });
 
-  const daily = Array.from({length: 15}, (_, index) => {
-    const date = new Date(firstDay.getTime() + index * 24 * HOUR);
+  const daily = Array.from({length: 18}, (_, index) => {
+    const dayIndex = index - HISTORY_DAYS;
+    const date = new Date(firstDay.getTime() + dayIndex * 24 * HOUR);
     const sunrise = new Date(date); sunrise.setHours(6, 30, 0, 0);
     const sunset = new Date(date); sunset.setHours(18, 45, 0, 0);
-    const scenario = FUTURE_SCENARIOS[index % FUTURE_SCENARIOS.length];
-    const temperatureRange = TEMPERATURE_RANGES[index];
-    const mushroomScore = [38, 52, 68, 81, 87, 74, 59, 44, 31, 63, 78, 84, 69, 48, 35][index];
+    const scenario = dayIndex < 0 ? {code: 2, cloudCover: 45} : FUTURE_SCENARIOS[dayIndex % FUTURE_SCENARIOS.length];
+    const temperatureRange = dayIndex < 0 ? {minimum: 5, maximum: 17} : TEMPERATURE_RANGES[dayIndex];
+    const mushroomScore = dayIndex < 0 ? 45 : [38, 52, 68, 81, 87, 74, 59, 44, 31, 63, 78, 84, 69, 48, 35][dayIndex];
     const mushroomLevel = mushroomScore >= 75 ? 'excellent' : mushroomScore >= 50 ? 'good' : mushroomScore >= 25 ? 'fair' : 'poor';
     return {
       date: localDate(date),
@@ -242,9 +245,9 @@ export function createWeatherDemo(now = new Date()) {
       sunshineDuration: Math.max(0, (sunset - sunrise) / 1000 * (1 - scenario.cloudCover / 100)),
       precipitation: (scenario.precipitation ?? 0) * 5,
       precipitationProbability: scenario.probability ?? 0,
-      windSpeedMaximum: 8 + index * 2,
-      windGustsMaximum: 18 + index * 2,
-      windDirection: index * 31 % 360,
+      windSpeedMaximum: 8 + Math.max(0, dayIndex) * 2,
+      windGustsMaximum: 18 + Math.max(0, dayIndex) * 2,
+      windDirection: (dayIndex + HISTORY_DAYS) * 31 % 360,
       uvIndexMaximum: scenario.cloudCover < 50 ? 5 : 1,
       mushroom: {
         score: mushroomScore,
@@ -260,16 +263,16 @@ export function createWeatherDemo(now = new Date()) {
     available: true,
     demo: true,
     current: {
-      timestamp: hourly[0].timestamp,
-      temperature: hourly[0].temperature,
-      apparentTemperature: hourly[0].apparentTemperature,
-      relativeHumidity: hourly[0].relativeHumidity,
-      surfacePressure: hourly[0].surfacePressure,
-      cloudCover: hourly[0].cloudCover,
-      weatherCode: hourly[0].weatherCode,
-      windSpeed: hourly[0].windSpeed,
-      windDirection: hourly[0].windDirection,
-      windGusts: hourly[0].windGusts
+      timestamp: hourly[HISTORY_DAYS * 24].timestamp,
+      temperature: hourly[HISTORY_DAYS * 24].temperature,
+      apparentTemperature: hourly[HISTORY_DAYS * 24].apparentTemperature,
+      relativeHumidity: hourly[HISTORY_DAYS * 24].relativeHumidity,
+      surfacePressure: hourly[HISTORY_DAYS * 24].surfacePressure,
+      cloudCover: hourly[HISTORY_DAYS * 24].cloudCover,
+      weatherCode: hourly[HISTORY_DAYS * 24].weatherCode,
+      windSpeed: hourly[HISTORY_DAYS * 24].windSpeed,
+      windDirection: hourly[HISTORY_DAYS * 24].windDirection,
+      windGusts: hourly[HISTORY_DAYS * 24].windGusts
     },
     hourly,
     daily,

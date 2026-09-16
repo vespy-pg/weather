@@ -49,6 +49,8 @@ test('forecastUrl requests the fields shared by web and Android clients', () => 
   const mushroomUrl = new URL(forecastUrl({latitude: 50.67, longitude: 19.12, timezone: 'Europe/Warsaw', includeMushrooms: true}));
   assert.equal(mushroomUrl.searchParams.get('past_days'), '7');
   assert.match(mushroomUrl.searchParams.get('hourly'), /soil_moisture_0_to_1cm/);
+  const historyUrl = new URL(forecastUrl({latitude: 50.67, longitude: 19.12, timezone: 'Europe/Warsaw', pastDays: 3}));
+  assert.equal(historyUrl.searchParams.get('past_days'), '3');
 });
 
 test('scores mushroom conditions from recent rain, moisture, humidity, and temperature', () => {
@@ -134,6 +136,22 @@ test('normalizeForecast starts the hourly timeline at the current hour', () => {
   const result = normalizeForecast(source, {name: 'Test'});
   assert.deepEqual(result.hourly.map(point => point.timestamp), ['2026-09-11T12:00', '2026-09-11T13:00']);
   assert.deepEqual(result.hourly.map(point => point.temperature), [19, 20]);
+});
+
+test('normalizeForecast includes requested history and preserves the future horizon', () => {
+  const start = Date.UTC(2026, 8, 8);
+  const time = Array.from({length: 14 * 24}, (_, index) => new Date(start + index * 60 * 60 * 1000).toISOString().slice(0, 16));
+  const dailyTime = Array.from({length: 14}, (_, index) => new Date(start + index * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
+  const source = {
+    current: {time: '2026-09-11T00:15'},
+    hourly: {time, temperature_2m: time.map((_, index) => index)},
+    daily: {time: dailyTime}
+  };
+  const result = normalizeForecast(source, {name: 'Test'}, {pastDays: 3});
+  assert.equal(result.hourly[0].timestamp, '2026-09-08T00:00');
+  assert.equal(result.hourly[72].timestamp, '2026-09-11T00:00');
+  assert.equal(result.hourly.at(-1).timestamp, '2026-09-20T23:00');
+  assert.deepEqual(result.daily.map(day => day.date), source.daily.time);
 });
 
 test('selectCapitalResult prefers the matching national capital', () => {

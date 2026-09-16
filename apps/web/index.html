@@ -106,7 +106,8 @@
           </div>
         </div>
       </div>
-      <div class="forecast-timeline-scroll" id="forecastTimelineScroll">
+      <div class="forecast-timeline-scroll" id="forecastTimelineScroll" tabindex="0" aria-describedby="forecastHistoryHint">
+        <span class="visually-hidden" id="forecastHistoryHint" data-i18n="forecast.historyHint">Pull past now to reveal the previous three days.</span>
         <div class="forecast-chart-y-axes" aria-hidden="true">
           <div class="forecast-chart-y-axis forecast-chart-y-axis-temperature">
             <span style="--axis-position:162px">+20°</span>
@@ -170,6 +171,8 @@
             </div>
           </div>
           <div class="forecast-day-dividers" id="forecastDayDividers" aria-hidden="true"></div>
+          <div class="forecast-history-shade" id="forecastHistoryShade" aria-hidden="true" hidden></div>
+          <div class="forecast-now-marker" id="forecastNowMarker" aria-hidden="true" hidden><span data-i18n="forecast.history">HISTORY</span></div>
         </div>
       </div>
     </section>
@@ -177,9 +180,17 @@
     <aside class="web-promotion" id="webPromotion" aria-label="Promotion" hidden></aside>
 
     <section class="panel forecast-guide" aria-labelledby="forecastGuideTitle">
-      <p class="eyebrow" data-i18n="legend.eyebrow">FORECAST LEGEND</p>
-      <h2 id="forecastGuideTitle" data-i18n="legend.title">How to read this forecast</h2>
-      <div class="legend-grid">
+      <div class="forecast-guide-heading">
+        <div>
+          <p class="eyebrow" data-i18n="legend.eyebrow">FORECAST LEGEND</p>
+          <h2 id="forecastGuideTitle" data-i18n="legend.title">How to read this forecast</h2>
+        </div>
+        <button class="secondary-button forecast-guide-toggle" type="button" id="forecastGuideToggle" aria-expanded="false" aria-controls="forecastGuideContent">
+          <span id="forecastGuideToggleLabel" data-i18n="legend.show">Show legend</span>
+          <span class="forecast-guide-toggle-icon" aria-hidden="true">⌄</span>
+        </button>
+      </div>
+      <div class="legend-grid" id="forecastGuideContent" hidden>
         <article class="legend-card legend-sky-card">
           <strong data-i18n="legend.skyTitle">Sun, clouds and precipitation</strong>
           <canvas class="legend-preview legend-sky-preview" id="legendSkyCanvas" height="100" aria-hidden="true"></canvas>
@@ -377,6 +388,8 @@
         <label class="setting-row"><span data-i18n="settings.zoom">Default timeline zoom</span>
           <select id="defaultZoom"><option value="0.25">25% (2/day)</option><option value="0.3">30% (4/day)</option><option value="0.5">50% (6/day)</option><option value="0.75">75% (8/day)</option><option value="1">100% (12/day)</option><option value="2">200% (24/day)</option></select>
         </label>
+        <label class="setting-row"><span data-i18n="settings.historicalData">Show historical data</span><input id="showHistoricalData" type="checkbox"></label>
+        <label class="setting-row"><span data-i18n="settings.dates">Show dates beside day names</span><input id="showDates" type="checkbox"></label>
         <label class="setting-row"><span data-i18n="settings.hourlyTemperature">Hourly temperature values</span><input id="showHourlyTemperatures" type="checkbox"></label>
         <label class="setting-row"><span data-i18n="settings.apparent">Apparent temperature area</span><input id="showApparentTemperature" type="checkbox"></label>
         <label class="setting-row"><span data-i18n="settings.precipitation">Precipitation symbols</span><input id="showPrecipitation" type="checkbox"></label>

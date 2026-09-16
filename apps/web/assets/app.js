@@ -2,7 +2,7 @@ import {drawForecastSky, drawWeatherChart, drawWindFlow, setTemperatureColorThre
 import {initializeAnalytics, trackEvent} from './analytics.js';
 import {createWeatherDemo} from './weather-demo.js';
 import {escapeHtml, formatForecastDate, formatTime, measurement, numericValue, shortTemperature, temperature} from './components.js';
-import {forecastSkyLayout, groupHourlyForecast, hoursPerGroup, temperatureRange} from './forecast-view.js';
+import {forecastSkyLayout, groupHourlyForecast, hoursPerGroup, resistedHistoryPosition, stopTimelineAtNow, temperatureRange, timelineCurrentIndex, timelineHourlyWindow, withinTimelineMagnet} from './forecast-view.js';
 import {applyWidgetQuery, widgetBoolean, widgetDays, widgetQuery} from './embed-options.js';
 import {normalizeLanguage, preferredSupportedLanguage, setLanguage, supportedLanguages, t} from './i18n.js';
 import {
@@ -33,6 +33,7 @@ const LOCATION_REQUEST_TIMEOUT_MS = 10000;
 const WEATHER_RETRY_DELAY_MS = 3000;
 const WEATHER_REFRESH_INTERVAL_MS = 15 * 60 * 1000;
 const WEATHER_STALE_AFTER_MS = 60 * 60 * 1000;
+const WEATHER_HISTORY_DAYS = 3;
 const DEFAULT_ZOOM = .5;
 const LAYOUT_VERSION = 3;
 const ZOOM_LEVELS = [.25, .3, .5, .75, 1, 2];
@@ -66,6 +67,8 @@ const DEFAULT_SETTINGS = {
   showWind: true,
   showWindArrows: false,
   showMushrooms: false,
+  showHistoricalData: true,
+  showDates: false,
   embedDays: 10,
   embedLegend: false
 };
@@ -156,6 +159,8 @@ let weatherAbortController = null;
 let weatherLoadedAt = 0;
 let zoomIndex = Math.max(0, ZOOM_LEVELS.indexOf(Number(settings.zoom)));
 let forecastDrawFrame = 0;
+let timelineInitialPositionPending = true;
+let timelineNowScrollLeft = 0;
 let locationSearchTimer = 0;
 let locationSearchRequest = 0;
 let promotionRequest = 0;
@@ -750,6 +755,50 @@ function renderDayDividers(hourly) {
   }).join('');
 }
 
+function updateTimelineNowPosition(hourly) {
+  const scroll = document.getElementById('forecastTimelineScroll');
+  const timeline = document.getElementById('forecastTimeline');
+  const marker = document.getElementById('forecastNowMarker');
+  const history = document.getElementById('forecastHistoryShade');
+  scroll.classList.remove('now-boundary-locked');
+  if (!settings.showHistoricalData) {
+    marker.hidden = true;
+    history.hidden = true;
+    timelineNowScrollLeft = 0;
+    scroll.scrollLeft = 0;
+    timeline.style.setProperty('--forecast-legend-offset', '0px');
+    return;
+  }
+  const currentIndex = timelineCurrentIndex(hourly, weather?.current?.timestamp);
+  if (currentIndex < 0 || !hourly.length) {
+    marker.hidden = true;
+    history.hidden = true;
+    return;
+  }
+  const wasAtNow = Math.abs(scroll.scrollLeft - timelineNowScrollLeft) <= 2;
+  const dataWidth = Math.max(0, timeline.clientWidth - 86);
+  const markerLeft = 52 + currentIndex / hourly.length * dataWidth;
+  marker.hidden = false;
+  history.hidden = false;
+  marker.style.left = `${markerLeft}px`;
+  history.style.width = `${Math.max(0, markerLeft - 52)}px`;
+  timelineNowScrollLeft = Math.max(0, markerLeft - 52);
+  if (timelineInitialPositionPending || wasAtNow) {
+    scroll.scrollLeft = timelineNowScrollLeft;
+    timelineInitialPositionPending = false;
+  }
+  updateTimelineLegendPosition();
+}
+
+function updateTimelineLegendPosition() {
+  const scroll = document.getElementById('forecastTimelineScroll');
+  const timeline = document.getElementById('forecastTimeline');
+  const offset = settings.showHistoricalData
+    ? Math.min(scroll.scrollLeft, timelineNowScrollLeft)
+    : 0;
+  timeline.style.setProperty('--forecast-legend-offset', `${Math.max(0, offset)}px`);
+}
+
 function drawLegendPreviews() {
   const deepFrost = temperature(settings.temperatureThresholds.deepFrost);
   const freezing = temperature(0);
@@ -767,6 +816,21 @@ function drawLegendPreviews() {
   drawForecastSky(document.getElementById('legendSkyCanvas'), LEGEND_SKY_POINTS, LEGEND_SKY_DAYS, {showHourlyTemperatures: false});
   drawWindFlow(document.getElementById('legendWindCanvas'), LEGEND_WIND_POINTS, {tornadoVerticalScale: .42});
 }
+
+function setForecastGuideExpanded(expanded) {
+  const toggle = document.getElementById('forecastGuideToggle');
+  const content = document.getElementById('forecastGuideContent');
+  const label = document.getElementById('forecastGuideToggleLabel');
+  toggle.setAttribute('aria-expanded', String(expanded));
+  content.hidden = !expanded;
+  label.dataset.i18n = expanded ? 'legend.hide' : 'legend.show';
+  label.textContent = t(label.dataset.i18n);
+  if (expanded) requestAnimationFrame(drawLegendPreviews);
+}
+
+document.getElementById('forecastGuideToggle').addEventListener('click', event => {
+  setForecastGuideExpanded(event.currentTarget.getAttribute('aria-expanded') !== 'true');
+});
 
 function drawForecastWelcome() {
   const skyOptions = {
@@ -803,7 +867,8 @@ function showForecastWelcomeOnce() {
 
 function drawForecast() {
   if (!weather?.available) return;
-  const hourly = weather.hourly.slice(0, EMBED_DAYS * 24);
+  const historyDays = settings.showHistoricalData ? WEATHER_HISTORY_DAYS : 0;
+  const hourly = timelineHourlyWindow(weather.hourly, weather.current?.timestamp, EMBED_DAYS, historyDays);
   const zoom = ZOOM_LEVELS[zoomIndex];
   const groupHours = hoursPerGroup(zoom);
   const displayedHourly = groupHourlyForecast(hourly, groupHours);
@@ -812,6 +877,7 @@ function drawForecast() {
   const range = temperatureRange(displayedHourly, settings.showApparentTemperature);
   const timeline = document.getElementById('forecastTimeline');
   timeline.style.setProperty('--forecast-slots', displayedHourly.length);
+  updateTimelineNowPosition(displayedHourly);
   updateTemperatureAxis(range);
   renderDayDividers(displayedHourly);
   const windVisual = document.getElementById('forecastWindVisual');
@@ -830,6 +896,8 @@ function drawForecast() {
     visualScale,
     groupHours,
     fullDayLabels: zoom >= .5,
+    currentTimestamp: weather.current?.timestamp,
+    showDates: settings.showDates,
     hourY: 24 + enlargedLabelOffset * 16,
     temperatureY: 40 + enlargedLabelOffset * 26,
     weatherLineY,
@@ -880,7 +948,8 @@ function renderForecast() {
     [t('metric.pressure'), measurement(current.surfacePressure, ' hPa'), t('metric.surfacePressure')]
   ].map(([label, value, detail]) => `<article class="metric-card"><div class="metric-label">${escapeHtml(label)}</div><div class="metric-value">${value}</div><div class="metric-detail">${escapeHtml(detail)}</div></article>`).join('');
 
-  document.getElementById('dailyForecast').innerHTML = weather.daily.slice(0, 10).map(day => {
+  const currentDate = String(current.timestamp || '').slice(0, 10);
+  document.getElementById('dailyForecast').innerHTML = weather.daily.filter(day => day.date >= currentDate).slice(0, 10).map(day => {
     const dayCondition = weatherPresentation(day.weatherCode);
     return `<article class="forecast-day">
       <div class="forecast-day-heading"><strong>${escapeHtml(formatForecastDate(day.date, {weekday: 'short', day: 'numeric', month: 'short'}))}</strong><span class="forecast-day-symbol">${dayCondition[0]}</span></div>
@@ -927,7 +996,8 @@ async function requestWeather(requestedLocation, {signal} = {}) {
     longitude: requestedLocation.longitude,
     timezone: requestedLocation.timezone || 'auto',
     name: requestedLocation.name,
-    mushrooms: settings.showMushrooms ? '1' : '0'
+    mushrooms: settings.showMushrooms ? '1' : '0',
+    past_days: String(settings.showHistoricalData ? WEATHER_HISTORY_DAYS : 0)
   });
   const response = await fetch(new URL(`weather?${parameters}`, API_ROOT), {signal});
   if (!response.ok) throw new Error((await response.json()).error || 'Forecast request failed.');
@@ -1141,6 +1211,8 @@ function fillSettingsForm() {
   document.getElementById('showWind').checked = settings.showWind;
   document.getElementById('showWindArrows').checked = settings.showWindArrows;
   document.getElementById('showMushrooms').checked = settings.showMushrooms;
+  document.getElementById('showHistoricalData').checked = settings.showHistoricalData;
+  document.getElementById('showDates').checked = settings.showDates;
   document.getElementById('embedDays').value = String(settings.embedDays);
   document.getElementById('embedLegend').checked = settings.embedLegend;
   document.getElementById('locationResults').innerHTML = '';
@@ -1209,6 +1281,8 @@ function settingsFromForm() {
     showWind: document.getElementById('showWind').checked,
     showWindArrows: document.getElementById('showWindArrows').checked,
     showMushrooms: document.getElementById('showMushrooms').checked,
+    showHistoricalData: document.getElementById('showHistoricalData').checked,
+    showDates: document.getElementById('showDates').checked,
     embedDays: widgetDays(document.getElementById('embedDays').value),
     embedLegend: document.getElementById('embedLegend').checked,
     layoutVersion: LAYOUT_VERSION
@@ -1227,18 +1301,23 @@ function saveFormChanges({reloadWeather = false} = {}) {
   const previousWind = settings.showWind;
   const previousWindArrows = settings.showWindArrows;
   const previousMushrooms = settings.showMushrooms;
+  const previousHistoricalData = settings.showHistoricalData;
+  const previousDates = settings.showDates;
   settings = settingsFromForm();
   const locationChanged = !sameLocation(previousLocation, settings.location);
   const languageChanged = previousLanguage !== settings.language;
   const themeChanged = previousTheme !== settings.theme;
   const unitChanged = previousUnit !== settings.temperatureUnit;
   const zoomChanged = previousZoom !== settings.zoom;
+  const historicalDataChanged = previousHistoricalData !== settings.showHistoricalData;
   const forecastDisplayChanged = previousHourlyTemperatures !== settings.showHourlyTemperatures
     || previousApparentTemperature !== settings.showApparentTemperature
     || previousPrecipitation !== settings.showPrecipitation
     || previousWind !== settings.showWind
     || previousWindArrows !== settings.showWindArrows
-    || previousMushrooms !== settings.showMushrooms;
+    || previousMushrooms !== settings.showMushrooms
+    || historicalDataChanged
+    || previousDates !== settings.showDates;
   settings.language = languageChanged ? setLanguage(settings.language) : normalizeLanguage(settings.language);
   applyTemperatureSettings();
   saveSettings();
@@ -1261,7 +1340,10 @@ function saveFormChanges({reloadWeather = false} = {}) {
   } else if (previousMushrooms && languageChanged) {
     loadMushroomObservations();
   }
-  if (!previousMushrooms && settings.showMushrooms) loadWeather();
+  if (historicalDataChanged) {
+    timelineInitialPositionPending = true;
+    loadWeather();
+  } else if (!previousMushrooms && settings.showMushrooms) loadWeather();
   else if (reloadWeather) loadWeather();
 }
 
@@ -1541,6 +1623,105 @@ document.getElementById('forecastTimelineScroll').addEventListener('wheel', even
 }, {passive: false});
 
 const forecastTimelineScroll = document.getElementById('forecastTimelineScroll');
+const timelineHistoryResistance = () => Math.min(150, Math.max(80, forecastTimelineScroll.clientWidth * .16)) * .0625;
+const timelineMagneticDistance = () => forecastBaseHourWidth() * ZOOM_LEVELS[zoomIndex] * 6;
+let timelineWheelResistance = 0;
+let timelineWheelResetTimer = 0;
+let timelineWheelStartPosition = null;
+let timelineTouchActive = false;
+let timelineTouchStartPosition = null;
+let timelineTouchBoundaryLocked = false;
+let timelineTouchSettleTimer = 0;
+
+function snapTimelineToNowIfClose() {
+  if (!settings.showHistoricalData || !withinTimelineMagnet(forecastTimelineScroll.scrollLeft, timelineNowScrollLeft, timelineMagneticDistance())) return;
+  forecastTimelineScroll.scrollTo({left: timelineNowScrollLeft, behavior: 'smooth'});
+}
+
+function scheduleTimelineNowSnap() {
+  window.clearTimeout(timelineWheelResetTimer);
+  timelineWheelResetTimer = window.setTimeout(() => {
+    timelineWheelResistance = 0;
+    timelineWheelStartPosition = null;
+    snapTimelineToNowIfClose();
+  }, 180);
+}
+
+forecastTimelineScroll.addEventListener('wheel', event => {
+  if (event.ctrlKey || !settings.showHistoricalData) return;
+  const delta = Math.abs(event.deltaX) >= Math.abs(event.deltaY)
+    ? event.deltaX
+    : event.shiftKey ? event.deltaY : 0;
+  if (!delta) return;
+  event.preventDefault();
+  if (timelineWheelStartPosition === null) {
+    timelineWheelStartPosition = forecastTimelineScroll.scrollLeft;
+  }
+  const attempted = Math.max(0, forecastTimelineScroll.scrollLeft + delta);
+  const bounded = stopTimelineAtNow(timelineWheelStartPosition, attempted, timelineNowScrollLeft);
+  if (bounded !== attempted) {
+    forecastTimelineScroll.scrollLeft = bounded;
+  } else if (Math.abs(timelineWheelStartPosition - timelineNowScrollLeft) <= 1 && attempted < timelineNowScrollLeft) {
+    timelineWheelResistance += Math.max(0, -delta);
+    forecastTimelineScroll.scrollLeft = resistedHistoryPosition(
+      timelineNowScrollLeft,
+      timelineNowScrollLeft - timelineWheelResistance,
+      timelineNowScrollLeft,
+      timelineHistoryResistance()
+    );
+  } else {
+    forecastTimelineScroll.scrollLeft = bounded;
+  }
+  scheduleTimelineNowSnap();
+}, {passive: false});
+
+forecastTimelineScroll.addEventListener('touchstart', event => {
+  if (event.touches.length !== 1 || !settings.showHistoricalData) return;
+  window.clearTimeout(timelineTouchSettleTimer);
+  forecastTimelineScroll.classList.remove('now-boundary-locked');
+  timelineTouchActive = true;
+  timelineTouchStartPosition = forecastTimelineScroll.scrollLeft;
+  timelineTouchBoundaryLocked = false;
+}, {passive: true});
+
+function settleTimelineTouch() {
+  window.clearTimeout(timelineTouchSettleTimer);
+  timelineTouchSettleTimer = window.setTimeout(() => {
+    if (timelineTouchActive) {
+      settleTimelineTouch();
+      return;
+    }
+    const wasLocked = timelineTouchBoundaryLocked;
+    timelineTouchStartPosition = null;
+    timelineTouchBoundaryLocked = false;
+    forecastTimelineScroll.classList.remove('now-boundary-locked');
+    if (wasLocked) forecastTimelineScroll.scrollLeft = timelineNowScrollLeft;
+    snapTimelineToNowIfClose();
+  }, 140);
+}
+
+forecastTimelineScroll.addEventListener('scroll', () => {
+  updateTimelineLegendPosition();
+  if (!settings.showHistoricalData || timelineTouchStartPosition === null) return;
+  const bounded = stopTimelineAtNow(timelineTouchStartPosition, forecastTimelineScroll.scrollLeft, timelineNowScrollLeft);
+  if (bounded !== forecastTimelineScroll.scrollLeft) {
+    timelineTouchBoundaryLocked = true;
+    forecastTimelineScroll.classList.add('now-boundary-locked');
+    forecastTimelineScroll.scrollLeft = bounded;
+  }
+  settleTimelineTouch();
+}, {passive: true});
+
+forecastTimelineScroll.addEventListener('touchend', () => {
+  timelineTouchActive = false;
+  settleTimelineTouch();
+});
+
+forecastTimelineScroll.addEventListener('touchcancel', () => {
+  timelineTouchActive = false;
+  settleTimelineTouch();
+});
+
 let pinchStartDistance = 0;
 let pinchStartZoom = DEFAULT_ZOOM;
 const touchDistance = touches => Math.hypot(
@@ -1550,6 +1731,11 @@ const touchDistance = touches => Math.hypot(
 forecastTimelineScroll.addEventListener('touchstart', event => {
   if (event.touches.length !== 2) return;
   event.preventDefault();
+  window.clearTimeout(timelineTouchSettleTimer);
+  timelineTouchActive = false;
+  timelineTouchStartPosition = null;
+  timelineTouchBoundaryLocked = false;
+  forecastTimelineScroll.classList.remove('now-boundary-locked');
   pinchStartDistance = touchDistance(event.touches);
   pinchStartZoom = ZOOM_LEVELS[zoomIndex];
 }, {passive: false});

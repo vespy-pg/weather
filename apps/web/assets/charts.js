@@ -485,6 +485,7 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
   const temperatureFontSize = Math.min(18, Math.max(14, 12 * visualScale));
   const hourY = configuredNumber(options.hourY, 24);
   const temperatureY = configuredNumber(options.temperatureY, 36);
+  const currentDate = String(options.currentTimestamp || points[0]?.timestamp || '').slice(0, 10);
   context.font = `700 ${hourFontSize}px ui-monospace, monospace`;
   context.textAlign = 'center';
   points.forEach((point, index) => {
@@ -522,9 +523,13 @@ export function drawForecastSky(canvas, points, days = [], options = {}) {
     if (options.showDayLabels === false) return;
     context.fillStyle = chartColor('--chart-text', '#e7edf7');
     context.textAlign = 'left';
-    const dayLabel = index === 0
+    const dayName = date === currentDate
       ? t('forecast.today')
       : formatForecastDate(point.timestamp, {weekday: options.fullDayLabels ? 'long' : 'short'});
+    const dateLabel = options.showDates && date !== currentDate
+      ? ` ${formatForecastDate(point.timestamp, {day: 'numeric', month: 'short'})}`
+      : '';
+    const dayLabel = `${dayName}${dateLabel}`;
     const nextDayIndex = points.findIndex((candidate, candidateIndex) => (
       candidateIndex > index && String(candidate.timestamp).slice(0, 10) !== date
     ));

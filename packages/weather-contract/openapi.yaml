@@ -129,6 +129,13 @@ paths:
           description: Include mushroom suitability data derived from seven days of weather history.
           schema:
             type: boolean
+        - in: query
+          name: past_days
+          description: Include up to three days before the current hour in the normalized timeline.
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 3
       responses:
         '200':
           description: Normalized current, hourly, and daily forecast

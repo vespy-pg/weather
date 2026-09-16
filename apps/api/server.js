@@ -158,17 +158,20 @@ export function mushroomCondition(source, dailyIndex) {
   };
 }
 
-export function normalizeForecast(source, location) {
+export function normalizeForecast(source, location, {pastDays = 0} = {}) {
   const allHourlyTimes = source.hourly?.time || [];
   const currentHour = String(source.current?.time || '').slice(0, 13);
   const matchingHourIndex = allHourlyTimes.findIndex(timestamp => String(timestamp).slice(0, 13) === currentHour);
-  const hourlyStartIndex = matchingHourIndex < 0 ? 0 : matchingHourIndex;
-  const hourlyTimes = allHourlyTimes.slice(hourlyStartIndex, hourlyStartIndex + 240);
+  const currentHourIndex = matchingHourIndex < 0 ? 0 : matchingHourIndex;
+  const historyDays = Math.max(0, Math.min(7, Math.trunc(Number(pastDays) || 0)));
+  const hourlyStartIndex = Math.max(0, currentHourIndex - historyDays * 24);
+  const hourlyTimes = allHourlyTimes.slice(hourlyStartIndex, currentHourIndex + 240);
   const allDailyTimes = source.daily?.time || [];
   const currentDate = String(source.current?.time || '').slice(0, 10);
   const matchingDayIndex = allDailyTimes.findIndex(date => String(date) >= currentDate);
-  const dailyStartIndex = matchingDayIndex < 0 ? 0 : matchingDayIndex;
-  const dailyTimes = allDailyTimes.slice(dailyStartIndex, dailyStartIndex + 15);
+  const currentDayIndex = matchingDayIndex < 0 ? 0 : matchingDayIndex;
+  const dailyStartIndex = Math.max(0, currentDayIndex - historyDays);
+  const dailyTimes = allDailyTimes.slice(dailyStartIndex, currentDayIndex + 15);
   return {
     available: true,
     fetchedAt: new Date().toISOString(),
@@ -232,7 +235,7 @@ export function normalizeForecast(source, location) {
   };
 }
 
-export function forecastUrl({latitude, longitude, timezone, includeMushrooms = false}) {
+export function forecastUrl({latitude, longitude, timezone, includeMushrooms = false, pastDays = 0}) {
   const hourly = [
     'temperature_2m', 'apparent_temperature', 'relative_humidity_2m', 'precipitation_probability',
     'precipitation', 'rain', 'snowfall', 'weather_code', 'cloud_cover', 'surface_pressure',
@@ -248,7 +251,8 @@ export function forecastUrl({latitude, longitude, timezone, includeMushrooms = f
     hourly: hourly.join(','),
     daily: 'weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,daylight_duration,sunshine_duration,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant,uv_index_max'
   });
-  if (includeMushrooms) parameters.set('past_days', '7');
+  const requestedPastDays = Math.max(includeMushrooms ? 7 : 0, Math.max(0, Math.min(7, Math.trunc(Number(pastDays) || 0))));
+  if (requestedPastDays) parameters.set('past_days', String(requestedPastDays));
   return `https://api.open-meteo.com/v1/forecast?${parameters}`;
 }
 
@@ -533,12 +537,14 @@ async function weather(requestUrl, response) {
   }
   const timezone = requestUrl.searchParams.get('timezone') || 'auto';
   const name = requestUrl.searchParams.get('name') || `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`;
+  const pastDays = Math.max(0, Math.min(3, Math.trunc(Number(requestUrl.searchParams.get('past_days')) || 0)));
   const location = {name, latitude, longitude, timezone};
   const source = await cachedFetch(forecastUrl({
     ...location,
-    includeMushrooms: ['1', 'true'].includes(requestUrl.searchParams.get('mushrooms'))
+    includeMushrooms: ['1', 'true'].includes(requestUrl.searchParams.get('mushrooms')),
+    pastDays
   }));
-  return json(response, 200, normalizeForecast(source, location));
+  return json(response, 200, normalizeForecast(source, location, {pastDays}));
 }
 
 async function mushroomObservations(requestUrl, response) {
