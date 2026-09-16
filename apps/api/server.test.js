@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {forecastUrl, isForecastRoutePath, locationSearchUrl, mushroomCondition, mushroomObservationsUrl, normalizeForecast, normalizeGoogleAnalyticsId, normalizeLocale, normalizeMushroomObservations, normalizePostalLocations, normalizeReverseLocation, postalCodeSearchUrl, preferredLanguageForCountry, promotionFeed, renderIndexHtml, selectCapitalResult, seoPageMetadata} from './server.js';
+import {forecastUrl, isForecastRoutePath, locationSearchUrl, mushroomCondition, mushroomObservationsUrl, normalizeForecast, normalizeGoogleAnalyticsId, normalizeLocale, normalizeMushroomObservations, normalizePostalLocations, normalizeReverseLocation, postalCodeSearchUrl, preferredLanguageForCountry, promotionFeed, renderIndexHtml, selectCapitalResult, seoPageMetadata, staticCacheControl} from './server.js';
+
+test('forces application assets and the service worker to revalidate', () => {
+  assert.equal(staticCacheControl('/assets/app.js'), 'no-cache');
+  assert.equal(staticCacheControl('/assets/app.css'), 'no-cache');
+  assert.equal(staticCacheControl('/sw.js'), 'no-store');
+});
 
 test('normalizeGoogleAnalyticsId accepts only GA4 measurement IDs', () => {
   assert.equal(normalizeGoogleAnalyticsId(' g-ab12cd34 '), 'G-AB12CD34');

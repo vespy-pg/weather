@@ -588,11 +588,18 @@ async function staticFile(requestUrl, response) {
     const metadata = await stat(filePath);
     if (!metadata.isFile()) throw new Error('Not a file');
     const body = await readFile(filePath);
-    response.writeHead(200, {'Content-Type': contentTypes[path.extname(filePath)] || 'application/octet-stream'});
+    response.writeHead(200, {
+      'Cache-Control': staticCacheControl(requestUrl.pathname),
+      'Content-Type': contentTypes[path.extname(filePath)] || 'application/octet-stream'
+    });
     response.end(body);
   } catch {
     json(response, 404, {error: 'Not found.'});
   }
+}
+
+export function staticCacheControl(pathname) {
+  return pathname === '/sw.js' ? 'no-store' : 'no-cache';
 }
 
 export function createServer() {

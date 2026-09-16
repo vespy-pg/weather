@@ -1,10 +1,10 @@
-const CACHE_NAME = 'weather-shell-v50';
+const CACHE_NAME = 'weather-shell-v51';
 const APP_SHELL = [
   '/',
   '/index.html',
   '/manifest.webmanifest',
-  '/assets/app.css',
-  '/assets/app.js',
+  '/assets/app.css?v=51',
+  '/assets/app.js?v=51',
   '/assets/analytics.js',
   '/assets/charts.js',
   '/assets/components.js',
@@ -34,7 +34,7 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
-  event.respondWith(fetch(event.request).then(response => {
+  event.respondWith(fetch(new Request(event.request, {cache: 'no-store'})).then(response => {
     const copy = response.clone();
     if (response.ok && new URL(event.request.url).origin === self.location.origin) {
       caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));

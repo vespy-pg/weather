@@ -1973,5 +1973,16 @@ document.addEventListener('visibilitychange', () => {
 });
 
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+  const reloadOnUpdate = Boolean(navigator.serviceWorker.controller);
+  let updateReloadStarted = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!reloadOnUpdate || updateReloadStarted) return;
+    updateReloadStarted = true;
+    location.reload();
+  });
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js', {updateViaCache: 'none'})
+      .then(registration => registration.update())
+      .catch(() => {});
+  });
 }
