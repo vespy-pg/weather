@@ -1,10 +1,10 @@
-const CACHE_NAME = 'weather-shell-v51';
+const CACHE_NAME = 'weather-shell-v52';
 const APP_SHELL = [
   '/',
   '/index.html',
   '/manifest.webmanifest',
-  '/assets/app.css?v=51',
-  '/assets/app.js?v=51',
+  '/assets/app.css?v=52',
+  '/assets/app.js?v=52',
   '/assets/analytics.js',
   '/assets/charts.js',
   '/assets/components.js',
@@ -14,6 +14,7 @@ const APP_SHELL = [
   '/assets/location-state.js',
   '/assets/route-state.js',
   '/assets/temperature-scale.js',
+  '/assets/weather-refresh.js',
   '/assets/weather-demo.js',
   '/assets/dinpanel-logo-dark.png',
   '/assets/dinpanel-logo-light.png',

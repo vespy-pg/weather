@@ -17,6 +17,7 @@ import {
   withLocation
 } from './location-state.js';
 import {applicationRouteUrl, forecastRouteUrl, parseCoordinatePair, parseForecastRoute, shouldUseRouteLocation} from './route-state.js';
+import {weatherRefreshIsDue} from './weather-refresh.js';
 import {
   celsiusToDisplay,
   DEFAULT_THRESHOLDS,
@@ -157,6 +158,7 @@ let weather = null;
 let weatherRequest = 0;
 let weatherAbortController = null;
 let weatherLoadedAt = 0;
+let weatherRefreshStartedAt = 0;
 let zoomIndex = Math.max(0, ZOOM_LEVELS.indexOf(Number(settings.zoom)));
 let forecastDrawFrame = 0;
 let timelineInitialPositionPending = true;
@@ -1066,6 +1068,7 @@ async function loadMushroomObservations(requestedLocation = settings.location) {
 }
 
 async function loadWeather() {
+  weatherRefreshStartedAt = Date.now();
   weatherAbortController?.abort();
   const controller = new AbortController();
   weatherAbortController = controller;
@@ -1103,6 +1106,16 @@ async function loadWeather() {
       document.querySelector('.forecast-panel').removeAttribute('aria-busy');
     }
   }
+}
+
+function refreshWeatherIfNeeded() {
+  if (IS_DEMO || document.visibilityState !== 'visible' || document.body.classList.contains('location-loading')) return;
+  if (!weatherRefreshIsDue({
+    loadedAt: weatherLoadedAt,
+    refreshStartedAt: weatherRefreshStartedAt,
+    refreshInterval: WEATHER_REFRESH_INTERVAL_MS
+  })) return;
+  loadWeather();
 }
 
 function renderLocationLoading(status = t('status.loading')) {
@@ -1961,16 +1974,17 @@ initializeAnalytics(API_ROOT);
 initialize().finally(() => {
   loadPromotion();
   monitorGeolocationPermission();
-  setInterval(() => {
-    if (!IS_DEMO && document.visibilityState === 'visible' && !document.body.classList.contains('location-loading')) loadWeather();
-  }, WEATHER_REFRESH_INTERVAL_MS);
+  setInterval(refreshWeatherIfNeeded, WEATHER_REFRESH_INTERVAL_MS);
   setInterval(updateWeatherFreshnessWarning, 60 * 1000);
 });
 
 document.addEventListener('visibilitychange', () => {
-  if (!IS_DEMO && weatherLoadedAt && document.visibilityState === 'visible' && !document.body.classList.contains('location-loading') && Date.now() - weatherLoadedAt >= WEATHER_REFRESH_INTERVAL_MS) loadWeather();
+  refreshWeatherIfNeeded();
   updateWeatherFreshnessWarning();
 });
+window.addEventListener('pageshow', refreshWeatherIfNeeded);
+window.addEventListener('focus', refreshWeatherIfNeeded);
+window.addEventListener('online', refreshWeatherIfNeeded);
 
 if ('serviceWorker' in navigator) {
   const reloadOnUpdate = Boolean(navigator.serviceWorker.controller);
