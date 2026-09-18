@@ -13,4 +13,7 @@
     <xhtml:link rel="alternate" hreflang="pl-PL" href="https://weather.vespy.eu/pl-PL" />
     <xhtml:link rel="alternate" hreflang="x-default" href="https://weather.vespy.eu/en-US" />
   </url>
+  <url>
+    <loc>https://weather.vespy.eu/privacy.html</loc>
+  </url>
 </urlset>
