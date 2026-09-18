@@ -36,6 +36,7 @@ import kotlin.math.roundToInt
 
 open class WeatherWidgetProvider : AppWidgetProvider() {
     protected open val advisoryFooter = false
+    protected open val compactStrip = false
 
     override fun onUpdate(context: Context, manager: AppWidgetManager, appWidgetIds: IntArray) {
         val result = goAsync()
@@ -69,7 +70,7 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
                         val widthDp = size.width.roundToInt().coerceAtLeast(40)
                         val heightDp = size.height.roundToInt().coerceAtLeast(40)
                         val columns = (widthDp / 80).coerceIn(1, 8)
-                        val rows = ((heightDp + 13) / 136).coerceIn(1, 8)
+                        val rows = if (compactStrip) 1 else ((heightDp + 13) / 136).coerceIn(1, 8)
                         val rawWidth = (widthDp * density).roundToInt()
                         val rawHeight = (heightDp * density).roundToInt()
                         val bitmapScale = min(1f, min(MAX_BITMAP_SIZE.toFloat() / rawWidth, MAX_BITMAP_SIZE.toFloat() / rawHeight))
@@ -92,6 +93,7 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
                             } else null,
                             advisoryLabel = localizedContext.getString(R.string.forecast_summary_label),
                             advisoryIsAlert = advisoryFooter && forecast.alerts.isNotEmpty(),
+                            compactStrip = compactStrip,
                         )
                         views(context, bitmap, widgetId, location, widgetSettings.demo)
                     }
@@ -192,6 +194,7 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
         advisoryText: String?,
         advisoryLabel: String,
         advisoryIsAlert: Boolean,
+        compactStrip: Boolean,
     ): Bitmap {
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
@@ -209,13 +212,26 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
         val chartHeight = height - footerHeight
         val expanded = rows >= 3
         val labelHeight = when {
+            compactStrip -> chartHeight * .42f
             rows == 1 -> chartHeight * .38f
             rows == 2 -> min(50f * density, chartHeight * .36f)
             else -> chartHeight * .24f
         }
         val contentHeight = chartHeight - labelHeight
-        val skyHeight = if (expanded) min(68f * density, contentHeight * .36f) else min(56f * density, contentHeight * .3f)
-        val windHeight = if (expanded) min(42f * density, contentHeight * .22f) else min(34f * density, contentHeight * .18f)
+        val skyHeight = if (compactStrip) {
+            chartHeight * .30f
+        } else if (expanded) {
+            min(68f * density, contentHeight * .36f)
+        } else {
+            min(56f * density, contentHeight * .3f)
+        }
+        val windHeight = if (compactStrip) {
+            chartHeight - labelHeight - skyHeight
+        } else if (expanded) {
+            min(42f * density, contentHeight * .22f)
+        } else {
+            min(34f * density, contentHeight * .18f)
+        }
         val mushroomHeight = if (widgetSettings.showMushrooms && expanded) min(34f * density, contentHeight * .18f) else 0f
         ForecastGraphics.drawTimeline(
             canvas, RectF(0f, 0f, width.toFloat(), chartHeight), points, days, dark, todayLabel, labelHeight, skyHeight, windHeight,
@@ -241,6 +257,7 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
             showWindArrows = widgetSettings.showWindArrows,
             showMushrooms = widgetSettings.showMushrooms,
             mushroomHeight = mushroomHeight,
+            showTemperatureChart = !compactStrip,
             demoLabel = "DEMO".takeIf { widgetSettings.demo },
             lightningScale = .68f,
         )
@@ -326,7 +343,11 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
 
         fun refreshAll(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
-            listOf(WeatherWidgetProvider::class.java, WeatherAdvisoryWidgetProvider::class.java).forEach { providerClass ->
+            listOf(
+                WeatherWidgetProvider::class.java,
+                WeatherAdvisoryWidgetProvider::class.java,
+                WeatherStripWidgetProvider::class.java,
+            ).forEach { providerClass ->
                 val component = ComponentName(context, providerClass)
                 val widgetIds = manager.getAppWidgetIds(component)
                 if (widgetIds.isNotEmpty()) context.sendBroadcast(Intent(context, providerClass).apply {

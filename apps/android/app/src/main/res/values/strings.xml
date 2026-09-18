@@ -32,6 +32,8 @@
     <string name="widget_name">Weather timeline</string>
     <string name="advisory_widget_name">Weather and warnings</string>
     <string name="advisory_widget_description">Weather timeline with an official warning or multi-event outlook</string>
+    <string name="strip_widget_name">Sky and wind</string>
+    <string name="strip_widget_description">Compact weather timeline with sky, precipitation and wind</string>
     <string name="add_widget">Add home-screen widget</string>
     <string name="widget_pin_unavailable">Add the widget from your launcher widget picker</string>
     <string name="search_location">Search city, place or postal code</string>

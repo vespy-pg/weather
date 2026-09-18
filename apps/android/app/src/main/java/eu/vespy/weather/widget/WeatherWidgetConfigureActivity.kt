@@ -87,6 +87,8 @@ class WeatherWidgetConfigureActivity : ComponentActivity() {
         val preferences = WeatherPreferences(this)
         val locations = preferences.migrateLegacyDefaultLocations(DEFAULT_LOCATIONS, LEGACY_DEFAULT_LOCATIONS)
         val initialLocation = preferences.widgetLocation(widgetId, locations.firstOrNull() ?: DEFAULT_LOCATIONS.first())
+        val compactStrip = AppWidgetManager.getInstance(this).getAppWidgetInfo(widgetId)?.provider?.className ==
+            WeatherStripWidgetProvider::class.java.name
         setContent {
             WidgetLocationPicker(
                 locations = locations,
@@ -94,6 +96,7 @@ class WeatherWidgetConfigureActivity : ComponentActivity() {
                 initialForecastHours = preferences.widgetForecastHours(widgetId),
                 initialWidgetSettings = preferences.widgetDisplaySettings(widgetId),
                 initialAppTheme = preferences.displaySettings().theme,
+                compactStrip = compactStrip,
                 onBack = ::finish,
                 onRemoveLocation = { removed ->
                     val saved = preferences.locations(DEFAULT_LOCATIONS)
@@ -146,6 +149,7 @@ private fun WidgetLocationPicker(
     initialForecastHours: Int,
     initialWidgetSettings: WidgetDisplaySettings,
     initialAppTheme: String,
+    compactStrip: Boolean,
     onBack: () -> Unit,
     onRemoveLocation: (WeatherLocation) -> Unit,
     onSave: (WeatherLocation, Int, WidgetDisplaySettings) -> Unit,
@@ -201,7 +205,9 @@ private fun WidgetLocationPicker(
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = .4f)),
                             ) {
                                 Image(
-                                    painter = painterResource(R.drawable.widget_preview_chart),
+                                    painter = painterResource(
+                                        if (compactStrip) R.drawable.widget_strip_preview else R.drawable.widget_preview_chart,
+                                    ),
                                     contentDescription = null,
                                     contentScale = ContentScale.FillBounds,
                                 )
@@ -258,10 +264,10 @@ private fun WidgetLocationPicker(
                     }
                     WeatherSettingsSection(stringResource(R.string.widget_display_section)) {
                         WidgetSwitch(stringResource(R.string.show_hourly_temperatures), widgetSettings.showHourlyTemperatures) { widgetSettings = widgetSettings.copy(showHourlyTemperatures = it) }
-                        WidgetSwitch(stringResource(R.string.show_apparent_temperature), widgetSettings.showApparentTemperature) { widgetSettings = widgetSettings.copy(showApparentTemperature = it) }
+                        if (!compactStrip) WidgetSwitch(stringResource(R.string.show_apparent_temperature), widgetSettings.showApparentTemperature) { widgetSettings = widgetSettings.copy(showApparentTemperature = it) }
                         WidgetSwitch(stringResource(R.string.show_precipitation), widgetSettings.showPrecipitation) { widgetSettings = widgetSettings.copy(showPrecipitation = it) }
                         WidgetSwitch(stringResource(R.string.show_wind_arrows), widgetSettings.showWindArrows) { widgetSettings = widgetSettings.copy(showWindArrows = it) }
-                        WidgetSwitch(stringResource(R.string.show_mushrooms), widgetSettings.showMushrooms) { widgetSettings = widgetSettings.copy(showMushrooms = it) }
+                        if (!compactStrip) WidgetSwitch(stringResource(R.string.show_mushrooms), widgetSettings.showMushrooms) { widgetSettings = widgetSettings.copy(showMushrooms = it) }
                         WidgetDefaultOrOn(stringResource(R.string.show_widget_location), widgetSettings.forceLocationName) { widgetSettings = widgetSettings.copy(forceLocationName = it) }
                         WidgetSwitch(stringResource(R.string.demo_weather), widgetSettings.demo) { widgetSettings = widgetSettings.copy(demo = it) }
                     }

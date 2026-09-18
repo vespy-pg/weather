@@ -230,6 +230,7 @@ object ForecastGraphics {
         showHistory: Boolean = false,
         historyLabel: String = "",
         showMushrooms: Boolean = false,
+        showTemperatureChart: Boolean = true,
         temperatureMinimum: Double? = null,
         temperatureMaximum: Double? = null,
         demoLabel: String? = null,
@@ -240,7 +241,12 @@ object ForecastGraphics {
         if (points.isEmpty() || bounds.width() <= 0f || bounds.height() <= 0f) return
         val palette = palette(dark)
         val sky = RectF(bounds.left, bounds.top, bounds.right, bounds.top + labelHeight + skyHeight)
-        val temperature = RectF(sky.left, sky.bottom, sky.right, bounds.bottom - windHeight - mushroomHeight)
+        val temperature = RectF(
+            sky.left,
+            sky.bottom,
+            sky.right,
+            if (showTemperatureChart) bounds.bottom - windHeight - mushroomHeight else sky.bottom,
+        )
         val wind = RectF(bounds.left, temperature.bottom, bounds.right, bounds.bottom - mushroomHeight)
         val mushrooms = RectF(bounds.left, wind.bottom, bounds.right, bounds.bottom)
         canvas.drawRect(bounds, Paint().apply { color = palette.background })
@@ -250,8 +256,10 @@ object ForecastGraphics {
             showWeekdayNames, fullWeekdayNames, dayLabelTextSize, hourTextSize, temperatureTextSize,
             showTemperatureValues, showPrecipitation, temperatureThresholds, currentTimestamp, showDates,
         )
-        drawTemperature(canvas, temperature, points, palette, pixelScale, showApparentTemperature, temperatureThresholds, temperatureMinimum, temperatureMaximum, lightningScale)
-        if (demoLabel != null) drawDemoWatermarks(canvas, temperature, points, demoLabel, demoEveryDay, pixelScale, palette)
+        if (showTemperatureChart) {
+            drawTemperature(canvas, temperature, points, palette, pixelScale, showApparentTemperature, temperatureThresholds, temperatureMinimum, temperatureMaximum, lightningScale)
+            if (demoLabel != null) drawDemoWatermarks(canvas, temperature, points, demoLabel, demoEveryDay, pixelScale, palette)
+        }
         if (showWind) {
             drawWind(canvas, wind, points, palette, pixelScale, windScale, pointOffset)
             if (showWindArrows) drawWindAnnotations(canvas, wind, points, palette, pixelScale)
@@ -263,7 +271,7 @@ object ForecastGraphics {
         drawDaySeparators(canvas, bounds, points, palette, pixelScale)
         val border = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = palette.grid; strokeWidth = pixelScale; style = Paint.Style.STROKE }
         canvas.drawLine(bounds.left, sky.bottom, bounds.right, sky.bottom, border)
-        canvas.drawLine(bounds.left, temperature.bottom, bounds.right, temperature.bottom, border)
+        if (showTemperatureChart) canvas.drawLine(bounds.left, temperature.bottom, bounds.right, temperature.bottom, border)
         if (showMushrooms && mushroomHeight > 0f) canvas.drawLine(bounds.left, wind.bottom, bounds.right, wind.bottom, border)
         canvas.drawLine(bounds.left, bounds.bottom - 1f, bounds.right, bounds.bottom - 1f, border)
     }
