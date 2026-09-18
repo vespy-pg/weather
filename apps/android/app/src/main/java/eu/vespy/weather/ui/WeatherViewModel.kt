@@ -26,8 +26,6 @@ data class WeatherUiState(
     val loading: Boolean = true,
     val error: String? = null,
     val locations: List<WeatherLocation> = DEFAULT_LOCATIONS,
-    val locationResults: List<WeatherLocation> = emptyList(),
-    val searchingLocations: Boolean = false,
     val temperatureUnit: String = "C",
     val displaySettings: ForecastDisplaySettings = ForecastDisplaySettings(),
     val analyticsConsent: Boolean? = null,
@@ -35,17 +33,22 @@ data class WeatherUiState(
 )
 
 val DEFAULT_LOCATIONS = listOf(
+    WeatherLocation("London", "United Kingdom", 51.5074, -0.1278, "Europe/London"),
+)
+
+val LEGACY_DEFAULT_LOCATIONS = listOf(
     WeatherLocation("Jastrząb Rozparcelowany", "Poland", 50.67244, 19.18239, "Europe/Warsaw"),
     WeatherLocation("Katowice", "Poland", 50.2649, 19.0238, "Europe/Warsaw"),
-    WeatherLocation("London", "United Kingdom", 51.5074, -0.1278, "Europe/London"),
 )
 
 class WeatherViewModel(application: Application) : AndroidViewModel(application) {
     private val api = WeatherApi()
     private val preferences = WeatherPreferences(application)
     private val analytics = WeatherAnalytics(application, preferences.analyticsConsent())
-    private val savedLocations = preferences.locations(DEFAULT_LOCATIONS)
-    private val savedLocation = preferences.activeLocation(savedLocations.first())
+    private val savedLocations = preferences.migrateLegacyDefaultLocations(DEFAULT_LOCATIONS, LEGACY_DEFAULT_LOCATIONS)
+    private val savedLocation = preferences.activeLocation(savedLocations.first()).takeIf { active ->
+        savedLocations.any { it.latitude == active.latitude && it.longitude == active.longitude }
+    } ?: savedLocations.first().also(preferences::saveActiveLocation)
 
     var state by mutableStateOf(
         WeatherUiState(
@@ -85,7 +88,7 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
 
     fun addLocation(location: WeatherLocation, darkTheme: Boolean, source: String = "search") {
         val locations = (state.locations + location).distinctBy { "${it.latitude},${it.longitude}" }
-        state = state.copy(locations = locations, locationResults = emptyList(), location = location)
+        state = state.copy(locations = locations, location = location)
         preferences.saveLocations(locations)
         preferences.saveActiveLocation(location)
         analytics.locationSelected(source)
@@ -103,15 +106,6 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
         preferences.saveActiveLocation(activeLocation)
         WeatherWidgetProvider.refreshAll(getApplication())
         if (removedActiveLocation) refresh(darkTheme)
-    }
-
-    fun searchLocations(query: String) {
-        if (query.trim().length < 2) return
-        state = state.copy(searchingLocations = true, locationResults = emptyList())
-        viewModelScope.launch {
-            val results = runCatching { api.locations(query.trim(), Locale.getDefault().language) }.getOrDefault(emptyList())
-            state = state.copy(searchingLocations = false, locationResults = results)
-        }
     }
 
     fun addCurrentLocation(latitude: Double, longitude: Double, darkTheme: Boolean) {
@@ -150,7 +144,7 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
             settings.showMushrooms != previous.showMushrooms -> analytics.displayPreferenceChanged("mushrooms", settings.showMushrooms.toString())
             settings.showWidgetLocation != previous.showWidgetLocation -> analytics.displayPreferenceChanged("widget_location", settings.showWidgetLocation.toString())
         }
-        if (settings.theme != previous.theme || settings.temperatureThresholds != previous.temperatureThresholds || settings.showWidgetLocation != previous.showWidgetLocation) {
+        if (settings.temperatureThresholds != previous.temperatureThresholds || settings.showWidgetLocation != previous.showWidgetLocation) {
             WeatherWidgetProvider.refreshAll(getApplication())
         }
     }

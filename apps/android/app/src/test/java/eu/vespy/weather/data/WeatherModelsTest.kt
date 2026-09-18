@@ -79,8 +79,9 @@ class WeatherModelsTest {
 
         val window = points.timelineWindow(currentTimestamp, futureDays = 5, historyDays = 3)
 
-        assertEquals(3 * 24 + 5 * 24, window.size)
+        assertEquals(3 * 24 + 5 * 24 + 16, window.size)
         assertEquals(points[8].timestamp, window.first().timestamp)
+        assertEquals("2026-09-18T23:00", window.last().timestamp)
         assertEquals(3 * 24, window.currentIndex(currentTimestamp))
     }
 }

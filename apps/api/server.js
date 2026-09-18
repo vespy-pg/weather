@@ -420,6 +420,7 @@ export function normalizePostalLocations(source) {
     name: item['place name'],
     country: source.country,
     admin1: item.state || null,
+    admin2: null,
     postalCode: source['post code'] || null,
     latitude: Number(item.latitude),
     longitude: Number(item.longitude),
@@ -436,6 +437,7 @@ async function locations(requestUrl, response) {
     name: item.name,
     country: item.country,
     admin1: item.admin1 || null,
+    admin2: item.admin2 || null,
     postalCode: item.postcodes?.[0] || null,
     latitude: item.latitude,
     longitude: item.longitude,
@@ -498,7 +500,10 @@ export function normalizeReverseLocation(source, fallback) {
   return {
     ...fallback,
     name,
-    country: address.country || fallback.country || ''
+    country: address.country || fallback.country || '',
+    admin1: address.state || address.region || null,
+    admin2: address.county || address.state_district || null,
+    postalCode: address.postcode || null
   };
 }
 

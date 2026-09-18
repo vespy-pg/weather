@@ -104,6 +104,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.input.pointer.pointerInput
@@ -238,7 +239,6 @@ fun VespyWeatherApp(viewModel: WeatherViewModel) {
                     state = state,
                     onDismiss = { showSettings = false },
                     onSelectLocation = { viewModel.selectLocation(it, darkTheme) },
-                    onSearch = viewModel::searchLocations,
                     onAddLocation = { viewModel.addLocation(it, darkTheme) },
                     onCurrentLocation = { latitude, longitude -> viewModel.addCurrentLocation(latitude, longitude, darkTheme) },
                     onRemoveLocation = { viewModel.removeLocation(it, darkTheme) },
@@ -396,7 +396,9 @@ private fun ForecastCard(
     ) {
         Column {
             Row(
-                modifier = Modifier.fillMaxWidth().height(if (landscape) 30.dp else 44.dp).padding(horizontal = 10.dp),
+                modifier = Modifier.fillMaxWidth()
+                    .heightIn(min = if (landscape) 30.dp else 44.dp)
+                    .padding(horizontal = 10.dp, vertical = if (landscape) 3.dp else 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
@@ -925,8 +927,23 @@ private fun PromotionRail(
 @Composable
 private fun PromotionAction(label: String, accent: Color, fontSize: Int = 12) {
     val contentColor = if (accent.luminance() > .5f) Color(0xFF17100B) else Color.White
-    Surface(color = accent, contentColor = contentColor, shape = RoundedCornerShape(8.dp)) {
-        Text(label, modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp), fontSize = fontSize.sp, fontWeight = FontWeight.Black, maxLines = 1)
+    val windowWidth = LocalWindowInfo.current.containerSize.width
+    val narrowScreen = with(LocalDensity.current) { windowWidth.toDp() < 420.dp }
+    Surface(
+        modifier = Modifier.widthIn(max = if (narrowScreen) 120.dp else 180.dp),
+        color = accent,
+        contentColor = contentColor,
+        shape = RoundedCornerShape(8.dp),
+    ) {
+        Text(
+            label,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+            fontSize = fontSize.sp,
+            lineHeight = (fontSize + 2).sp,
+            fontWeight = FontWeight.Black,
+            maxLines = 2,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
     }
 }
 
@@ -969,7 +986,6 @@ private fun SettingsDialog(
     state: WeatherUiState,
     onDismiss: () -> Unit,
     onSelectLocation: (eu.vespy.weather.data.WeatherLocation) -> Unit,
-    onSearch: (String) -> Unit,
     onAddLocation: (eu.vespy.weather.data.WeatherLocation) -> Unit,
     onCurrentLocation: (Double, Double) -> Unit,
     onRemoveLocation: (eu.vespy.weather.data.WeatherLocation) -> Unit,
@@ -978,7 +994,6 @@ private fun SettingsDialog(
     onAnalyticsConsent: (Boolean) -> Unit,
     onResetDefaults: () -> Unit,
 ) {
-    var query by remember { mutableStateOf("") }
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
     val configuration = LocalConfiguration.current
@@ -1001,49 +1016,13 @@ private fun SettingsDialog(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text(stringResource(R.string.saved_locations), color = Muted, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                LocationDropdown(state.locations, state.location, onSelectLocation)
-                state.locations.forEach { location ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text(location.name, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        TextButton(onClick = { onRemoveLocation(location) }, enabled = state.locations.size > 1) {
-                            Text(stringResource(R.string.remove))
-                        }
-                    }
-                }
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    label = { Text(stringResource(R.string.search_location)) },
+                LocationControls(
+                    locations = state.locations,
+                    selectedLocation = state.location,
+                    onSelectLocation = onSelectLocation,
+                    onSearchResult = onAddLocation,
+                    onRemoveLocation = onRemoveLocation,
                 )
-                Button(
-                    onClick = { onSearch(query) },
-                    enabled = query.trim().length >= 2 && !state.searchingLocations,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    if (state.searchingLocations) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                    else Text(stringResource(R.string.search))
-                }
-                state.locationResults.forEach { location ->
-                    Surface(
-                        modifier = Modifier.fillMaxWidth().clickable {
-                            onAddLocation(location)
-                            query = ""
-                        },
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        shape = RoundedCornerShape(8.dp),
-                    ) {
-                        Column(Modifier.padding(10.dp)) {
-                            Text(location.name, fontWeight = FontWeight.Bold)
-                            Text(location.country, color = Muted, fontSize = 10.sp)
-                        }
-                    }
-                }
                 Button(
                     onClick = {
                         if (context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {

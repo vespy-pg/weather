@@ -52,10 +52,10 @@ class WeatherWidgetProvider : AppWidgetProvider() {
                     val options = manager.getAppWidgetOptions(widgetId)
                     val density = context.resources.displayMetrics.density.coerceAtMost(2.5f)
                     val forecastHours = preferences.widgetForecastHours(widgetId)
-                    val dark = when (displaySettings.theme) {
+                    val dark = when (widgetSettings.theme) {
                         "dark" -> true
                         "light" -> false
-                        else -> context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
+                        else -> context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK == android.content.res.Configuration.UI_MODE_NIGHT_YES
                     }
                     val viewsBySize = widgetSizes(context, options).associateWith { size ->
                         val widthDp = size.width.roundToInt().coerceAtLeast(40)

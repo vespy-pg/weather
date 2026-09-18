@@ -26,6 +26,9 @@ class WeatherApi(private val baseUrl: String = BuildConfig.API_BASE_URL) {
                     latitude = item.optDouble("latitude"),
                     longitude = item.optDouble("longitude"),
                     timezone = item.optString("timezone").takeIf(String::isNotBlank) ?: "auto",
+                    admin1 = item.optString("admin1").takeIf(String::isNotBlank),
+                    admin2 = item.optString("admin2").takeIf(String::isNotBlank),
+                    postalCode = item.optString("postalCode").takeIf(String::isNotBlank),
                 ))
             }
         }
@@ -57,6 +60,9 @@ class WeatherApi(private val baseUrl: String = BuildConfig.API_BASE_URL) {
             latitude = item.optDouble("latitude", latitude),
             longitude = item.optDouble("longitude", longitude),
             timezone = item.optString("timezone").ifBlank { "auto" },
+            admin1 = item.optString("admin1").takeIf(String::isNotBlank),
+            admin2 = item.optString("admin2").takeIf(String::isNotBlank),
+            postalCode = item.optString("postalCode").takeIf(String::isNotBlank),
         )
     }
 

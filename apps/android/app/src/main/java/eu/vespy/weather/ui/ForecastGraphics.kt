@@ -550,6 +550,20 @@ object ForecastGraphics {
                 shader = LinearGradient(startX, 0f, endX, 0f, temperatureColor(start, temperatureThresholds), temperatureColor(end, temperatureThresholds), Shader.TileMode.CLAMP)
             })
         }
+        points.first().temperature?.let { first ->
+            canvas.drawLine(bounds.left, y(first), x(0), y(first), Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = temperatureColor(first, temperatureThresholds)
+                strokeWidth = 3.2f * pixelScale
+                strokeCap = Paint.Cap.ROUND
+            })
+        }
+        points.last().temperature?.let { last ->
+            canvas.drawLine(x(points.lastIndex), y(last), bounds.right, y(last), Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = temperatureColor(last, temperatureThresholds)
+                strokeWidth = 3.2f * pixelScale
+                strokeCap = Paint.Cap.ROUND
+            })
+        }
         points.forEachIndexed { index, point ->
             if (point.weatherCode !in listOf(95, 96, 99) || point.temperature == null) return@forEachIndexed
             val probability = ((point.precipitationProbability ?: 0.0) / 100.0).toFloat().coerceIn(0f, 1f)
@@ -570,6 +584,7 @@ object ForecastGraphics {
                 path.quadTo(x, y, (x + nextX) / 2f, (y + next) / 2f)
             }
         }
+        values.lastOrNull()?.let { y -> path.lineTo(left + values.size * cell, y) }
         return path
     }
 

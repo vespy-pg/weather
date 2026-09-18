@@ -34,7 +34,7 @@ class WeatherPreferences(context: Context) {
 
     fun displaySettings() = ForecastDisplaySettings(
         zoom = preferences.getFloat(KEY_ZOOM, .5f).takeIf { it in ZOOM_LEVELS } ?: .5f,
-        theme = preferences.getString(KEY_THEME, "system").takeIf { it in THEMES } ?: "system",
+        theme = preferences.getString(KEY_THEME, "dark").takeIf { it in THEMES } ?: "dark",
         language = preferences.getString(KEY_LANGUAGE, "system").takeIf { it in LANGUAGES } ?: "system",
         temperatureThresholds = TemperatureThresholds(
             deepFrost = preferences.getFloat(KEY_DEEP_FROST, -12f),
@@ -66,6 +66,15 @@ class WeatherPreferences(context: Context) {
                 }
             }
         editor.putString(KEY_LOCATIONS, encoded).apply()
+    }
+
+    fun migrateLegacyDefaultLocations(fallback: List<WeatherLocation>, obsolete: List<WeatherLocation>): List<WeatherLocation> {
+        val current = locations(fallback)
+        if (preferences.getBoolean(KEY_DEFAULT_LOCATIONS_MIGRATED, false)) return current
+        val migrated = current.filterNot { location -> obsolete.any { it.preferenceKey() == location.preferenceKey() } }.ifEmpty { fallback }
+        saveLocations(migrated)
+        preferences.edit().putBoolean(KEY_DEFAULT_LOCATIONS_MIGRATED, true).apply()
+        return migrated
     }
 
     fun saveActiveLocation(location: WeatherLocation) {
@@ -131,6 +140,7 @@ class WeatherPreferences(context: Context) {
     }
 
     fun widgetDisplaySettings(widgetId: Int, defaults: ForecastDisplaySettings = displaySettings()) = WidgetDisplaySettings(
+        theme = preferences.getString("${KEY_WIDGET_PREFIX}theme_$widgetId", "dark").takeIf { it in THEMES } ?: "dark",
         forceLocationName = preferences.getBoolean("${KEY_WIDGET_PREFIX}location_$widgetId", false),
         showHourlyTemperatures = preferences.getBoolean("${KEY_WIDGET_PREFIX}temperatures_$widgetId", defaults.showHourlyTemperatures),
         showApparentTemperature = preferences.getBoolean("${KEY_WIDGET_PREFIX}apparent_$widgetId", defaults.showApparentTemperature),
@@ -142,6 +152,7 @@ class WeatherPreferences(context: Context) {
 
     fun saveWidgetDisplaySettings(widgetId: Int, settings: WidgetDisplaySettings) {
         preferences.edit()
+            .putString("${KEY_WIDGET_PREFIX}theme_$widgetId", settings.theme)
             .putBoolean("${KEY_WIDGET_PREFIX}location_$widgetId", settings.forceLocationName)
             .putBoolean("${KEY_WIDGET_PREFIX}temperatures_$widgetId", settings.showHourlyTemperatures)
             .putBoolean("${KEY_WIDGET_PREFIX}apparent_$widgetId", settings.showApparentTemperature)
@@ -156,6 +167,7 @@ class WeatherPreferences(context: Context) {
         preferences.edit()
             .remove("$KEY_WIDGET_LOCATION_PREFIX$widgetId")
             .remove("$KEY_WIDGET_FORECAST_HOURS_PREFIX$widgetId")
+            .remove("${KEY_WIDGET_PREFIX}theme_$widgetId")
             .remove("${KEY_WIDGET_PREFIX}location_$widgetId")
             .remove("${KEY_WIDGET_PREFIX}temperatures_$widgetId")
             .remove("${KEY_WIDGET_PREFIX}apparent_$widgetId")
@@ -172,6 +184,9 @@ class WeatherPreferences(context: Context) {
         put("latitude", latitude)
         put("longitude", longitude)
         put("timezone", timezone)
+        put("admin1", admin1)
+        put("admin2", admin2)
+        put("postalCode", postalCode)
     }
 
     private fun WeatherLocation.preferenceKey() = "$latitude,$longitude"
@@ -186,12 +201,16 @@ class WeatherPreferences(context: Context) {
             latitude = latitude,
             longitude = longitude,
             timezone = optString("timezone").takeIf(String::isNotBlank) ?: "auto",
+            admin1 = optString("admin1").takeIf(String::isNotBlank),
+            admin2 = optString("admin2").takeIf(String::isNotBlank),
+            postalCode = optString("postalCode").takeIf(String::isNotBlank),
         )
     }
 
     private companion object {
         const val PREFERENCES_NAME = "weather_preferences"
         const val KEY_LOCATIONS = "favorite_locations"
+        const val KEY_DEFAULT_LOCATIONS_MIGRATED = "default_locations_migrated_v2"
         const val KEY_ACTIVE_LOCATION = "active_location"
         const val KEY_TEMPERATURE_UNIT = "temperature_unit"
         const val KEY_ANALYTICS_CONSENT = "analytics_consent"

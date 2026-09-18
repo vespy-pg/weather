@@ -6,6 +6,9 @@ data class WeatherLocation(
     val latitude: Double,
     val longitude: Double,
     val timezone: String,
+    val admin1: String? = null,
+    val admin2: String? = null,
+    val postalCode: String? = null,
 )
 
 data class CurrentWeather(
@@ -77,7 +80,7 @@ data class PromotionFeed(
 
 data class ForecastDisplaySettings(
     val zoom: Float = .5f,
-    val theme: String = "system",
+    val theme: String = "dark",
     val language: String = "system",
     val temperatureThresholds: TemperatureThresholds = TemperatureThresholds(),
     val showHourlyTemperatures: Boolean = true,
@@ -99,6 +102,7 @@ data class TemperatureThresholds(
 )
 
 data class WidgetDisplaySettings(
+    val theme: String = "dark",
     val forceLocationName: Boolean = false,
     val showHourlyTemperatures: Boolean = true,
     val showApparentTemperature: Boolean = true,
@@ -174,7 +178,11 @@ fun List<HourlyWeather>.timelineWindow(currentTimestamp: String, futureDays: Int
     val currentIndex = indexOfFirst { it.timestamp.take(13) == currentHour }
     if (currentIndex < 0) return take(futureDays.coerceAtLeast(0) * 24)
     val start = (currentIndex - historyDays.coerceAtLeast(0) * 24).coerceAtLeast(0)
-    val end = (currentIndex + futureDays.coerceAtLeast(0) * 24).coerceAtMost(size)
+    val requestedEnd = (currentIndex + futureDays.coerceAtLeast(0) * 24).coerceAtMost(size)
+    val boundaryDate = getOrNull(requestedEnd - 1)?.timestamp?.take(10)
+    val end = if (boundaryDate == null) requestedEnd else {
+        (requestedEnd until size).firstOrNull { this[it].timestamp.take(10) != boundaryDate } ?: size
+    }
     return subList(start, end)
 }
 
