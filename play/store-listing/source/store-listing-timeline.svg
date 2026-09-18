@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" role="img" aria-labelledby="slide-title slide-description">
+  <title id="slide-title">See weather unfold</title>
+  <desc id="slide-description">A real Vespy Weather timeline showing weather history and a multi-day hourly forecast.</desc>
+
+  <style>
+    .text-eyebrow {
+      fill: #75bdff;
+      font-family: Inter, Arial, sans-serif;
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: 5px;
+    }
+
+    .text-title {
+      fill: #ffffff;
+      font-family: Inter, Arial, sans-serif;
+      font-size: 84px;
+      font-weight: 800;
+      letter-spacing: -1.5px;
+    }
+
+    .text-subtitle {
+      fill: #c2d2e4;
+      font-family: Inter, Arial, sans-serif;
+      font-size: 33px;
+      font-weight: 400;
+    }
+
+    .text-feature {
+      fill: #e7edf7;
+      font-family: Inter, Arial, sans-serif;
+      font-size: 27px;
+      font-weight: 700;
+    }
+  </style>
+
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#173854"/>
+      <stop offset=".5" stop-color="#0c2635"/>
+      <stop offset="1" stop-color="#07151d"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-25%" width="120%" height="160%">
+      <feDropShadow dx="0" dy="22" stdDeviation="28" flood-color="#000000" flood-opacity=".5"/>
+    </filter>
+    <clipPath id="timeline-clip">
+      <rect x="91" y="421" width="1738" height="380" rx="20"/>
+    </clipPath>
+  </defs>
+
+  <rect width="1920" height="1080" fill="url(#background)"/>
+  <circle cx="1780" cy="-180" r="590" fill="#58a6ff" opacity=".08"/>
+  <circle cx="1760" cy="1280" r="640" fill="#45cf88" opacity=".05"/>
+
+  <text class="text-eyebrow" x="94" y="92">VESPY WEATHER</text>
+  <text class="text-title" x="94" y="218">See weather unfold</text>
+  <text class="text-subtitle" x="99" y="305">Temperature, sky, precipitation and wind on one continuous timeline.</text>
+
+  <g filter="url(#shadow)">
+    <rect x="75" y="405" width="1770" height="412" rx="30" fill="#09111b" stroke="#527090" stroke-width="3"/>
+    <image
+      href="timeline-forecast.png"
+      x="91"
+      y="421"
+      width="1738"
+      height="380"
+      preserveAspectRatio="xMidYMid meet"
+      clip-path="url(#timeline-clip)"
+    />
+  </g>
+
+  <g transform="translate(94 920)">
+    <circle cx="9" cy="-8" r="9" fill="#ffd83d"/>
+    <text class="text-feature" x="38" y="2">Weather history</text>
+  </g>
+  <g transform="translate(680 920)">
+    <circle cx="9" cy="-8" r="9" fill="#45cf88"/>
+    <text class="text-feature" x="38" y="2">Hourly forecast</text>
+  </g>
+  <g transform="translate(1248 920)">
+    <circle cx="9" cy="-8" r="9" fill="#58a6ff"/>
+    <text class="text-feature" x="38" y="2">Storms, snow and wind</text>
+  </g>
+</svg>
