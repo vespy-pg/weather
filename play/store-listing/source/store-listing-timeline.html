@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vespy Weather - timeline store graphic</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      min-height: 100%;
+      margin: 0;
+      background: #050c12;
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+    }
+
+    .store-slide {
+      display: block;
+      width: 1920px;
+      height: 1080px;
+      border: 0;
+    }
+  </style>
+</head>
+<body>
+  <!--
+    The SVG provides the vector background, typography and frame.
+    It overlays timeline-forecast.png using a relative path, so keep all
+    three files in the same directory.
+  -->
+  <object
+    class="store-slide"
+    data="store-listing-timeline.svg"
+    type="image/svg+xml"
+    aria-label="Vespy Weather timeline store graphic"
+  ></object>
+</body>
+</html>
