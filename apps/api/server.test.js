@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {forecastUrl, isForecastRoutePath, locationMatchesQualifiers, locationSearchUrl, mushroomCondition, mushroomObservationsUrl, normalizeForecast, normalizeGoogleAnalyticsId, normalizeLocale, normalizeMushroomObservations, normalizePostalLocations, normalizeReverseLocation, postalCodeSearchUrl, preferredLanguageForCountry, promotionFeed, renderIndexHtml, selectCapitalResult, seoPageMetadata, staticCacheControl} from './server.js';
+import {forecastUrl, isForecastRoutePath, locationMatchesQualifiers, locationSearchUrl, locationSearchVariants, mushroomCondition, mushroomObservationsUrl, normalizeForecast, normalizeGoogleAnalyticsId, normalizeLocale, normalizeMushroomObservations, normalizePostalLocations, normalizeReverseLocation, normalizedSearchText, postalCodeSearchUrl, preferredLanguageForCountry, promotionFeed, rankLocationCandidates, renderIndexHtml, selectCapitalResult, seoPageMetadata, staticCacheControl} from './server.js';
 
 test('forces application assets and the service worker to revalidate', () => {
   assert.equal(staticCacheControl('/assets/app.js'), 'no-cache');
@@ -189,6 +189,30 @@ test('location qualifiers match administrative areas without diacritics', () => 
   assert.equal(locationMatchesQualifiers(zawada, ['kamienica']), true);
   assert.equal(locationMatchesQualifiers(zawada, ['slaskie', 'kamienica']), true);
   assert.equal(locationMatchesQualifiers(zawada, ['myszkow']), false);
+});
+
+test('location search normalizes non-decomposing letters across languages', () => {
+  assert.equal(normalizedSearchText('Mysłowice'), 'myslowice');
+  assert.equal(normalizedSearchText('Łódź'), 'lodz');
+  assert.equal(normalizedSearchText('Sønderborg'), 'sonderborg');
+  assert.equal(normalizedSearchText('Đorđevac'), 'dordevac');
+  assert.equal(normalizedSearchText('Straße'), 'strasse');
+});
+
+test('location search generates generic provider variants without changing display names', () => {
+  assert.equal(locationSearchVariants('myslo').includes('mysło'), true);
+  assert.equal(locationSearchVariants('lodz').includes('łodz'), true);
+  assert.equal(locationSearchVariants('sonderborg').includes('sønderborg'), true);
+  assert.equal(locationSearchVariants('strasse').includes('straße'), true);
+});
+
+test('location search ranks accent-equivalent provider names by exactness and population', () => {
+  const results = rankLocationCandidates([
+    {id: 1, name: 'Myslov', population: 400},
+    {id: 2, name: 'Mysłowice', population: 74601},
+    {id: 3, name: 'Other place', population: 1000000}
+  ], 'myslo');
+  assert.deepEqual(results.map(item => item.name), ['Mysłowice', 'Myslov']);
 });
 
 test('postal code fallback supports localized Polish and US formats', () => {

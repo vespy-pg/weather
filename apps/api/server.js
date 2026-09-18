@@ -404,8 +404,61 @@ export function locationSearchUrl(query, language = DEFAULT_LOCALE, count = 8) {
   return `https://geocoding-api.open-meteo.com/v1/search?${parameters}`;
 }
 
-function normalizedSearchText(value) {
-  return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+const SEARCH_TRANSLITERATIONS = [
+  ['ae', 'æ'],
+  ['d', 'đ'],
+  ['d', 'ð'],
+  ['h', 'ħ'],
+  ['i', 'ı'],
+  ['ij', 'ĳ'],
+  ['k', 'ĸ'],
+  ['l', 'ł'],
+  ['n', 'ŋ'],
+  ['o', 'ø'],
+  ['oe', 'œ'],
+  ['ss', 'ß'],
+  ['t', 'ŧ'],
+  ['th', 'þ']
+];
+const SEARCH_TRANSLITERATION_MAP = new Map(SEARCH_TRANSLITERATIONS.map(([ascii, letter]) => [letter, ascii]));
+
+export function normalizedSearchText(value) {
+  return Array.from(String(value || '').normalize('NFKD').toLowerCase())
+    .filter(character => !/\p{M}/u.test(character))
+    .map(character => SEARCH_TRANSLITERATION_MAP.get(character) || character)
+    .join('');
+}
+
+export function locationSearchVariants(value, limit = 8) {
+  const source = String(value || '').normalize('NFC').toLowerCase();
+  const variants = [source];
+  const seen = new Set(variants);
+  for (const [ascii, letter] of SEARCH_TRANSLITERATIONS) {
+    let position = source.indexOf(ascii);
+    while (position >= 0 && variants.length < limit) {
+      const candidate = `${source.slice(0, position)}${letter}${source.slice(position + ascii.length)}`;
+      if (!seen.has(candidate)) {
+        seen.add(candidate);
+        variants.push(candidate);
+      }
+      position = source.indexOf(ascii, position + 1);
+    }
+  }
+  return variants;
+}
+
+export function rankLocationCandidates(candidates, query) {
+  const normalizedQuery = normalizedSearchText(query);
+  return candidates
+    .map((item, index) => ({item, index, normalizedName: normalizedSearchText(item.name)}))
+    .filter(({normalizedName}) => normalizedName.startsWith(normalizedQuery))
+    .sort((left, right) => {
+      const exactDifference = Number(right.normalizedName === normalizedQuery) - Number(left.normalizedName === normalizedQuery);
+      if (exactDifference) return exactDifference;
+      const populationDifference = Number(right.item.population || 0) - Number(left.item.population || 0);
+      return populationDifference || left.index - right.index;
+    })
+    .map(({item}) => item);
 }
 
 export function locationMatchesQualifiers(location, qualifiers) {
@@ -450,15 +503,30 @@ async function locations(requestUrl, response) {
   const language = requestUrl.searchParams.get('language');
   const resultLimit = Math.max(1, Math.min(50, Number.parseInt(requestUrl.searchParams.get('limit') || '8', 10) || 8));
   const commaParts = query.split(',').map(value => value.trim()).filter(Boolean);
-  const fetchLocations = async (value, count = resultLimit + 1) => (await cachedFetch(locationSearchUrl(value, language, count))).results || [];
+  const fetchLocations = async value => {
+    const directResults = (await cachedFetch(locationSearchUrl(value, language, 100))).results || [];
+    const variants = directResults.length < 100 ? locationSearchVariants(value).slice(1) : [];
+    const variantResults = await Promise.all(variants.map(async variant => (
+      (await cachedFetch(locationSearchUrl(variant, language, 100))).results || []
+    )));
+    const uniqueResults = [];
+    const seenIds = new Set();
+    for (const item of [directResults, ...variantResults].flat()) {
+      const id = String(item.id ?? `${item.latitude}:${item.longitude}:${item.name}`);
+      if (seenIds.has(id)) continue;
+      seenIds.add(id);
+      uniqueResults.push(item);
+    }
+    return rankLocationCandidates(uniqueResults, value);
+  };
   let providerResults;
   if (commaParts.length > 1) {
-    providerResults = (await fetchLocations(commaParts[0], 100)).filter(item => locationMatchesQualifiers(item, commaParts.slice(1)));
+    providerResults = (await fetchLocations(commaParts[0])).filter(item => locationMatchesQualifiers(item, commaParts.slice(1)));
   } else {
     providerResults = await fetchLocations(query);
     const words = query.split(/\s+/).filter(Boolean);
     for (let split = words.length - 1; providerResults.length === 0 && split > 0; split -= 1) {
-      const candidates = await fetchLocations(words.slice(0, split).join(' '), 100);
+      const candidates = await fetchLocations(words.slice(0, split).join(' '));
       providerResults = candidates.filter(item => locationMatchesQualifiers(item, words.slice(split)));
     }
   }
