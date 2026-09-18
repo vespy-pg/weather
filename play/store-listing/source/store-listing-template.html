@@ -157,6 +157,31 @@
       object-position: center;
     }
 
+    .widget-gallery {
+      position: absolute;
+      z-index: 1;
+      top: 48px;
+      left: 76px;
+      display: flex;
+      width: 780px;
+      height: 936px;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 24px;
+      overflow: hidden;
+      border: 3px solid var(--border);
+      border-radius: var(--corner);
+      background: var(--surface);
+      box-shadow: 0 22px 28px rgb(0 0 0 / 50%);
+    }
+
+    .widget-gallery img {
+      display: block;
+      width: 100%;
+      height: auto;
+      filter: drop-shadow(0 18px 18px rgb(0 0 0 / 42%));
+    }
+
     .feature-list {
       display: grid;
       gap: 30px;
@@ -310,13 +335,15 @@
     - layout-wide-bottom
     - layout-phone-left
 
-    For a clean source screenshot, replace widgets-home.png below. The image is
-    clipped by the frame and never synthesized or redrawn by this template.
+    The widget gallery uses three real captures with transparent backgrounds.
+    Keep the PNG files next to this HTML file.
   -->
   <main class="store-slide layout-split-left">
-    <figure class="screenshot-frame">
-      <img src="widgets-home.png" alt="Vespy Weather widgets on an Android home screen">
-    </figure>
+    <div class="widget-gallery" aria-label="Three Vespy Weather home-screen widgets">
+      <img src="widget-timeline-isolated.png" alt="Weather timeline widget">
+      <img src="widget-advisory-isolated.png" alt="Weather and warnings widget">
+      <img src="widget-sky-wind-isolated.png" alt="Sky and wind widget">
+    </div>
 
     <section class="slide-copy">
       <p class="text-eyebrow">Home-screen widgets</p>
