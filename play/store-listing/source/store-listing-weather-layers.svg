@@ -66,7 +66,7 @@
   <g filter="url(#shadow)">
     <rect x="75" y="368" width="1770" height="195" rx="28" fill="#142333" stroke="#2f5575" stroke-width="2"/>
     <text class="text-section-title" x="112" y="445">Sky</text>
-    <text class="text-section-description" x="112" y="480">Clouds, rain and snow</text>
+    <text class="text-section-description" x="112" y="480">Sun, clouds and rain</text>
     <image href="sky.png" x="324" y="390" width="1490" height="151" preserveAspectRatio="xMidYMid meet" clip-path="url(#sky-clip)"/>
   </g>
 
