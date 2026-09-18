@@ -2,10 +2,10 @@
 
 ## Release artifact
 
-- [x] Increase the Android version to `0.1.4` with version code `5`.
+- [x] Increase the Android version to `0.1.5` with version code `6`.
 - [x] Run `./gradlew clean test lint bundleRelease` from `apps/android`.
 - [x] Verify the generated AAB with `jarsigner`.
-- [ ] Upload `apps/android/app/build/outputs/bundle/release/app-release.aab` to Closed testing.
+- [ ] Upload `apps/android/app/build/outputs/bundle/release/app-release.aab` as an update to the main Closed testing track.
 - [ ] Add the English and Polish notes from `play/store-listing`.
 
 ## Closed track

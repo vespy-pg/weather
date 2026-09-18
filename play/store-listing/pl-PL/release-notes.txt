@@ -1,1 +1,1 @@
-Dodano wielozjawiskowe podsumowania pogody, oficjalne ostrzeżenia MeteoAlarm i nowy widget prognozy z alertami. Ulepszono responsywne układy widgetów, niezależne motywy, wyszukiwanie lokalizacji i czytelność prognozy.
+Wprowadzono pełnoekranowe ustawienia aplikacji i widgetów, dodano kompaktowy widget nieba i wiatru oraz ulepszono podglądy i skalowanie widgetów.
