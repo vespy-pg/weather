@@ -1,0 +1,1 @@
+Initial testing release with the ten-day weather timeline, three-day history, saved locations, configurable display layers and custom home-screen widgets.

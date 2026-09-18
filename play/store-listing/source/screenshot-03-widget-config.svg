@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#102c49"/><stop offset=".52" stop-color="#0b1e31"/><stop offset="1" stop-color="#07111c"/></linearGradient>
+    <filter id="shadow" x="-25%" y="-20%" width="150%" height="160%"><feDropShadow dx="0" dy="25" stdDeviation="30" flood-color="#000" flood-opacity=".5"/></filter>
+    <clipPath id="screen"><rect x="85" y="55" width="585" height="900" rx="34"/></clipPath>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+  <circle cx="1710" cy="920" r="420" fill="#45cf88" opacity=".07"/>
+  <g filter="url(#shadow)">
+    <rect x="85" y="55" width="585" height="900" rx="34" fill="#0b1018" stroke="#527090" stroke-width="3"/>
+    <image href="widget-configuration.png" x="85" y="55" width="585" height="1266" preserveAspectRatio="none" clip-path="url(#screen)"/>
+  </g>
+  <text x="790" y="175" fill="#75bdff" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="800" letter-spacing="5">YOUR FORECAST, YOUR WIDGET</text>
+  <text x="790" y="315" fill="#fff" font-family="Inter,Arial,sans-serif" font-size="85" font-weight="800">Build the widget</text>
+  <text x="790" y="412" fill="#fff" font-family="Inter,Arial,sans-serif" font-size="85" font-weight="800">around your day</text>
+  <text x="795" y="505" fill="#c4d4e6" font-family="Inter,Arial,sans-serif" font-size="33">Configure each widget independently.</text>
+  <g font-family="Inter,Arial,sans-serif" font-size="28" font-weight="700">
+    <circle cx="806" cy="625" r="9" fill="#ffd83d"/><text x="836" y="635" fill="#e7edf7">Choose its location</text>
+    <circle cx="806" cy="700" r="9" fill="#45cf88"/><text x="836" y="710" fill="#e7edf7">Set the forecast range</text>
+    <circle cx="806" cy="775" r="9" fill="#58a6ff"/><text x="836" y="785" fill="#e7edf7">Control theme and detail</text>
+    <circle cx="806" cy="850" r="9" fill="#8bdcff"/><text x="836" y="860" fill="#e7edf7">Resize it on your home screen</text>
+  </g>
+</svg>

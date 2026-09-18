@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#163c62"/><stop offset=".58" stop-color="#0b2035"/><stop offset="1" stop-color="#07111c"/></linearGradient>
+    <filter id="shadow" x="-20%" y="-30%" width="140%" height="180%"><feDropShadow dx="0" dy="24" stdDeviation="28" flood-color="#000" flood-opacity=".48"/></filter>
+    <clipPath id="screen"><rect x="75" y="647" width="1770" height="299" rx="20"/></clipPath>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+  <circle cx="1670" cy="-270" r="610" fill="#ffd83d" opacity=".11"/>
+  <text x="94" y="103" fill="#75bdff" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="800" letter-spacing="5">VESPY WEATHER</text>
+  <text x="94" y="244" fill="#fff" font-family="Inter,Arial,sans-serif" font-size="92" font-weight="800">The whole forecast</text>
+  <text x="94" y="347" fill="#fff" font-family="Inter,Arial,sans-serif" font-size="92" font-weight="800">at a glance</text>
+  <text x="99" y="425" fill="#c2d2e4" font-family="Inter,Arial,sans-serif" font-size="34">Temperature, sky, precipitation and wind stay aligned hour by hour.</text>
+  <g font-family="Inter,Arial,sans-serif" font-size="25" font-weight="700">
+    <text x="99" y="505" fill="#ffd83d">10-day forecast</text>
+    <text x="360" y="505" fill="#45cf88">3-day history</text>
+    <text x="580" y="505" fill="#58a6ff">Continuous timeline</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="75" y="647" width="1770" height="299" rx="20" fill="#09111b" stroke="#45617f" stroke-width="3"/>
+    <image href="demo-timeline.png" x="75" y="647" width="1770" height="299" preserveAspectRatio="none" clip-path="url(#screen)"/>
+  </g>
+</svg>

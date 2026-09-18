@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#173854"/><stop offset=".5" stop-color="#0c2635"/><stop offset="1" stop-color="#07151d"/></linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="25" stdDeviation="35" flood-color="#000" flood-opacity=".5"/></filter>
+    <clipPath id="preview"><rect x="900" y="95" width="920" height="890" rx="36"/></clipPath>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+  <circle cx="250" cy="990" r="510" fill="#58a6ff" opacity=".08"/>
+  <text x="105" y="155" fill="#75bdff" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="800" letter-spacing="5">LIVE ON YOUR HOME SCREEN</text>
+  <text x="105" y="285" fill="#fff" font-family="Inter,Arial,sans-serif" font-size="72" font-weight="800">See what comes next</text>
+  <text x="105" y="370" fill="#fff" font-family="Inter,Arial,sans-serif" font-size="72" font-weight="800">without opening</text>
+  <text x="105" y="455" fill="#fff" font-family="Inter,Arial,sans-serif" font-size="72" font-weight="800">the app</text>
+  <text x="110" y="555" fill="#c4d4e6" font-family="Inter,Arial,sans-serif" font-size="31">Sky, temperature and wind remain readable</text>
+  <text x="110" y="598" fill="#c4d4e6" font-family="Inter,Arial,sans-serif" font-size="31">from compact tiles to wide dashboards.</text>
+  <g font-family="Inter,Arial,sans-serif" font-size="27" font-weight="700">
+    <rect x="110" y="690" width="280" height="58" rx="29" fill="#183b58" stroke="#58a6ff"/><text x="151" y="728" fill="#e7edf7">6 hours to 5 days</text>
+    <rect x="415" y="690" width="225" height="58" rx="29" fill="#173a34" stroke="#45cf88"/><text x="458" y="728" fill="#e7edf7">Light or dark</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="900" y="95" width="920" height="890" rx="36" fill="#111a27" stroke="#4a6682" stroke-width="3"/>
+    <image href="widget-6x4.png" x="1015" y="170" width="690" height="395" clip-path="url(#preview)"/>
+    <image href="widget-2x2.png" x="975" y="680" width="256" height="220" clip-path="url(#preview)"/>
+    <image href="widget-4x2.png" x="1280" y="690" width="470" height="202" clip-path="url(#preview)"/>
+  </g>
+</svg>

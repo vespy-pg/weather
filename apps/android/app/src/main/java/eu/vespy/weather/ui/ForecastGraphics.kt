@@ -15,6 +15,7 @@ import eu.vespy.weather.data.TemperatureThresholds
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.TextStyle
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.atan2
@@ -79,11 +80,13 @@ object ForecastGraphics {
         labelHeight: Float,
         skyHeight: Float,
         windHeight: Float,
+        mushroomHeight: Float = 0f,
         pixelScale: Float,
     ) {
         val palette = palette(dark)
         val skyBottom = bounds.top + labelHeight + skyHeight
-        val temperatureBottom = bounds.bottom - windHeight
+        val temperatureBottom = bounds.bottom - windHeight - mushroomHeight
+        val windBottom = bounds.bottom - mushroomHeight
         val centerX = bounds.centerX()
         canvas.drawRect(bounds, Paint().apply { color = palette.background })
 
@@ -94,6 +97,7 @@ object ForecastGraphics {
         canvas.drawLine(bounds.right - pixelScale, bounds.top, bounds.right - pixelScale, bounds.bottom, separator)
         canvas.drawLine(bounds.left, skyBottom, bounds.right, skyBottom, separator)
         canvas.drawLine(bounds.left, temperatureBottom, bounds.right, temperatureBottom, separator)
+        if (mushroomHeight > 0f) canvas.drawLine(bounds.left, windBottom, bounds.right, windBottom, separator)
 
         val skySectionHeight = skyBottom - bounds.top
         val iconStroke = 1.6f * pixelScale
@@ -202,6 +206,7 @@ object ForecastGraphics {
         labelHeight: Float,
         skyHeight: Float,
         windHeight: Float,
+        mushroomHeight: Float = 0f,
         temperatureUnit: String = "C",
         pixelScale: Float = 1f,
         textScale: Float = 1f,
@@ -209,6 +214,7 @@ object ForecastGraphics {
         temperatureStep: Int = 1,
         precipitationScale: Float = 1f,
         showWeekdayNames: Boolean = false,
+        fullWeekdayNames: Boolean = false,
         dayLabelTextSize: Float? = null,
         hourTextSize: Float? = null,
         temperatureTextSize: Float? = null,
@@ -219,29 +225,81 @@ object ForecastGraphics {
         showWind: Boolean = true,
         showWindArrows: Boolean = false,
         temperatureThresholds: TemperatureThresholds = TemperatureThresholds(),
+        currentTimestamp: String? = null,
+        showDates: Boolean = false,
+        showHistory: Boolean = false,
+        historyLabel: String = "",
+        showMushrooms: Boolean = false,
+        temperatureMinimum: Double? = null,
+        temperatureMaximum: Double? = null,
+        demoLabel: String? = null,
+        demoEveryDay: Boolean = false,
+        pointOffset: Int = 0,
+        lightningScale: Float = 1f,
     ) {
         if (points.isEmpty() || bounds.width() <= 0f || bounds.height() <= 0f) return
         val palette = palette(dark)
         val sky = RectF(bounds.left, bounds.top, bounds.right, bounds.top + labelHeight + skyHeight)
-        val temperature = RectF(sky.left, sky.bottom, sky.right, bounds.bottom - windHeight)
-        val wind = RectF(bounds.left, temperature.bottom, bounds.right, bounds.bottom)
+        val temperature = RectF(sky.left, sky.bottom, sky.right, bounds.bottom - windHeight - mushroomHeight)
+        val wind = RectF(bounds.left, temperature.bottom, bounds.right, bounds.bottom - mushroomHeight)
+        val mushrooms = RectF(bounds.left, wind.bottom, bounds.right, bounds.bottom)
         canvas.drawRect(bounds, Paint().apply { color = palette.background })
         drawSky(
             canvas, sky, points, days, palette, todayLabel, labelHeight, temperatureUnit,
             pixelScale, textScale, showHours, temperatureStep.coerceAtLeast(1), precipitationScale,
-            showWeekdayNames, dayLabelTextSize, hourTextSize, temperatureTextSize,
-            showTemperatureValues, showPrecipitation, temperatureThresholds,
+            showWeekdayNames, fullWeekdayNames, dayLabelTextSize, hourTextSize, temperatureTextSize,
+            showTemperatureValues, showPrecipitation, temperatureThresholds, currentTimestamp, showDates,
         )
-        drawTemperature(canvas, temperature, points, palette, pixelScale, showApparentTemperature, temperatureThresholds)
+        drawTemperature(canvas, temperature, points, palette, pixelScale, showApparentTemperature, temperatureThresholds, temperatureMinimum, temperatureMaximum, lightningScale)
+        if (demoLabel != null) drawDemoWatermarks(canvas, temperature, points, demoLabel, demoEveryDay, pixelScale, palette)
         if (showWind) {
-            drawWind(canvas, wind, points, palette, pixelScale, windScale)
+            drawWind(canvas, wind, points, palette, pixelScale, windScale, pointOffset)
             if (showWindArrows) drawWindAnnotations(canvas, wind, points, palette, pixelScale)
+        }
+        if (showMushrooms && mushroomHeight > 0f) drawMushrooms(canvas, mushrooms, points, days, palette, pixelScale)
+        if (showHistory && currentTimestamp != null) {
+            drawHistoryOverlay(canvas, bounds, points, currentTimestamp, historyLabel, pixelScale)
         }
         drawDaySeparators(canvas, bounds, points, palette, pixelScale)
         val border = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = palette.grid; strokeWidth = pixelScale; style = Paint.Style.STROKE }
         canvas.drawLine(bounds.left, sky.bottom, bounds.right, sky.bottom, border)
         canvas.drawLine(bounds.left, temperature.bottom, bounds.right, temperature.bottom, border)
+        if (showMushrooms && mushroomHeight > 0f) canvas.drawLine(bounds.left, wind.bottom, bounds.right, wind.bottom, border)
         canvas.drawLine(bounds.left, bounds.bottom - 1f, bounds.right, bounds.bottom - 1f, border)
+    }
+
+    private fun drawMushrooms(
+        canvas: Canvas,
+        bounds: RectF,
+        points: List<HourlyWeather>,
+        days: List<DailyWeather>,
+        palette: ForecastPalette,
+        pixelScale: Float,
+    ) {
+        if (points.isEmpty() || bounds.height() <= 0f) return
+        val conditions = days.associateBy(DailyWeather::date)
+        val cell = bounds.width() / points.size
+        points.forEachIndexed { index, point ->
+            val score = conditions[point.timestamp.take(10)]?.mushroom?.score
+            val color = if (score == null) palette.background else Color.HSVToColor(
+                if (Color.luminance(palette.background) < .5f) 210 else 238,
+                floatArrayOf(18f + score.coerceIn(0, 100) / 100f * 82f, .4f, if (Color.luminance(palette.background) < .5f) .28f else .78f),
+            )
+            val left = bounds.left + index * cell
+            canvas.drawRect(left, bounds.top, left + cell, bounds.bottom, Paint().apply { this.color = color })
+            if (index == 0 || point.timestamp.take(10) != points[index - 1].timestamp.take(10)) {
+                val icon = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    this.color = if (Color.luminance(color) < .5f) Color.WHITE else Color.rgb(53, 45, 31)
+                    textSize = 9f * pixelScale
+                    typeface = Typeface.create("monospace", Typeface.BOLD)
+                }
+                val iconX = left + 10f * pixelScale
+                val iconY = bounds.centerY()
+                canvas.drawArc(RectF(iconX - 6f * pixelScale, iconY - 7f * pixelScale, iconX + 6f * pixelScale, iconY + 3f * pixelScale), 180f, 180f, true, icon)
+                canvas.drawRoundRect(RectF(iconX - 2f * pixelScale, iconY, iconX + 2f * pixelScale, iconY + 7f * pixelScale), pixelScale, pixelScale, icon)
+                canvas.drawText("${score ?: "-"}/100", iconX + 9f * pixelScale, iconY - (icon.ascent() + icon.descent()) / 2f, icon)
+            }
+        }
     }
 
     private fun drawSky(
@@ -259,12 +317,15 @@ object ForecastGraphics {
         temperatureStep: Int,
         precipitationScale: Float,
         showWeekdayNames: Boolean,
+        fullWeekdayNames: Boolean,
         dayLabelTextSize: Float?,
         hourTextSize: Float?,
         temperatureTextSize: Float?,
         showTemperatureValues: Boolean,
         showPrecipitation: Boolean,
         temperatureThresholds: TemperatureThresholds,
+        currentTimestamp: String?,
+        showDates: Boolean,
     ) {
         val cell = bounds.width() / points.size
         val daylightByDate = days.associateBy({ it.date }, { day ->
@@ -287,8 +348,9 @@ object ForecastGraphics {
 
         drawHeader(
             canvas, bounds, points, palette, todayLabel, labelHeight, cell, temperatureUnit,
-            textScale, showHours, temperatureStep, pixelScale, showWeekdayNames,
+            textScale, showHours, temperatureStep, pixelScale, showWeekdayNames, fullWeekdayNames,
             dayLabelTextSize, hourTextSize, temperatureTextSize, showTemperatureValues, temperatureThresholds,
+            currentTimestamp, showDates,
         )
         val weatherLine = bounds.top + labelHeight
         val weatherDepth = (bounds.height() - labelHeight) * .58f
@@ -327,9 +389,9 @@ object ForecastGraphics {
             val x = bounds.left + (index + .5f) * cell
             val alpha = (.22f + probability / 100f * .78f).coerceIn(0f, 1f)
             when (point.weatherCode) {
-                71, 73, 75, 77, 85, 86 -> drawSnow(canvas, x, precipitationY, (4.5f * pixelScale + sqrt(max(0.0, point.snowfall ?: 0.0)).toFloat() * 3f * pixelScale) * precipitationScale, alpha, palette, pixelScale)
-                96, 99 -> drawHail(canvas, x, precipitationY, (4f * pixelScale + sqrt(amount) * 1.6f * pixelScale) * precipitationScale, alpha, palette, pixelScale)
-                else -> drawDrop(canvas, x, precipitationY, (5.5f * pixelScale + min(9f * pixelScale, sqrt(amount) * 4f * pixelScale)) * precipitationScale, alpha, palette)
+                71, 73, 75, 77, 85, 86 -> drawSnow(canvas, x, precipitationY, (4.5f * pixelScale + sqrt(max(0.0, point.snowfall ?: 0.0)).toFloat() * 1.2f * pixelScale) * precipitationScale, alpha, palette, pixelScale)
+                96, 99 -> drawHail(canvas, x, precipitationY, (4f * pixelScale + sqrt(amount) * .55f * pixelScale) * precipitationScale, alpha, palette, pixelScale)
+                else -> drawDrop(canvas, x, precipitationY, (5.5f * pixelScale + min(5.5f * pixelScale, sqrt(amount) * 2.4f * pixelScale)) * precipitationScale, alpha, palette)
             }
         }
     }
@@ -348,15 +410,18 @@ object ForecastGraphics {
         temperatureStep: Int,
         pixelScale: Float,
         showWeekdayNames: Boolean,
+        fullWeekdayNames: Boolean,
         dayLabelTextSize: Float?,
         hourTextSize: Float?,
         temperatureTextSize: Float?,
         showTemperatureValues: Boolean,
         temperatureThresholds: TemperatureThresholds,
+        currentTimestamp: String?,
+        showDates: Boolean,
     ) {
         val mono = Typeface.create("monospace", Typeface.BOLD)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = mono; textAlign = Paint.Align.CENTER }
-        val today = LocalDate.now()
+        val today = parseDateTime(currentTimestamp)?.toLocalDate() ?: LocalDate.now()
         points.forEachIndexed { index, point ->
             val dateTime = parseDateTime(point.timestamp)
             val newDay = index == 0 || point.timestamp.take(10) != points[index - 1].timestamp.take(10)
@@ -364,12 +429,20 @@ object ForecastGraphics {
                 paint.color = palette.text
                 paint.textAlign = Paint.Align.LEFT
                 paint.textSize = dayLabelTextSize ?: height * .17f * textScale
-                val label = if (dateTime?.toLocalDate() == today) todayLabel.uppercase() else dateTime?.let {
-                    if (showWeekdayNames) it.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()).uppercase()
+                val dayName = if (dateTime?.toLocalDate() == today) todayLabel.uppercase() else dateTime?.let {
+                    if (showWeekdayNames) it.dayOfWeek.getDisplayName(if (fullWeekdayNames) TextStyle.FULL else TextStyle.SHORT, Locale.getDefault()).uppercase()
                     else "%02d/%02d".format(it.dayOfMonth, it.monthValue)
                 }.orEmpty()
-                val labelBaseline = bounds.top + max(4f * pixelScale, height * .05f) - paint.fontMetrics.top
+                val dateLabel = if (showDates && dateTime != null && dateTime.toLocalDate() != today) {
+                    " " + dateTime.format(DateTimeFormatter.ofPattern("d MMM", Locale.getDefault()))
+                } else ""
+                val label = dayName + dateLabel
+                val labelBaseline = bounds.top + max(2f * pixelScale, height * .01f) - paint.fontMetrics.top
+                val nextDayIndex = ((index + 1) until points.size).firstOrNull { points[it].timestamp.take(10) != point.timestamp.take(10) } ?: points.size
+                canvas.save()
+                canvas.clipRect(bounds.left + index * cell, bounds.top, bounds.left + nextDayIndex * cell, bounds.top + paint.textSize + 4f * pixelScale)
                 canvas.drawText(label, bounds.left + index * cell + 6f * pixelScale, labelBaseline, paint)
+                canvas.restore()
             }
             paint.textAlign = Paint.Align.CENTER
             if (showHours) {
@@ -424,13 +497,13 @@ object ForecastGraphics {
         close()
     }
 
-    private fun drawTemperature(canvas: Canvas, bounds: RectF, points: List<HourlyWeather>, palette: ForecastPalette, pixelScale: Float, showApparentTemperature: Boolean, temperatureThresholds: TemperatureThresholds) {
+    private fun drawTemperature(canvas: Canvas, bounds: RectF, points: List<HourlyWeather>, palette: ForecastPalette, pixelScale: Float, showApparentTemperature: Boolean, temperatureThresholds: TemperatureThresholds, fixedMinimum: Double?, fixedMaximum: Double?, lightningScale: Float) {
         val values = points.flatMap { point ->
             if (showApparentTemperature) listOfNotNull(point.temperature, point.apparentTemperature) else listOfNotNull(point.temperature)
         }
         if (points.size < 2 || values.isEmpty()) return
-        val minimum = values.min() - 3.0
-        val maximum = values.max() + 3.0
+        val minimum = fixedMinimum ?: values.min() - 3.0
+        val maximum = fixedMaximum ?: values.max() + 3.0
         val span = max(1.0, maximum - minimum)
         val cell = bounds.width() / points.size
         fun x(index: Int) = bounds.left + (index + .5f) * cell
@@ -459,22 +532,28 @@ object ForecastGraphics {
             canvas.drawPath(area, Paint().apply { color = if (warmer) Color.argb(72, 242, 142, 62) else Color.argb(72, 59, 142, 229) })
         }
 
-        val temperatures = points.map { it.temperature }
-        val path = smoothLinePath(bounds.left, cell, temperatures.map { it?.let(::y) })
-        val line = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeWidth = 3.2f * pixelScale
-            strokeCap = Paint.Cap.ROUND
-            strokeJoin = Paint.Join.ROUND
-            shader = LinearGradient(0f, bounds.top, 0f, bounds.bottom,
-                intArrayOf(temperatureColor(maximum, temperatureThresholds), temperatureColor(temperatureThresholds.warm.toDouble(), temperatureThresholds), temperatureColor(temperatureThresholds.mild.toDouble(), temperatureThresholds), temperatureColor(0.0, temperatureThresholds), temperatureColor(minimum, temperatureThresholds)),
-                floatArrayOf(0f, ((maximum - temperatureThresholds.warm) / span).toFloat().coerceIn(0f, 1f), ((maximum - temperatureThresholds.mild) / span).toFloat().coerceIn(0f, 1f), ((maximum - 0) / span).toFloat().coerceIn(0f, 1f), 1f), Shader.TileMode.CLAMP)
+        points.zipWithNext().forEachIndexed { index, pair ->
+            val start = pair.first.temperature ?: return@forEachIndexed
+            val end = pair.second.temperature ?: return@forEachIndexed
+            val startX = x(index)
+            val endX = x(index + 1)
+            val middleX = (startX + endX) / 2f
+            val segment = Path().apply {
+                moveTo(startX, y(start))
+                cubicTo(middleX, y(start), middleX, y(end), endX, y(end))
+            }
+            canvas.drawPath(segment, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                strokeWidth = 3.2f * pixelScale
+                strokeCap = Paint.Cap.ROUND
+                strokeJoin = Paint.Join.ROUND
+                shader = LinearGradient(startX, 0f, endX, 0f, temperatureColor(start, temperatureThresholds), temperatureColor(end, temperatureThresholds), Shader.TileMode.CLAMP)
+            })
         }
-        canvas.drawPath(path, line)
         points.forEachIndexed { index, point ->
             if (point.weatherCode !in listOf(95, 96, 99) || point.temperature == null) return@forEachIndexed
             val probability = ((point.precipitationProbability ?: 0.0) / 100.0).toFloat().coerceIn(0f, 1f)
-            drawLightning(canvas, x(index), max(bounds.top + 13f * pixelScale, y(point.temperature) - 13f * pixelScale), (.55f + probability) * pixelScale)
+            drawLightning(canvas, x(index), max(bounds.top + 16f * pixelScale, y(point.temperature) - 16f * pixelScale), (1.2f + probability * 1.4f) * pixelScale * lightningScale)
         }
     }
 
@@ -520,7 +599,40 @@ object ForecastGraphics {
         }
     }
 
-    private fun drawWind(canvas: Canvas, bounds: RectF, points: List<HourlyWeather>, palette: ForecastPalette, pixelScale: Float, windScale: Float) {
+    fun drawWindLayer(canvas: Canvas, bounds: RectF, points: List<HourlyWeather>, dark: Boolean, pixelScale: Float, windScale: Float, showAnnotations: Boolean) {
+        val palette = palette(dark)
+        drawWind(canvas, bounds, points, palette, pixelScale, windScale, 0)
+        if (showAnnotations) drawWindAnnotations(canvas, bounds, points, palette, pixelScale)
+        canvas.drawLine(bounds.left, bounds.top, bounds.right, bounds.top, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = palette.separator
+            strokeWidth = 1.25f * pixelScale
+        })
+        drawDaySeparators(canvas, bounds, points, palette, pixelScale)
+    }
+
+    private fun drawDemoWatermarks(canvas: Canvas, bounds: RectF, points: List<HourlyWeather>, label: String, everyDay: Boolean, pixelScale: Float, palette: ForecastPalette) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = withAlpha(palette.text, 72)
+            textSize = 9f * pixelScale
+            typeface = Typeface.create("monospace", Typeface.BOLD)
+        }
+        val cell = bounds.width() / points.size.coerceAtLeast(1)
+        val ranges = if (!everyDay) listOf(0 until points.size) else points.indices.groupBy { points[it].timestamp.take(10) }.values.map { it.first()..it.last() }
+        ranges.forEach { range ->
+            val left = bounds.left + range.first * cell + 5f * pixelScale
+            val right = bounds.left + (range.last + 1) * cell - 5f * pixelScale
+            val top = bounds.top + 12f * pixelScale
+            val bottom = bounds.bottom - 5f * pixelScale
+            paint.textAlign = Paint.Align.LEFT
+            canvas.drawText(label, left, top, paint)
+            canvas.drawText(label, left, bottom, paint)
+            paint.textAlign = Paint.Align.RIGHT
+            canvas.drawText(label, right, top, paint)
+            canvas.drawText(label, right, bottom, paint)
+        }
+    }
+
+    private fun drawWind(canvas: Canvas, bounds: RectF, points: List<HourlyWeather>, palette: ForecastPalette, pixelScale: Float, windScale: Float, pointOffset: Int) {
         if (points.size < 2) return
         canvas.drawRect(bounds, Paint().apply { color = withAlpha(palette.background, if (Color.luminance(palette.background) < .5f) 255 else 245) })
         val cell = bounds.width() / points.size
@@ -543,13 +655,13 @@ object ForecastGraphics {
             }
             atan2(vectorY, vectorX)
         }
-        fun cumulativePhases(frequencies: List<Float>): List<Float> = buildList {
+        fun cumulativePhases(frequencies: List<Float>, initial: Float): List<Float> = buildList {
             frequencies.forEachIndexed { index, frequency ->
-                add(if (index == 0) 0f else last() + (frequencies[index - 1] + frequency) / 2f)
+                add(if (index == 0) initial else last() + (frequencies[index - 1] + frequency) / 2f)
             }
         }
-        val wavePhases = cumulativePhases(strength.mapIndexed { index, value -> .28f + value * .06f + gustiness[index].pow(1.35f) * 5f })
-        val gustPhases = cumulativePhases(gustiness.map { .68f + it * 6f })
+        val wavePhases = cumulativePhases(strength.mapIndexed { index, value -> .28f + value * .06f + gustiness[index].pow(1.35f) * 5f }, pointOffset * .42f)
+        val gustPhases = cumulativePhases(gustiness.map { .68f + it * 6f }, pointOffset * .82f)
         val lanes = floatArrayOf(-1f, -.6f, -.2f, .2f, .6f, 1f)
         val laneWeights = floatArrayOf(.58f, .78f, 1f, .96f, .76f, .56f)
         fun sample(values: List<Float>, position: Float): Float {
@@ -557,7 +669,7 @@ object ForecastGraphics {
             return values[start] + (values[end] - values[start]) * progress
         }
         val flowCenters = points.indices.map { index ->
-            bounds.top + bounds.height() * .61f + sin(index * .085f + directions[index] * .2f) * (.15f + strength[index] * 1.2f) * windScale
+            bounds.top + bounds.height() * .61f + sin((index + pointOffset) * .085f + directions[index] * .2f) * (.15f + strength[index] * 1.2f) * windScale
         }
         fun lineY(position: Float, laneIndex: Int): Float {
             val current = sample(strength, position); val gust = sample(gustiness, position)
@@ -566,7 +678,7 @@ object ForecastGraphics {
             val baseAmplitude = current.pow(1.08f) * bounds.height() * .18f * windScale
             val amplitude = min(bounds.height() * .34f * windScale, baseAmplitude * (1f + gust.pow(1.6f) * 1.8f))
             val mainWave = sin(sample(wavePhases, position) + direction * .14f + laneIndex * .11f) * amplitude
-            val secondaryWave = sin(position * .16f + laneIndex * .23f) * amplitude * .28f
+            val secondaryWave = sin((position + pointOffset) * .16f + laneIndex * .23f) * amplitude * .28f
             val gustWave = sin(sample(gustPhases, position) + laneIndex * .37f) * gust * baseAmplitude * .8f
             val separation = lane * (2.2f + current * 5.1f) * pixelScale * windScale
             return (sample(flowCenters, position) + separation + mainWave + secondaryWave + gustWave)
@@ -647,6 +759,36 @@ object ForecastGraphics {
                 })
             }
         }
+        var tornadoStart: Int? = null
+        points.forEachIndexed { index, point ->
+            if (point.tornado && tornadoStart == null) tornadoStart = index
+            val closes = tornadoStart != null && (!point.tornado || index == points.lastIndex)
+            if (closes) {
+                val start = tornadoStart
+                val end = if (point.tornado) index else index - 1
+                val centerX = bounds.left + ((start + end + 1) / 2f) * cell
+                val funnelWidth = max(18f * pixelScale, min(34f * pixelScale, (end - start + 1) * cell * 1.2f))
+                drawTornadoFunnel(canvas, centerX, bounds, funnelWidth, palette.wind, pixelScale)
+                tornadoStart = null
+            }
+        }
+    }
+
+    private fun drawTornadoFunnel(canvas: Canvas, centerX: Float, bounds: RectF, width: Float, color: Int, pixelScale: Float) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = color
+            style = Paint.Style.STROKE
+            strokeWidth = 1.5f * pixelScale
+            strokeCap = Paint.Cap.ROUND
+        }
+        val top = bounds.top + bounds.height() * .16f
+        val height = bounds.height() * .68f
+        repeat(5) { index ->
+            val progress = index / 4f
+            val y = top + progress * height
+            val half = width * (1f - progress * .78f) / 2f
+            canvas.drawArc(centerX - half, y - 2f * pixelScale, centerX + half, y + 2f * pixelScale, if (index % 2 == 0) 195f else 15f, 300f, false, paint)
+        }
     }
 
     private fun drawDaySeparators(canvas: Canvas, bounds: RectF, points: List<HourlyWeather>, palette: ForecastPalette, pixelScale: Float) {
@@ -657,6 +799,30 @@ object ForecastGraphics {
                 val x = bounds.left + index * cell
                 canvas.drawLine(x, bounds.top, x, bounds.bottom, paint)
             }
+        }
+    }
+
+    private fun drawHistoryOverlay(canvas: Canvas, bounds: RectF, points: List<HourlyWeather>, currentTimestamp: String, historyLabel: String, pixelScale: Float) {
+        val currentIndex = points.indexOfLast { it.timestamp.take(13) <= currentTimestamp.take(13) }
+        if (currentIndex < 0) return
+        val cell = bounds.width() / points.size
+        val markerX = if (points.last().timestamp.take(13) <= currentTimestamp.take(13)) bounds.right else bounds.left + currentIndex * cell
+        canvas.drawRect(bounds.left, bounds.top, markerX, bounds.bottom, Paint().apply { color = Color.argb(32, 244, 123, 50) })
+        canvas.drawLine(bounds.left, bounds.top + 1.5f * pixelScale, markerX, bounds.top + 1.5f * pixelScale, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(165, 244, 123, 50)
+            strokeWidth = 2f * pixelScale
+        })
+        canvas.drawLine(markerX, bounds.top, markerX, bounds.bottom, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.rgb(244, 123, 50)
+            strokeWidth = 1.5f * pixelScale
+        })
+        if (historyLabel.isNotBlank()) {
+            canvas.drawText(historyLabel.uppercase(), markerX - 5f * pixelScale, bounds.top + 13f * pixelScale, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.rgb(244, 123, 50)
+                textAlign = Paint.Align.RIGHT
+                textSize = 8f * pixelScale
+                typeface = Typeface.create("monospace", Typeface.BOLD)
+            })
         }
     }
 
@@ -677,7 +843,13 @@ object ForecastGraphics {
 
     private fun drawLightning(canvas: Canvas, x: Float, y: Float, scale: Float) {
         val path = Path().apply { moveTo(x + 2f * scale, y - 9f * scale); lineTo(x - 4f * scale, y + scale); lineTo(x, y + scale); lineTo(x - 2f * scale, y + 10f * scale); lineTo(x + 6f * scale, y - 2f * scale); lineTo(x + 2f * scale, y - 2f * scale); close() }
-        canvas.drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(255, 211, 77); maskFilter = BlurMaskFilter(2f * scale, BlurMaskFilter.Blur.NORMAL) })
+        canvas.drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.rgb(126, 82, 0)
+            style = Paint.Style.STROKE
+            strokeWidth = 1.25f * scale
+            strokeJoin = Paint.Join.ROUND
+        })
+        canvas.drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(255, 220, 68); style = Paint.Style.FILL })
     }
 
     private fun sunlightEdge(point: HourlyWeather, daylight: Map<String, Pair<LocalDateTime?, LocalDateTime?>>): Float {

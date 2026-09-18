@@ -47,11 +47,25 @@ class WeatherPreferences(context: Context) {
         showPrecipitation = preferences.getBoolean(KEY_SHOW_PRECIPITATION, true),
         showWind = preferences.getBoolean(KEY_SHOW_WIND, true),
         showWindArrows = preferences.getBoolean(KEY_SHOW_WIND_ARROWS, false),
+        showHistoricalData = preferences.getBoolean(KEY_SHOW_HISTORICAL_DATA, true),
+        showDates = preferences.getBoolean(KEY_SHOW_DATES, false),
+        showMushrooms = preferences.getBoolean(KEY_SHOW_MUSHROOMS, false),
+        showWidgetLocation = preferences.getBoolean(KEY_SHOW_WIDGET_LOCATION, true),
     )
 
     fun saveLocations(locations: List<WeatherLocation>) {
         val encoded = JSONArray().apply { locations.forEach { put(it.toJson()) } }.toString()
-        preferences.edit().putString(KEY_LOCATIONS, encoded).apply()
+        val currentLocations = locations(locations)
+        val editor = preferences.edit()
+        preferences.all.keys
+            .filter { it.startsWith(KEY_WIDGET_LOCATION_PREFIX) }
+            .forEach { key ->
+                val widgetLocationKey = preferences.getString(key, null)?.takeUnless { it.startsWith('{') }
+                currentLocations.firstOrNull { it.preferenceKey() == widgetLocationKey }?.let { location ->
+                    editor.putString(key, location.toJson().toString())
+                }
+            }
+        editor.putString(KEY_LOCATIONS, encoded).apply()
     }
 
     fun saveActiveLocation(location: WeatherLocation) {
@@ -80,6 +94,75 @@ class WeatherPreferences(context: Context) {
             .putBoolean(KEY_SHOW_PRECIPITATION, settings.showPrecipitation)
             .putBoolean(KEY_SHOW_WIND, settings.showWind)
             .putBoolean(KEY_SHOW_WIND_ARROWS, settings.showWindArrows)
+            .putBoolean(KEY_SHOW_HISTORICAL_DATA, settings.showHistoricalData)
+            .putBoolean(KEY_SHOW_DATES, settings.showDates)
+            .putBoolean(KEY_SHOW_MUSHROOMS, settings.showMushrooms)
+            .putBoolean(KEY_SHOW_WIDGET_LOCATION, settings.showWidgetLocation)
+            .apply()
+    }
+
+    fun widgetLocation(widgetId: Int, fallback: WeatherLocation): WeatherLocation {
+        val encoded = preferences.getString("$KEY_WIDGET_LOCATION_PREFIX$widgetId", null) ?: return fallback
+        val savedLocation = encoded.takeIf { it.startsWith('{') }?.let {
+            runCatching { JSONObject(it).toLocation() }.getOrNull()
+        }
+        if (savedLocation != null) return savedLocation
+
+        val locationFromSharedList = locations(listOf(fallback)).firstOrNull { it.preferenceKey() == encoded }
+            ?: return fallback
+        saveWidgetLocation(widgetId, locationFromSharedList)
+        return locationFromSharedList
+    }
+
+    fun saveWidgetLocation(widgetId: Int, location: WeatherLocation) {
+        preferences.edit().putString("$KEY_WIDGET_LOCATION_PREFIX$widgetId", location.toJson().toString()).apply()
+    }
+
+    fun widgetForecastHours(widgetId: Int): Int = preferences
+        .getInt("$KEY_WIDGET_FORECAST_HOURS_PREFIX$widgetId", DEFAULT_WIDGET_FORECAST_HOURS)
+        .takeIf { it in WIDGET_FORECAST_HOURS }
+        ?: DEFAULT_WIDGET_FORECAST_HOURS
+
+    fun saveWidgetForecastHours(widgetId: Int, hours: Int) {
+        preferences.edit().putInt(
+            "$KEY_WIDGET_FORECAST_HOURS_PREFIX$widgetId",
+            hours.takeIf { it in WIDGET_FORECAST_HOURS } ?: DEFAULT_WIDGET_FORECAST_HOURS,
+        ).apply()
+    }
+
+    fun widgetDisplaySettings(widgetId: Int, defaults: ForecastDisplaySettings = displaySettings()) = WidgetDisplaySettings(
+        forceLocationName = preferences.getBoolean("${KEY_WIDGET_PREFIX}location_$widgetId", false),
+        showHourlyTemperatures = preferences.getBoolean("${KEY_WIDGET_PREFIX}temperatures_$widgetId", defaults.showHourlyTemperatures),
+        showApparentTemperature = preferences.getBoolean("${KEY_WIDGET_PREFIX}apparent_$widgetId", defaults.showApparentTemperature),
+        showPrecipitation = preferences.getBoolean("${KEY_WIDGET_PREFIX}precipitation_$widgetId", defaults.showPrecipitation),
+        showWindArrows = preferences.getBoolean("${KEY_WIDGET_PREFIX}wind_arrows_$widgetId", defaults.showWindArrows),
+        showMushrooms = preferences.getBoolean("${KEY_WIDGET_PREFIX}mushrooms_$widgetId", defaults.showMushrooms),
+        demo = preferences.getBoolean("${KEY_WIDGET_PREFIX}demo_$widgetId", false),
+    )
+
+    fun saveWidgetDisplaySettings(widgetId: Int, settings: WidgetDisplaySettings) {
+        preferences.edit()
+            .putBoolean("${KEY_WIDGET_PREFIX}location_$widgetId", settings.forceLocationName)
+            .putBoolean("${KEY_WIDGET_PREFIX}temperatures_$widgetId", settings.showHourlyTemperatures)
+            .putBoolean("${KEY_WIDGET_PREFIX}apparent_$widgetId", settings.showApparentTemperature)
+            .putBoolean("${KEY_WIDGET_PREFIX}precipitation_$widgetId", settings.showPrecipitation)
+            .putBoolean("${KEY_WIDGET_PREFIX}wind_arrows_$widgetId", settings.showWindArrows)
+            .putBoolean("${KEY_WIDGET_PREFIX}mushrooms_$widgetId", settings.showMushrooms)
+            .putBoolean("${KEY_WIDGET_PREFIX}demo_$widgetId", settings.demo)
+            .apply()
+    }
+
+    fun removeWidgetLocation(widgetId: Int) {
+        preferences.edit()
+            .remove("$KEY_WIDGET_LOCATION_PREFIX$widgetId")
+            .remove("$KEY_WIDGET_FORECAST_HOURS_PREFIX$widgetId")
+            .remove("${KEY_WIDGET_PREFIX}location_$widgetId")
+            .remove("${KEY_WIDGET_PREFIX}temperatures_$widgetId")
+            .remove("${KEY_WIDGET_PREFIX}apparent_$widgetId")
+            .remove("${KEY_WIDGET_PREFIX}precipitation_$widgetId")
+            .remove("${KEY_WIDGET_PREFIX}wind_arrows_$widgetId")
+            .remove("${KEY_WIDGET_PREFIX}mushrooms_$widgetId")
+            .remove("${KEY_WIDGET_PREFIX}demo_$widgetId")
             .apply()
     }
 
@@ -90,6 +173,8 @@ class WeatherPreferences(context: Context) {
         put("longitude", longitude)
         put("timezone", timezone)
     }
+
+    private fun WeatherLocation.preferenceKey() = "$latitude,$longitude"
 
     private fun JSONObject.toLocation(): WeatherLocation? {
         val name = optString("name").takeIf(String::isNotBlank) ?: return null
@@ -122,7 +207,16 @@ class WeatherPreferences(context: Context) {
         const val KEY_SHOW_PRECIPITATION = "show_precipitation"
         const val KEY_SHOW_WIND = "show_wind"
         const val KEY_SHOW_WIND_ARROWS = "show_wind_arrows"
-        val ZOOM_LEVELS = setOf(.125f, .25f, .375f, .5f, .75f, 1f, 1.25f, 1.5f, 2f)
+        const val KEY_SHOW_HISTORICAL_DATA = "show_historical_data"
+        const val KEY_SHOW_DATES = "show_dates"
+        const val KEY_SHOW_MUSHROOMS = "show_mushrooms"
+        const val KEY_SHOW_WIDGET_LOCATION = "show_widget_location"
+        const val KEY_WIDGET_LOCATION_PREFIX = "widget_location_"
+        const val KEY_WIDGET_FORECAST_HOURS_PREFIX = "widget_forecast_hours_"
+        const val KEY_WIDGET_PREFIX = "widget_setting_"
+        const val DEFAULT_WIDGET_FORECAST_HOURS = 48
+        val WIDGET_FORECAST_HOURS = (6..120 step 6).toSet()
+        val ZOOM_LEVELS = setOf(.25f, .3f, .5f, .75f, 1f, 2f)
         val THEMES = setOf("system", "dark", "light")
         val LANGUAGES = setOf("system", "en-US", "pl-PL")
     }

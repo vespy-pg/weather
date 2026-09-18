@@ -31,12 +31,14 @@ class WeatherApi(private val baseUrl: String = BuildConfig.API_BASE_URL) {
         }
     }
 
-    suspend fun forecast(location: WeatherLocation): WeatherForecast = withContext(Dispatchers.IO) {
+    suspend fun forecast(location: WeatherLocation, pastDays: Int = 0, includeMushrooms: Boolean = false): WeatherForecast = withContext(Dispatchers.IO) {
         val url = endpoint("weather").buildUpon()
             .appendQueryParameter("latitude", location.latitude.toString())
             .appendQueryParameter("longitude", location.longitude.toString())
             .appendQueryParameter("timezone", location.timezone)
             .appendQueryParameter("name", location.name)
+            .appendQueryParameter("past_days", pastDays.coerceIn(0, 3).toString())
+            .appendQueryParameter("mushrooms", if (includeMushrooms) "1" else "0")
             .build()
         parseForecast(request(url), location)
     }
@@ -160,10 +162,20 @@ class WeatherApi(private val baseUrl: String = BuildConfig.API_BASE_URL) {
         val daily = buildList {
             for (index in 0 until dailySource.length()) {
                 val item = dailySource.getJSONObject(index)
+                val mushroom = item.optJSONObject("mushroom")
                 add(DailyWeather(
                     date = item.optString("date"),
                     sunrise = item.optNullableString("sunrise"),
                     sunset = item.optNullableString("sunset"),
+                    mushroom = mushroom?.let {
+                        MushroomCondition(
+                            score = it.optNullableInt("score"),
+                            level = it.optNullableString("level"),
+                            recentRainfall = it.optNullableDouble("recentRainfall"),
+                            relativeHumidity = it.optNullableDouble("relativeHumidity"),
+                            soilMoisture = it.optNullableDouble("soilMoisture"),
+                        )
+                    },
                 ))
             }
         }

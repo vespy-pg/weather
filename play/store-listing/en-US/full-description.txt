@@ -1,0 +1,23 @@
+Weather turns a complex forecast into one continuous visual timeline.
+
+See temperature, apparent temperature, sunlight, cloud cover, rain, snow, hail, thunderstorms and wind together. Conditions stay aligned hour by hour, so you can understand what is changing without switching between unrelated charts.
+
+PLAN AHEAD
+- Explore a detailed ten-day hourly forecast.
+- Look back at up to three days of historical weather.
+- Compare temperature with apparent temperature.
+- Follow precipitation probability, intensity and type.
+- Read wind strength, direction and gusts in context.
+
+BUILD YOUR VIEW
+- Zoom the timeline from a compact overview to hourly detail.
+- Show or hide temperature labels, precipitation, wind arrows, dates and other layers.
+- Adjust meaningful temperature colour thresholds.
+- Choose Celsius or Fahrenheit and light, dark or system theme.
+- Save several locations and switch between them quickly.
+
+CUSTOM HOME-SCREEN WIDGETS
+Create widgets for different places and time ranges. Choose a compact or expanded layout, select the forecast length, control the displayed layers and decide whether the location name is shown. Each widget keeps its own configuration and opens the complete forecast when tapped.
+
+PRIVATE BY DEFAULT
+No account is required. Approximate device location is optional, and you can search for places manually. Anonymous usage analytics are disabled until you explicitly allow them and can be turned off again in Settings.

@@ -1,0 +1,6 @@
+App icon: Sun, two raindrops and layered wind lines on a dark weather background.
+Feature graphic: A continuous timeline showing temperature, sky, precipitation and wind.
+Screenshot 1: Ten-day forecast presented as one continuous visual timeline.
+Screenshot 2: Landscape forecast showing changing conditions across several days.
+Screenshot 3: Widget configuration with location, forecast length and display controls.
+Screenshot 4: Weather widgets in different sizes showing sky, temperature and wind.

@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="171 171 682 682">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0b1724"/>
+      <stop offset="1" stop-color="#102238"/>
+    </linearGradient>
+
+    <radialGradient id="sun" cx="50%" cy="10%" r="90%">
+      <stop offset="0" stop-color="#fff56a"/>
+      <stop offset="0.45" stop-color="#ffd83d"/>
+      <stop offset="1" stop-color="#ffb21f"/>
+    </radialGradient>
+
+    <linearGradient id="drop" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8fe9ff"/>
+      <stop offset="0.5" stop-color="#35bdf2"/>
+      <stop offset="1" stop-color="#2878f5"/>
+    </linearGradient>
+
+    <linearGradient id="cloud" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e2e6e9"/>
+      <stop offset="1" stop-color="#8995a1"/>
+    </linearGradient>
+
+    <linearGradient id="wave1" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#d7dde2"/>
+      <stop offset="0.5" stop-color="#b8c1c9"/>
+      <stop offset="1" stop-color="#e2e6e9"/>
+    </linearGradient>
+
+    <linearGradient id="wave2" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#929da7"/>
+      <stop offset="0.5" stop-color="#aab3bb"/>
+      <stop offset="1" stop-color="#87939e"/>
+    </linearGradient>
+
+    <linearGradient id="wave3" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#536170"/>
+      <stop offset="0.5" stop-color="#6d7a87"/>
+      <stop offset="1" stop-color="#4d5b69"/>
+    </linearGradient>
+
+    <filter id="glowSun" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="18" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <filter id="glowBlue" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+  </defs>
+
+  <g>
+    <rect width="1024" height="1024" fill="url(#bg)"/>
+
+    <g filter="url(#glowSun)" transform="translate(-220 85)">
+      <path d="M165 38 H859
+               C835 118 760 181 670 214
+               C572 250 452 252 352 220
+               C259 190 188 128 165 38 Z"
+            fill="url(#sun)"/>
+
+      <g stroke="#ffd83d" stroke-width="24" stroke-linecap="round">
+        <line x1="247" y1="236" x2="207" y2="292"/>
+        <line x1="377" y1="282" x2="354" y2="349"/>
+        <line x1="512" y1="300" x2="512" y2="378"/>
+        <line x1="647" y1="282" x2="670" y2="349"/>
+        <line x1="777" y1="236" x2="817" y2="292"/>
+      </g>
+    </g>
+
+    <path transform="translate(650 517.5) scale(.70 -1.1) translate(-568 0)" d="M610 315
+             C579 315 568 280 590 258
+             C604 244 622 242 638 249
+             C649 218 675 201 705 204
+             C733 207 751 223 760 245
+             C779 226 811 232 825 255
+             C831 264 834 274 833 283
+             C857 290 861 315 829 315 Z"
+          fill="url(#cloud)" stroke="#d7dde2" stroke-width="5" stroke-linejoin="round"/>
+
+    <g filter="url(#glowBlue)">
+      <path transform="translate(70 10)" d="M617 389
+               C617 389 561 470 561 520
+               C561 562 586 589 617 589
+               C649 589 674 562 674 520
+               C674 471 617 389 617 389 Z"
+            fill="url(#drop)"/>
+
+      <path transform="translate(760 315) scale(.72) translate(-798 -484)" d="M798 484
+               C798 484 763 534 763 565
+               C763 591 779 607 798 607
+               C817 607 833 591 833 565
+               C833 534 798 484 798 484 Z"
+            fill="url(#drop)"/>
+    </g>
+
+    <g fill="none" stroke-linecap="round">
+      <path d="M78 620
+               C190 630 255 572 342 584
+               C444 598 483 724 590 738
+               C696 752 754 602 872 606
+               C930 608 963 635 986 648"
+            stroke="url(#wave1)" stroke-width="18"/>
+
+      <path d="M78 658
+               C190 668 255 610 342 622
+               C444 636 483 762 590 776
+               C696 790 754 640 872 644
+               C930 646 963 673 986 686"
+            stroke="url(#wave2)" stroke-width="18"/>
+
+      <path d="M78 696
+               C190 706 255 648 342 660
+               C444 674 483 800 590 814
+               C696 828 754 678 872 682
+               C930 684 963 711 986 724"
+            stroke="url(#wave3)" stroke-width="18"/>
+    </g>
+
+  </g>
+</svg>

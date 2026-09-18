@@ -15,6 +15,7 @@
     <string name="more_from_vespy">WIĘCEJ OD VESPY</string>
     <string name="open">Otwórz</string>
     <string name="today">Dzisiaj</string>
+    <string name="history">Historia</string>
     <string name="widget_description">Oś pogody z temperaturą, niebem, opadami i wiatrem</string>
     <string name="add_widget">Dodaj widget do ekranu głównego</string>
     <string name="widget_pin_unavailable">Dodaj widget z listy widgetów launchera</string>
@@ -32,6 +33,26 @@
     <string name="show_precipitation">Symbole opadów</string>
     <string name="show_wind">Oś wiatru</string>
     <string name="show_wind_arrows">Kierunek i prędkość wiatru</string>
+    <string name="show_historical_data">Pokazuj dane historyczne</string>
+    <string name="show_dates">Pokazuj daty obok nazw dni</string>
+    <string name="show_mushrooms">Warunki dla grzybów</string>
+    <string name="show_widget_location">Pokazuj nazwę lokalizacji na widgetach</string>
+    <string name="choose_widget_location">Wybierz lokalizację widgetu</string>
+    <string name="choose_widget_location_description">Wyszukaj lub wybierz zapisaną lokalizację. Później możesz ją zmienić z menu widgetu.</string>
+    <string name="widget_forecast_length">Długość prognozy</string>
+    <string name="widget_forecast_option">%1$d godzin (%2$s dnia)</string>
+    <string name="demo_weather">Pogoda demo</string>
+    <string name="default_value">Domyślne</string>
+    <string name="on_value">Włączone</string>
+    <string name="widget_forecast_6_hours">6 godzin</string>
+    <string name="widget_forecast_12_hours">12 godzin</string>
+    <string name="widget_forecast_1_day">1 dzień</string>
+    <string name="widget_forecast_2_days">2 dni</string>
+    <string name="widget_forecast_3_days">3 dni</string>
+    <string name="widget_forecast_5_days">5 dni</string>
+    <string name="save_widget_settings">Zapisz ustawienia widgetu</string>
+    <string name="selected_location">Wybrana</string>
+    <string name="reset_defaults">Przywróć ustawienia domyślne</string>
     <string name="language">Język</string>
     <string name="color_theme">Motyw kolorystyczny</string>
     <string name="system_default">Systemowy</string>
@@ -50,4 +71,5 @@
     <string name="analytics_decline">Odrzuć</string>
     <string name="analytics_allow">Zezwól na analitykę</string>
     <string name="analytics_consent">Udostępniaj anonimowe dane analityczne</string>
+    <string name="privacy_policy">Polityka prywatności</string>
 </resources>

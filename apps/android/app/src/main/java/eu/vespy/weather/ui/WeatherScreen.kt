@@ -17,6 +17,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.ScrollableDefaults
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.rememberScrollableState
+import androidx.compose.foundation.gestures.scrollable
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,20 +36,25 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.requiredWidth
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -54,12 +66,16 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -71,8 +87,10 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -84,6 +102,14 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.compose.ui.window.DialogProperties
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import eu.vespy.weather.R
@@ -92,7 +118,9 @@ import eu.vespy.weather.data.Promotion
 import eu.vespy.weather.data.ForecastDisplaySettings
 import eu.vespy.weather.data.TemperatureThresholds
 import eu.vespy.weather.data.WeatherForecast
-import eu.vespy.weather.data.atExactInterval
+import eu.vespy.weather.data.currentIndex
+import eu.vespy.weather.data.groupByHours
+import eu.vespy.weather.data.timelineWindow
 import eu.vespy.weather.widget.WeatherWidgetProvider
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
@@ -115,6 +143,7 @@ private val DarkColors = darkColorScheme(
     surface = Color(0xFF151C27),
     surfaceVariant = Color(0xFF0D1118),
     primary = Color(0xFF58A6FF),
+    onPrimary = Color(0xFF07111E),
     secondary = Color(0xFF45CF88),
     onBackground = Color(0xFFE7EDF7),
     onSurface = Color(0xFFE7EDF7),
@@ -125,6 +154,7 @@ private val LightColors = lightColorScheme(
     surface = Color.White,
     surfaceVariant = Color(0xFFF5F8FC),
     primary = Color(0xFF176FC1),
+    onPrimary = Color.White,
     secondary = Color(0xFF23865A),
     onBackground = Color(0xFF172234),
     onSurface = Color(0xFF172234),
@@ -147,11 +177,13 @@ fun VespyWeatherApp(viewModel: WeatherViewModel) {
     val updateDisplaySettings: (ForecastDisplaySettings) -> Unit = { settings ->
         val languageChanged = settings.language != viewModel.state.displaySettings.language
         val themeChanged = settings.theme != viewModel.state.displaySettings.theme
+        val historyChanged = settings.showHistoricalData != viewModel.state.displaySettings.showHistoricalData
+        val mushroomsChanged = settings.showMushrooms != viewModel.state.displaySettings.showMushrooms
         viewModel.setDisplaySettings(settings)
         if (languageChanged) (context as? Activity)?.recreate()
-        else if (themeChanged) viewModel.refresh(settings.theme == "dark" || settings.theme == "system" && systemDarkTheme)
+        else if (themeChanged || historyChanged || mushroomsChanged) viewModel.refresh(settings.theme == "dark" || settings.theme == "system" && systemDarkTheme)
     }
-    var showSettings by remember { mutableStateOf(false) }
+    var showSettings by rememberSaveable { mutableStateOf(false) }
     MaterialTheme(colorScheme = if (darkTheme) DarkColors else LightColors) {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -168,6 +200,7 @@ fun VespyWeatherApp(viewModel: WeatherViewModel) {
                             onRetry = { viewModel.refresh(darkTheme) },
                             onSettings = { showSettings = true },
                             onDisplaySettings = updateDisplaySettings,
+                            darkTheme = darkTheme,
                             modifier = Modifier.weight(1f),
                         )
                         PromotionRail(
@@ -176,7 +209,7 @@ fun VespyWeatherApp(viewModel: WeatherViewModel) {
                             landscape = true,
                             onImpression = viewModel::recordPromotionImpression,
                             onClick = viewModel::recordPromotionClick,
-                            modifier = Modifier.width(150.dp).fillMaxHeight(),
+                            modifier = Modifier.width(190.dp).fillMaxHeight(),
                         )
                     }
                 } else {
@@ -188,6 +221,7 @@ fun VespyWeatherApp(viewModel: WeatherViewModel) {
                             onRetry = { viewModel.refresh(darkTheme) },
                             onSettings = { showSettings = true },
                             onDisplaySettings = updateDisplaySettings,
+                            darkTheme = darkTheme,
                             modifier = Modifier.weight(1f),
                         )
                         PromotionRail(
@@ -196,14 +230,14 @@ fun VespyWeatherApp(viewModel: WeatherViewModel) {
                             landscape = false,
                             onImpression = viewModel::recordPromotionImpression,
                             onClick = viewModel::recordPromotionClick,
-                            modifier = Modifier.fillMaxWidth().height(64.dp),
+                            modifier = Modifier.fillMaxWidth().height(132.dp),
                         )
                     }
                 }
                 if (showSettings) SettingsDialog(
                     state = state,
-                    darkTheme = darkTheme,
                     onDismiss = { showSettings = false },
+                    onSelectLocation = { viewModel.selectLocation(it, darkTheme) },
                     onSearch = viewModel::searchLocations,
                     onAddLocation = { viewModel.addLocation(it, darkTheme) },
                     onCurrentLocation = { latitude, longitude -> viewModel.addCurrentLocation(latitude, longitude, darkTheme) },
@@ -211,6 +245,10 @@ fun VespyWeatherApp(viewModel: WeatherViewModel) {
                     onTemperatureUnit = viewModel::setTemperatureUnit,
                     onDisplaySettings = updateDisplaySettings,
                     onAnalyticsConsent = viewModel::setAnalyticsConsent,
+                    onResetDefaults = {
+                        viewModel.setTemperatureUnit("C")
+                        updateDisplaySettings(ForecastDisplaySettings())
+                    },
                 )
                 if (state.analyticsConsent == null) AnalyticsConsentDialog(viewModel::setAnalyticsConsent)
             }
@@ -226,19 +264,20 @@ private fun ForecastPane(
     onRetry: () -> Unit,
     onSettings: () -> Unit,
     onDisplaySettings: (ForecastDisplaySettings) -> Unit,
+    darkTheme: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier
             .statusBarsPadding()
-            .then(if (!landscape) Modifier.navigationBarsPadding() else Modifier)
             .padding(horizontal = if (landscape) 10.dp else 14.dp, vertical = 8.dp),
     ) {
         if (landscape) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 LocationTitle(state.location.name, compact = true)
                 Spacer(Modifier.width(12.dp))
-                FavoriteLocations(state.locations, state.location.name, onLocation, onSettings, Modifier.weight(1f))
+                LocationDropdown(state.locations, state.location, onLocation, onSettings, Modifier.weight(1f))
+                Spacer(Modifier.width(8.dp))
                 SettingsButton(onSettings)
             }
         } else {
@@ -246,13 +285,13 @@ private fun ForecastPane(
                 LocationTitle(state.location.name, compact = false, modifier = Modifier.weight(1f))
                 SettingsButton(onSettings)
             }
-            FavoriteLocations(state.locations, state.location.name, onLocation, onSettings, Modifier.padding(vertical = 9.dp))
+            LocationDropdown(state.locations, state.location, onLocation, onSettings, Modifier.padding(vertical = 9.dp))
         }
 
         when {
             state.loading && state.forecast == null -> LoadingState(Modifier.weight(1f))
             state.error != null && state.forecast == null -> ErrorState(onRetry, Modifier.weight(1f))
-            state.forecast != null -> ForecastCard(state.forecast, landscape, state.temperatureUnit, state.displaySettings, onDisplaySettings)
+            state.forecast != null -> ForecastCard(state.forecast, landscape, state.temperatureUnit, state.displaySettings, onDisplaySettings, darkTheme, state.demo)
         }
     }
 }
@@ -294,21 +333,46 @@ private fun SettingsButton(onClick: () -> Unit) {
 }
 
 @Composable
-private fun FavoriteLocations(locations: List<eu.vespy.weather.data.WeatherLocation>, active: String, onLocation: (eu.vespy.weather.data.WeatherLocation) -> Unit, onAdd: () -> Unit, modifier: Modifier = Modifier) {
-    Row(modifier = modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        locations.forEach { location ->
-            val selected = location.name == active
-            Surface(
-                modifier = Modifier.clickable { onLocation(location) },
-                shape = CircleShape,
-                color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = .2f) else MaterialTheme.colorScheme.surfaceVariant,
-                border = androidx.compose.foundation.BorderStroke(1.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = .35f)),
-            ) {
-                Text(location.name, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), fontSize = 9.sp, maxLines = 1)
-            }
+private fun LocationDropdown(
+    locations: List<eu.vespy.weather.data.WeatherLocation>,
+    active: eu.vespy.weather.data.WeatherLocation,
+    onLocation: (eu.vespy.weather.data.WeatherLocation) -> Unit,
+    onManage: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box(modifier) {
+        Button(
+            onClick = { expanded = true },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+            ),
+        ) {
+            Text(active.name, modifier = Modifier.weight(1f), fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("▾", modifier = Modifier.padding(start = 8.dp), fontSize = 14.sp)
         }
-        Surface(modifier = Modifier.clickable(onClick = onAdd), shape = CircleShape, color = MaterialTheme.colorScheme.surfaceVariant) {
-            Text("+", modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp), fontSize = 13.sp)
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            locations.forEach { location ->
+                val selected = location.latitude == active.latitude && location.longitude == active.longitude
+                DropdownMenuItem(
+                    text = { Text(location.name, fontSize = 15.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal) },
+                    onClick = {
+                        expanded = false
+                        onLocation(location)
+                    },
+                )
+            }
+            if (onManage != null) {
+                DropdownMenuItem(
+                    text = { Text("+ ${stringResource(R.string.saved_locations)}", fontSize = 15.sp) },
+                    onClick = {
+                        expanded = false
+                        onManage()
+                    },
+                )
+            }
         }
     }
 }
@@ -320,6 +384,8 @@ private fun ForecastCard(
     temperatureUnit: String,
     displaySettings: ForecastDisplaySettings,
     onDisplaySettings: (ForecastDisplaySettings) -> Unit,
+    darkTheme: Boolean,
+    demo: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -345,9 +411,9 @@ private fun ForecastCard(
                         Text(stringResource(R.string.forecast_title), fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
                 }
-                ZoomControls(displaySettings, onDisplaySettings)
+                ZoomControls(displaySettings, onDisplaySettings, large = false)
             }
-            ForecastTimeline(forecast.hourly, forecast.daily, landscape, temperatureUnit, displaySettings)
+            ForecastTimeline(forecast, landscape, temperatureUnit, displaySettings, darkTheme, demo)
             if (!landscape) Metrics(forecast, temperatureUnit)
         }
     }
@@ -366,78 +432,146 @@ private fun ForecastEyebrow() {
 }
 
 @Composable
-private fun ZoomControls(settings: ForecastDisplaySettings, onChange: (ForecastDisplaySettings) -> Unit) {
-    val levels = listOf(.125f, .25f, .375f, .5f, .75f, 1f, 1.25f, 1.5f, 2f)
-    val index = levels.indexOf(settings.zoom).coerceAtLeast(3)
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-        ZoomButton("-", index > 0) { onChange(settings.copy(zoom = levels[index - 1])) }
+private fun ZoomControls(settings: ForecastDisplaySettings, onChange: (ForecastDisplaySettings) -> Unit, large: Boolean = false) {
+    val levels = listOf(.25f, .3f, .5f, .75f, 1f, 2f)
+    val index = levels.indexOf(settings.zoom).coerceAtLeast(2)
+    val buttonSize = if (large) 48.dp else 26.dp
+    val valueWidth = if (large) 74.dp else 38.dp
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(if (large) 8.dp else 3.dp)) {
+        ZoomButton("-", index > 0, buttonSize, if (large) 22 else 12) { onChange(settings.copy(zoom = levels[index - 1])) }
         Box(
-            Modifier.height(26.dp).width(38.dp).clickable { onChange(settings.copy(zoom = .5f)) }
-                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .35f), RoundedCornerShape(5.dp)),
+            Modifier.height(buttonSize).width(valueWidth).clickable { onChange(settings.copy(zoom = .5f)) }
+                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .35f), RoundedCornerShape(if (large) 10.dp else 5.dp)),
             contentAlignment = Alignment.Center,
-        ) { Text("${(settings.zoom * 100).roundToInt()}%", color = Muted, fontSize = 8.sp) }
-        ZoomButton("+", index < levels.lastIndex) { onChange(settings.copy(zoom = levels[index + 1])) }
+        ) { Text("${(settings.zoom * 100).roundToInt()}%", color = Muted, fontSize = if (large) 16.sp else 8.sp, fontWeight = if (large) FontWeight.Bold else FontWeight.Normal) }
+        ZoomButton("+", index < levels.lastIndex, buttonSize, if (large) 22 else 12) { onChange(settings.copy(zoom = levels[index + 1])) }
     }
 }
 
 @Composable
-private fun ZoomButton(label: String, enabled: Boolean, onClick: () -> Unit) {
+private fun ZoomButton(label: String, enabled: Boolean, size: Dp, fontSize: Int, onClick: () -> Unit) {
     Box(
-        Modifier.size(26.dp).clickable(enabled = enabled, onClick = onClick)
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = if (enabled) .35f else .15f), RoundedCornerShape(5.dp)),
+        Modifier.size(size).clickable(enabled = enabled, onClick = onClick)
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = if (enabled) .35f else .15f), RoundedCornerShape(if (size > 30.dp) 10.dp else 5.dp)),
         contentAlignment = Alignment.Center,
-    ) { Text(label, color = if (enabled) MaterialTheme.colorScheme.onSurface else Muted.copy(alpha = .35f), fontSize = 12.sp) }
+    ) { Text(label, color = if (enabled) MaterialTheme.colorScheme.onSurface else Muted.copy(alpha = .35f), fontSize = fontSize.sp, fontWeight = FontWeight.Bold) }
 }
 
 @Composable
 private fun ForecastTimeline(
-    hourly: List<HourlyWeather>,
-    days: List<eu.vespy.weather.data.DailyWeather>,
+    forecast: WeatherForecast,
     landscape: Boolean,
     temperatureUnit: String,
     settings: ForecastDisplaySettings,
+    dark: Boolean,
+    demo: Boolean,
 ) {
-    val groupHours = when (settings.zoom) { .125f -> 12; .25f -> 6; .375f -> 4; .5f -> 3; .75f -> 2; else -> 1 }
-    val points = remember(hourly, groupHours) { hourly.atExactInterval(groupHours) }
+    val groupHours = when (settings.zoom) { .25f -> 12; .3f -> 6; .5f -> 4; .75f -> 3; 1f -> 2; else -> 1 }
+    val hourly = remember(forecast.hourly, forecast.current.timestamp, settings.showHistoricalData) {
+        forecast.hourly.timelineWindow(forecast.current.timestamp, 10, if (settings.showHistoricalData) 3 else 0)
+    }
+    val points = remember(hourly, groupHours) { hourly.groupByHours(groupHours) }
+    val temperatureRange = remember(points, settings.showApparentTemperature) {
+        points.flatMap { point ->
+            if (settings.showApparentTemperature) listOfNotNull(point.temperature, point.apparentTemperature) else listOfNotNull(point.temperature)
+        }.takeIf { it.isNotEmpty() }?.let { (it.min() - 3.0) to (it.max() + 3.0) }
+    }
     val slotWidth = 22.dp * settings.zoom * groupHours
     val trackWidth = slotWidth * max(1, points.size)
-    val timelineHeight = if (landscape) 258.dp else 368.dp
-    val labelHeight = if (landscape) 44.dp else 62.dp
+    val mushroomHeight = if (settings.showMushrooms) (if (landscape) 34.dp else 44.dp) else 0.dp
+    val timelineHeight = (if (landscape) 290.dp else 368.dp) + mushroomHeight
+    val labelHeight = 62.dp
     val skyHeight = if (landscape) 68.dp else 103.dp
     val windHeight = if (!settings.showWind) 0.dp else if (settings.showWindArrows) {
         if (landscape) 48.dp else 60.dp
     } else if (landscape) 34.dp else 45.dp
-    val scrollState = rememberScrollState()
     val todayLabel = stringResource(R.string.today)
-    val dark = isSystemInDarkTheme()
+    val historyLabel = stringResource(R.string.history)
     val legendWidth = if (landscape) 38.dp else 44.dp
-    Box(modifier = Modifier.fillMaxWidth().height(timelineHeight).horizontalScroll(scrollState)) {
-        Canvas(modifier = Modifier.width(legendWidth + trackWidth).fillMaxHeight()) {
+    val densityContext = LocalDensity.current
+    val slotWidthPx = with(densityContext) { slotWidth.toPx() }
+    val nowIndex = remember(points, forecast.current.timestamp) { points.currentIndex(forecast.current.timestamp).coerceAtLeast(0) }
+    val nowPosition = if (settings.showHistoricalData) nowIndex * slotWidthPx else 0f
+    var position by remember(points, settings.zoom, settings.showHistoricalData) { mutableFloatStateOf(nowPosition) }
+    var gestureStart by remember { mutableStateOf<Float?>(null) }
+    var historyPull by remember { mutableFloatStateOf(0f) }
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth().height(timelineHeight).clipToBounds()) {
+        val viewportPx = with(densityContext) { maxWidth.toPx() }
+        val contentPx = with(densityContext) { (legendWidth + trackWidth).toPx() }
+        val maxPosition = (contentPx - viewportPx).coerceAtLeast(0f)
+        val resistance = with(densityContext) { 10.dp.toPx() }
+        val magneticDistance = slotWidthPx * 6f / groupHours
+        val scrollableState = rememberScrollableState { delta ->
+            val oldPosition = position
+            val attempted = (oldPosition - delta).coerceIn(0f, maxPosition)
+            val start = gestureStart ?: oldPosition.also { gestureStart = it }
+            val target = when {
+                !settings.showHistoricalData -> attempted
+                start > nowPosition + 1f && attempted < nowPosition -> nowPosition
+                start < nowPosition - 1f && attempted > nowPosition -> nowPosition
+                kotlin.math.abs(start - nowPosition) <= 1f && attempted < nowPosition -> {
+                    historyPull += delta.coerceAtLeast(0f)
+                    if (historyPull <= resistance) nowPosition else (nowPosition - historyPull + resistance).coerceAtLeast(0f)
+                }
+                else -> attempted
+            }
+            position = target
+            oldPosition - target
+        }
+        LaunchedEffect(scrollableState, nowPosition, magneticDistance) {
+            snapshotFlow { scrollableState.isScrollInProgress }.collect { moving ->
+                if (!moving) {
+                    delay(150)
+                    if (!scrollableState.isScrollInProgress) {
+                        if (settings.showHistoricalData && kotlin.math.abs(position - nowPosition) <= magneticDistance) position = nowPosition
+                        gestureStart = null
+                        historyPull = 0f
+                    }
+                }
+            }
+        }
+        Box(
+            modifier = Modifier.fillMaxSize()
+                .scrollable(scrollableState, Orientation.Horizontal, flingBehavior = ScrollableDefaults.flingBehavior())
+                .pointerInput(points, settings.showHistoricalData, nowPosition) {
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false)
+                        gestureStart = position
+                        historyPull = 0f
+                        waitForUpOrCancellation()
+                    }
+                },
+        ) {
+            Canvas(
+                modifier = Modifier.fillMaxSize(),
+            ) {
+            val nativeCanvas = drawContext.canvas.nativeCanvas
             val legendWidthPx = legendWidth.toPx()
-            ForecastGraphics.drawLegend(
-                canvas = drawContext.canvas.nativeCanvas,
-                bounds = android.graphics.RectF(0f, 0f, legendWidthPx, size.height),
-                dark = dark,
-                labelHeight = labelHeight.toPx(),
-                skyHeight = skyHeight.toPx(),
-                windHeight = windHeight.toPx(),
-                pixelScale = density,
-            )
+            val firstVisible = ((position - legendWidthPx) / slotWidthPx).toInt().coerceAtLeast(0)
+            val bufferedStart = (firstVisible - 2).coerceAtLeast(0)
+            val visibleCount = (size.width / slotWidthPx).toInt() + 5
+            val bufferedEnd = (bufferedStart + visibleCount).coerceAtMost(points.size)
+            val visiblePoints = points.subList(bufferedStart, bufferedEnd)
+            val visibleLeft = legendWidthPx + bufferedStart * slotWidthPx
+            nativeCanvas.save()
+            nativeCanvas.translate(-position, 0f)
             ForecastGraphics.drawTimeline(
-                canvas = drawContext.canvas.nativeCanvas,
-                bounds = android.graphics.RectF(legendWidthPx, 0f, size.width, size.height),
-                points = points,
-                days = days,
+                canvas = nativeCanvas,
+                bounds = android.graphics.RectF(visibleLeft, 0f, visibleLeft + visiblePoints.size * slotWidthPx, size.height),
+                points = visiblePoints,
+                days = forecast.daily,
                 dark = dark,
                 todayLabel = todayLabel,
                 labelHeight = labelHeight.toPx(),
                 skyHeight = skyHeight.toPx(),
                 windHeight = windHeight.toPx(),
+                mushroomHeight = mushroomHeight.toPx(),
                 temperatureUnit = temperatureUnit,
                 pixelScale = density,
                 textScale = 1.6f,
                 precipitationScale = 1.8f,
                 showWeekdayNames = true,
+                fullWeekdayNames = true,
                 dayLabelTextSize = 16f * density,
                 hourTextSize = 13f * density,
                 temperatureTextSize = 24f * density,
@@ -445,10 +579,55 @@ private fun ForecastTimeline(
                 showTemperatureValues = settings.showHourlyTemperatures,
                 showApparentTemperature = settings.showApparentTemperature,
                 showPrecipitation = settings.showPrecipitation,
-                showWind = settings.showWind,
-                showWindArrows = settings.showWindArrows,
+                showWind = false,
+                showWindArrows = false,
                 temperatureThresholds = settings.temperatureThresholds,
+                currentTimestamp = forecast.current.timestamp,
+                showDates = settings.showDates,
+                showHistory = settings.showHistoricalData,
+                historyLabel = historyLabel,
+                showMushrooms = settings.showMushrooms,
+                temperatureMinimum = temperatureRange?.first,
+                temperatureMaximum = temperatureRange?.second,
+                demoLabel = "DEMO".takeIf { demo },
+                demoEveryDay = demo,
+                pointOffset = bufferedStart,
             )
+            if (settings.showWind && windHeight.toPx() > 0f) {
+                ForecastGraphics.drawWindLayer(
+                    canvas = nativeCanvas,
+                    bounds = android.graphics.RectF(
+                        legendWidthPx,
+                        size.height - windHeight.toPx() - mushroomHeight.toPx(),
+                        legendWidthPx + trackWidth.toPx(),
+                        size.height - mushroomHeight.toPx(),
+                    ),
+                    points = points,
+                    dark = dark,
+                    pixelScale = density,
+                    windScale = 1.22f,
+                    showAnnotations = settings.showWindArrows,
+                )
+            }
+            nativeCanvas.restore()
+            }
+            val legendOffset = if (settings.showHistoricalData) -max(0f, position - nowPosition) else 0f
+            Canvas(
+                modifier = Modifier.width(legendWidth).fillMaxHeight()
+                    .offset { IntOffset(legendOffset.roundToInt(), 0) }
+                    .zIndex(2f),
+            ) {
+                ForecastGraphics.drawLegend(
+                    canvas = drawContext.canvas.nativeCanvas,
+                    bounds = android.graphics.RectF(0f, 0f, size.width, size.height),
+                    dark = dark,
+                    labelHeight = labelHeight.toPx(),
+                    skyHeight = skyHeight.toPx(),
+                    windHeight = windHeight.toPx(),
+                    mushroomHeight = mushroomHeight.toPx(),
+                    pixelScale = density,
+                )
+            }
         }
     }
 }
@@ -685,39 +864,69 @@ private fun PromotionRail(
     val uriHandler = LocalUriHandler.current
     val background = promotion.backgroundColor.toColorOrNull() ?: MaterialTheme.colorScheme.surface
     val accent = promotion.accentColor.toColorOrNull() ?: Color(0xFFF47B32)
-    Box(
-        modifier = modifier
-            .background(background)
-            .clickable {
-                onClick(promotion.id)
-                uriHandler.openUri(promotion.targetUrl)
-            }
-            .padding(if (landscape) 12.dp else 8.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (promotion.type == "image-banner" && promotion.imageUrl != null) {
-            RemotePromotionImage(promotion.imageUrl, promotion.imageAlt.orEmpty(), Modifier.fillMaxSize())
-        } else if (landscape) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                Text(promotion.eyebrow, color = Muted, fontFamily = FontFamily.Monospace, fontSize = 7.sp, fontWeight = FontWeight.Black)
-                Spacer(Modifier.height(10.dp))
-                PromotionLogo(promotion, accent)
-                Spacer(Modifier.height(10.dp))
-                Text(promotion.title, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
-                Text(promotion.description, modifier = Modifier.padding(top = 5.dp), color = Muted, fontSize = 8.sp, lineHeight = 11.sp, maxLines = 4, overflow = TextOverflow.Ellipsis)
-                Spacer(Modifier.height(10.dp))
-                Text(promotion.actionLabel, color = accent, fontSize = 8.sp, fontWeight = FontWeight.Black)
-            }
-        } else {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                PromotionLogo(promotion, accent, Modifier.size(46.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(promotion.title, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
-                    Text(promotion.description, color = Muted, fontSize = 8.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+    val foreground = if (background.luminance() < .45f) Color.White else Color(0xFF172234)
+    val secondaryForeground = foreground.copy(alpha = .68f)
+    val density = LocalDensity.current
+    val navigationLift = if (landscape) 0.dp else with(density) { WindowInsets.navigationBars.getBottom(this).toDp() }
+    Box(modifier = modifier) {
+        Box(
+            modifier = Modifier.fillMaxSize()
+                .offset(y = -navigationLift)
+                .background(background)
+                .pointerInput(promotion.id, promotion.targetUrl) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        var totalMovement = Offset.Zero
+                        var released = false
+                        while (!released) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            totalMovement += change.positionChange()
+                            if (!change.pressed) {
+                                released = true
+                                if (!change.isConsumed && totalMovement.getDistance() <= viewConfiguration.touchSlop) {
+                                    onClick(promotion.id)
+                                    uriHandler.openUri(promotion.targetUrl)
+                                }
+                            }
+                        }
+                    }
                 }
-                Text(promotion.actionLabel, color = accent, fontSize = 8.sp, fontWeight = FontWeight.Black)
+                .padding(if (landscape) 14.dp else 9.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (promotion.type == "image-banner" && promotion.imageUrl != null) {
+                RemotePromotionImage(promotion.imageUrl, promotion.imageAlt.orEmpty(), Modifier.fillMaxSize())
+            } else if (landscape) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                    Text(promotion.eyebrow, color = secondaryForeground, fontFamily = FontFamily.Monospace, fontSize = 13.sp, fontWeight = FontWeight.Black)
+                    Spacer(Modifier.height(18.dp))
+                    PromotionLogo(promotion, accent, Modifier.size(86.dp))
+                    Spacer(Modifier.height(18.dp))
+                    Text(promotion.title, color = foreground, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold)
+                    Text(promotion.description, modifier = Modifier.padding(top = 12.dp), color = foreground.copy(alpha = .86f), fontSize = 18.sp, lineHeight = 24.sp, maxLines = 8, overflow = TextOverflow.Ellipsis)
+                    Spacer(Modifier.height(22.dp))
+                    PromotionAction(promotion.actionLabel, accent, 15)
+                }
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    PromotionLogo(promotion, accent, Modifier.size(82.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(promotion.title, color = foreground, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+                        Text(promotion.description, color = foreground.copy(alpha = .9f), fontSize = 16.sp, lineHeight = 20.sp, maxLines = 4, overflow = TextOverflow.Ellipsis)
+                    }
+                    PromotionAction(promotion.actionLabel, accent, 14)
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun PromotionAction(label: String, accent: Color, fontSize: Int = 12) {
+    val contentColor = if (accent.luminance() > .5f) Color(0xFF17100B) else Color.White
+    Surface(color = accent, contentColor = contentColor, shape = RoundedCornerShape(8.dp)) {
+        Text(label, modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp), fontSize = fontSize.sp, fontWeight = FontWeight.Black, maxLines = 1)
     }
 }
 
@@ -758,8 +967,8 @@ private fun remoteBitmap(url: String?) = produceState<Bitmap?>(initialValue = nu
 @Composable
 private fun SettingsDialog(
     state: WeatherUiState,
-    darkTheme: Boolean,
     onDismiss: () -> Unit,
+    onSelectLocation: (eu.vespy.weather.data.WeatherLocation) -> Unit,
     onSearch: (String) -> Unit,
     onAddLocation: (eu.vespy.weather.data.WeatherLocation) -> Unit,
     onCurrentLocation: (Double, Double) -> Unit,
@@ -767,22 +976,32 @@ private fun SettingsDialog(
     onTemperatureUnit: (String) -> Unit,
     onDisplaySettings: (ForecastDisplaySettings) -> Unit,
     onAnalyticsConsent: (Boolean) -> Unit,
+    onResetDefaults: () -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
     val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
+    val configuration = LocalConfiguration.current
+    val landscape = configuration.screenWidthDp > configuration.screenHeightDp
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) useLastKnownLocation(context, onCurrentLocation)
         else Toast.makeText(context, R.string.location_permission_denied, Toast.LENGTH_LONG).show()
     }
     AlertDialog(
+        modifier = Modifier.fillMaxWidth(if (landscape) .92f else .84f),
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp,
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.settings), fontWeight = FontWeight.ExtraBold) },
         text = {
+            HideDialogNavigation()
             Column(
-                modifier = Modifier.heightIn(max = 430.dp).verticalScroll(rememberScrollState()),
+                modifier = Modifier.heightIn(max = (configuration.screenHeightDp * if (landscape) .76f else .72f).dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Text(stringResource(R.string.saved_locations), color = Muted, fontSize = 11.sp)
+                Text(stringResource(R.string.saved_locations), color = Muted, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                LocationDropdown(state.locations, state.location, onSelectLocation)
                 state.locations.forEach { location ->
                     Row(
                         modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 6.dp),
@@ -795,71 +1014,6 @@ private fun SettingsDialog(
                         }
                     }
                 }
-                Button(
-                    onClick = {
-                        if (context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                            useLastKnownLocation(context, onCurrentLocation)
-                        } else permissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text(stringResource(R.string.use_device_location)) }
-                Text(stringResource(R.string.language), color = Muted, fontSize = 11.sp)
-                OptionButtons(
-                    options = listOf("system" to stringResource(R.string.system_default), "en-US" to "English", "pl-PL" to "Polski"),
-                    selected = state.displaySettings.language,
-                ) { onDisplaySettings(state.displaySettings.copy(language = it)) }
-                Text(stringResource(R.string.color_theme), color = Muted, fontSize = 11.sp)
-                OptionButtons(
-                    options = listOf(
-                        "system" to stringResource(R.string.system_default),
-                        "dark" to stringResource(R.string.dark_theme),
-                        "light" to stringResource(R.string.light_theme),
-                    ),
-                    selected = state.displaySettings.theme,
-                ) { onDisplaySettings(state.displaySettings.copy(theme = it)) }
-                Text(stringResource(R.string.temperature_unit), color = Muted, fontSize = 11.sp)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("C", "F").forEach { unit ->
-                        Button(
-                            onClick = { onTemperatureUnit(unit) },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (state.temperatureUnit == unit) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                            ),
-                        ) { Text("°$unit") }
-                    }
-                }
-                Text(stringResource(R.string.temperature_color_thresholds), color = Muted, fontSize = 11.sp)
-                ThresholdSlider(stringResource(R.string.deep_frost), state.displaySettings.temperatureThresholds.deepFrost, -30f..-1f, state.temperatureUnit) { value ->
-                    updateThresholds(state, onDisplaySettings, state.displaySettings.temperatureThresholds.copy(deepFrost = value))
-                }
-                ThresholdSlider(stringResource(R.string.mild), state.displaySettings.temperatureThresholds.mild, 1f..(state.displaySettings.temperatureThresholds.warm - 1f), state.temperatureUnit) { value ->
-                    updateThresholds(state, onDisplaySettings, state.displaySettings.temperatureThresholds.copy(mild = value))
-                }
-                ThresholdSlider(stringResource(R.string.warm), state.displaySettings.temperatureThresholds.warm, (state.displaySettings.temperatureThresholds.mild + 1f)..(state.displaySettings.temperatureThresholds.hot - 1f), state.temperatureUnit) { value ->
-                    updateThresholds(state, onDisplaySettings, state.displaySettings.temperatureThresholds.copy(warm = value))
-                }
-                ThresholdSlider(stringResource(R.string.hot), state.displaySettings.temperatureThresholds.hot, (state.displaySettings.temperatureThresholds.warm + 1f)..45f, state.temperatureUnit) { value ->
-                    updateThresholds(state, onDisplaySettings, state.displaySettings.temperatureThresholds.copy(hot = value))
-                }
-                Text(stringResource(R.string.forecast_display), color = Muted, fontSize = 11.sp)
-                SettingSwitch(stringResource(R.string.show_hourly_temperatures), state.displaySettings.showHourlyTemperatures) {
-                    onDisplaySettings(state.displaySettings.copy(showHourlyTemperatures = it))
-                }
-                SettingSwitch(stringResource(R.string.show_apparent_temperature), state.displaySettings.showApparentTemperature) {
-                    onDisplaySettings(state.displaySettings.copy(showApparentTemperature = it))
-                }
-                SettingSwitch(stringResource(R.string.show_precipitation), state.displaySettings.showPrecipitation) {
-                    onDisplaySettings(state.displaySettings.copy(showPrecipitation = it))
-                }
-                SettingSwitch(stringResource(R.string.show_wind), state.displaySettings.showWind) {
-                    onDisplaySettings(state.displaySettings.copy(showWind = it))
-                }
-                SettingSwitch(stringResource(R.string.show_wind_arrows), state.displaySettings.showWindArrows) {
-                    onDisplaySettings(state.displaySettings.copy(showWindArrows = it, showWind = if (it) true else state.displaySettings.showWind))
-                }
-                SettingSwitch(stringResource(R.string.analytics_consent), state.analyticsConsent == true, onAnalyticsConsent)
-                Text(stringResource(R.string.default_zoom), color = Muted, fontSize = 11.sp)
-                ZoomControls(state.displaySettings, onDisplaySettings)
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
@@ -892,6 +1046,84 @@ private fun SettingsDialog(
                 }
                 Button(
                     onClick = {
+                        if (context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                            useLastKnownLocation(context, onCurrentLocation)
+                        } else permissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.use_device_location)) }
+                Text(stringResource(R.string.language), color = Muted, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                OptionButtons(
+                    options = listOf("system" to stringResource(R.string.system_default), "en-US" to "English", "pl-PL" to "Polski"),
+                    selected = state.displaySettings.language,
+                ) { onDisplaySettings(state.displaySettings.copy(language = it)) }
+                Text(stringResource(R.string.color_theme), color = Muted, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                OptionButtons(
+                    options = listOf(
+                        "system" to stringResource(R.string.system_default),
+                        "dark" to stringResource(R.string.dark_theme),
+                        "light" to stringResource(R.string.light_theme),
+                    ),
+                    selected = state.displaySettings.theme,
+                ) { onDisplaySettings(state.displaySettings.copy(theme = it)) }
+                Text(stringResource(R.string.temperature_unit), color = Muted, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("C", "F").forEach { unit ->
+                        Button(
+                            onClick = { onTemperatureUnit(unit) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (state.temperatureUnit == unit) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = if (state.temperatureUnit == unit) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                            ),
+                        ) { Text("°$unit") }
+                    }
+                }
+                Text(stringResource(R.string.temperature_color_thresholds), color = Muted, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                ThresholdSlider(stringResource(R.string.deep_frost), state.displaySettings.temperatureThresholds.deepFrost, -30f..-1f, state.temperatureUnit) { value ->
+                    updateThresholds(state, onDisplaySettings, state.displaySettings.temperatureThresholds.copy(deepFrost = value))
+                }
+                ThresholdSlider(stringResource(R.string.mild), state.displaySettings.temperatureThresholds.mild, 1f..(state.displaySettings.temperatureThresholds.warm - 1f), state.temperatureUnit) { value ->
+                    updateThresholds(state, onDisplaySettings, state.displaySettings.temperatureThresholds.copy(mild = value))
+                }
+                ThresholdSlider(stringResource(R.string.warm), state.displaySettings.temperatureThresholds.warm, (state.displaySettings.temperatureThresholds.mild + 1f)..(state.displaySettings.temperatureThresholds.hot - 1f), state.temperatureUnit) { value ->
+                    updateThresholds(state, onDisplaySettings, state.displaySettings.temperatureThresholds.copy(warm = value))
+                }
+                ThresholdSlider(stringResource(R.string.hot), state.displaySettings.temperatureThresholds.hot, (state.displaySettings.temperatureThresholds.warm + 1f)..45f, state.temperatureUnit) { value ->
+                    updateThresholds(state, onDisplaySettings, state.displaySettings.temperatureThresholds.copy(hot = value))
+                }
+                Text(stringResource(R.string.forecast_display), color = Muted, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                SettingSwitch(stringResource(R.string.show_hourly_temperatures), state.displaySettings.showHourlyTemperatures) {
+                    onDisplaySettings(state.displaySettings.copy(showHourlyTemperatures = it))
+                }
+                SettingSwitch(stringResource(R.string.show_apparent_temperature), state.displaySettings.showApparentTemperature) {
+                    onDisplaySettings(state.displaySettings.copy(showApparentTemperature = it))
+                }
+                SettingSwitch(stringResource(R.string.show_precipitation), state.displaySettings.showPrecipitation) {
+                    onDisplaySettings(state.displaySettings.copy(showPrecipitation = it))
+                }
+                SettingSwitch(stringResource(R.string.show_wind), state.displaySettings.showWind) {
+                    onDisplaySettings(state.displaySettings.copy(showWind = it))
+                }
+                SettingSwitch(stringResource(R.string.show_wind_arrows), state.displaySettings.showWindArrows) {
+                    onDisplaySettings(state.displaySettings.copy(showWindArrows = it, showWind = if (it) true else state.displaySettings.showWind))
+                }
+                SettingSwitch(stringResource(R.string.show_historical_data), state.displaySettings.showHistoricalData) {
+                    onDisplaySettings(state.displaySettings.copy(showHistoricalData = it))
+                }
+                SettingSwitch(stringResource(R.string.show_dates), state.displaySettings.showDates) {
+                    onDisplaySettings(state.displaySettings.copy(showDates = it))
+                }
+                SettingSwitch(stringResource(R.string.show_mushrooms), state.displaySettings.showMushrooms) {
+                    onDisplaySettings(state.displaySettings.copy(showMushrooms = it))
+                }
+                SettingSwitch(stringResource(R.string.show_widget_location), state.displaySettings.showWidgetLocation) {
+                    onDisplaySettings(state.displaySettings.copy(showWidgetLocation = it))
+                }
+                SettingSwitch(stringResource(R.string.analytics_consent), state.analyticsConsent == true, onAnalyticsConsent)
+                Text(stringResource(R.string.default_zoom), color = Muted, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                ZoomControls(state.displaySettings, onDisplaySettings, large = true)
+                Button(
+                    onClick = {
                         val supported = AppWidgetManager.getInstance(context).requestPinAppWidget(
                             ComponentName(context, WeatherWidgetProvider::class.java),
                             null,
@@ -901,6 +1133,15 @@ private fun SettingsDialog(
                     },
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text(stringResource(R.string.add_widget)) }
+                TextButton(onClick = onResetDefaults, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.reset_defaults))
+                }
+                TextButton(
+                    onClick = { uriHandler.openUri("https://weather.vespy.eu/privacy.html") },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.privacy_policy))
+                }
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) } },
@@ -912,7 +1153,10 @@ private fun AnalyticsConsentDialog(onConsent: (Boolean) -> Unit) {
     AlertDialog(
         onDismissRequest = {},
         title = { Text(stringResource(R.string.analytics_title), fontWeight = FontWeight.ExtraBold) },
-        text = { Text(stringResource(R.string.analytics_message)) },
+        text = {
+            HideDialogNavigation()
+            Text(stringResource(R.string.analytics_message))
+        },
         dismissButton = {
             TextButton(onClick = { onConsent(false) }) {
                 Text(stringResource(R.string.analytics_decline))
@@ -924,6 +1168,14 @@ private fun AnalyticsConsentDialog(onConsent: (Boolean) -> Unit) {
             }
         },
     )
+}
+
+@Composable
+private fun HideDialogNavigation() {
+    val view = LocalView.current
+    SideEffect {
+        (view.parent as? DialogWindowProvider)?.window?.let(::hideNavigationControls)
+    }
 }
 
 private fun useLastKnownLocation(context: Context, onLocation: (Double, Double) -> Unit) {
@@ -938,7 +1190,7 @@ private fun useLastKnownLocation(context: Context, onLocation: (Double, Double) 
 @Composable
 private fun SettingSwitch(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, modifier = Modifier.weight(1f), fontSize = 12.sp)
+        Text(label, modifier = Modifier.weight(1f), fontSize = 15.sp)
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
@@ -951,8 +1203,9 @@ private fun OptionButtons(options: List<Pair<String, String>>, selected: String,
                 onClick = { onSelect(value) },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (selected == value) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = if (selected == value) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
                 ),
-            ) { Text(label, fontSize = 10.sp) }
+            ) { Text(label, fontSize = 14.sp) }
         }
     }
 }
@@ -966,8 +1219,8 @@ private fun ThresholdSlider(label: String, value: Float, range: ClosedFloatingPo
     val displayed = if (unit == "F") value * 9f / 5f + 32f else value
     Column {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(label, fontSize = 10.sp)
-            Text("${displayed.toInt()}°$unit", color = Muted, fontSize = 10.sp)
+            Text(label, fontSize = 14.sp)
+            Text("${displayed.toInt()}°$unit", color = Muted, fontSize = 14.sp)
         }
         Slider(value = value, onValueChange = onChange, valueRange = range)
     }

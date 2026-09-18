@@ -50,7 +50,7 @@ Open **Settings** in Weather and use **Embed on a website** to copy an iframe co
 
 ```html
 <iframe
-  src="https://weather.vespy.eu/pl-PL/Katowice?ll=50.26489%2C19.02378&embed=1&days=2&theme=dark&unit=C&zoom=0.5&hourlyTemperatures=1&apparentTemperature=1&precipitation=1&wind=1&windArrows=0&deepFrost=-12&mild=18&warm=27&hot=32&legend=0"
+  src="https://weather.vespy.eu/en-US/London?ll=51.50740%2C-0.12780&embed=1&days=2&theme=dark&unit=C&zoom=0.5&hourlyTemperatures=1&apparentTemperature=1&precipitation=1&wind=1&windArrows=0&deepFrost=-12&mild=18&warm=27&hot=32&legend=0"
   title="Weather forecast"
   width="100%"
   height="390"

@@ -14,6 +14,7 @@ import eu.vespy.weather.data.WeatherForecast
 import eu.vespy.weather.data.WeatherLocation
 import eu.vespy.weather.data.WeatherPreferences
 import eu.vespy.weather.widget.WeatherWidgetProvider
+import eu.vespy.weather.widget.widgetDemoForecast
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -30,6 +31,7 @@ data class WeatherUiState(
     val temperatureUnit: String = "C",
     val displaySettings: ForecastDisplaySettings = ForecastDisplaySettings(),
     val analyticsConsent: Boolean? = null,
+    val demo: Boolean = false,
 )
 
 val DEFAULT_LOCATIONS = listOf(
@@ -62,11 +64,23 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
 
     fun selectLocation(location: WeatherLocation, darkTheme: Boolean) {
         if (location == state.location) return
-        state = state.copy(location = location)
+        state = state.copy(location = location, demo = false)
         preferences.saveActiveLocation(location)
         analytics.locationSelected("saved")
         WeatherWidgetProvider.refreshAll(getApplication())
         refresh(darkTheme)
+    }
+
+    fun showDemo() {
+        val forecast = widgetDemoForecast()
+        state = state.copy(
+            location = forecast.location,
+            forecast = forecast,
+            displaySettings = state.displaySettings.copy(zoom = .3f),
+            loading = false,
+            error = null,
+            demo = true,
+        )
     }
 
     fun addLocation(location: WeatherLocation, darkTheme: Boolean, source: String = "search") {
@@ -131,6 +145,13 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
             settings.showPrecipitation != previous.showPrecipitation -> analytics.displayPreferenceChanged("precipitation", settings.showPrecipitation.toString())
             settings.showWind != previous.showWind -> analytics.displayPreferenceChanged("wind", settings.showWind.toString())
             settings.showWindArrows != previous.showWindArrows -> analytics.displayPreferenceChanged("wind_arrows", settings.showWindArrows.toString())
+            settings.showHistoricalData != previous.showHistoricalData -> analytics.displayPreferenceChanged("historical_data", settings.showHistoricalData.toString())
+            settings.showDates != previous.showDates -> analytics.displayPreferenceChanged("dates", settings.showDates.toString())
+            settings.showMushrooms != previous.showMushrooms -> analytics.displayPreferenceChanged("mushrooms", settings.showMushrooms.toString())
+            settings.showWidgetLocation != previous.showWidgetLocation -> analytics.displayPreferenceChanged("widget_location", settings.showWidgetLocation.toString())
+        }
+        if (settings.theme != previous.theme || settings.temperatureThresholds != previous.temperatureThresholds || settings.showWidgetLocation != previous.showWidgetLocation) {
+            WeatherWidgetProvider.refreshAll(getApplication())
         }
     }
 
@@ -159,13 +180,19 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
 
     fun refresh(darkTheme: Boolean = true) {
         val requestedLocation = state.location
+        val requestedDemo = state.demo
         state = state.copy(loading = true, error = null)
         viewModelScope.launch {
             try {
-                val forecast = api.forecast(requestedLocation)
+                val forecast = if (requestedDemo) widgetDemoForecast() else api.forecast(
+                    requestedLocation,
+                    if (state.displaySettings.showHistoricalData) 3 else 0,
+                    state.displaySettings.showMushrooms,
+                )
                 val promotions = runCatching {
                     api.promotions(Locale.getDefault().language, if (darkTheme) "dark" else "light", "forecast_portrait")
                 }.getOrNull()
+                if (state.demo != requestedDemo || (!requestedDemo && state.location != requestedLocation)) return@launch
                 state = state.copy(
                     forecast = forecast,
                     promotions = promotions?.campaigns.orEmpty(),

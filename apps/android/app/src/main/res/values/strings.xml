@@ -15,6 +15,7 @@
     <string name="more_from_vespy">MORE FROM VESPY</string>
     <string name="open">Open</string>
     <string name="today">Today</string>
+    <string name="history">History</string>
     <string name="widget_description">Weather timeline with temperature, sky, precipitation and wind</string>
     <string name="add_widget">Add home-screen widget</string>
     <string name="widget_pin_unavailable">Add the widget from your launcher widget picker</string>
@@ -32,6 +33,26 @@
     <string name="show_precipitation">Precipitation symbols</string>
     <string name="show_wind">Wind timeline</string>
     <string name="show_wind_arrows">Wind direction arrows and speed</string>
+    <string name="show_historical_data">Show historical data</string>
+    <string name="show_dates">Show dates beside day names</string>
+    <string name="show_mushrooms">Mushroom conditions</string>
+    <string name="show_widget_location">Show location name on widgets</string>
+    <string name="choose_widget_location">Choose widget location</string>
+    <string name="choose_widget_location_description">Search or choose a saved location. You can edit it later from the widget menu.</string>
+    <string name="widget_forecast_length">Forecast length</string>
+    <string name="widget_forecast_option">%1$d hours (%2$s days)</string>
+    <string name="demo_weather">Demo weather</string>
+    <string name="default_value">Default</string>
+    <string name="on_value">On</string>
+    <string name="widget_forecast_6_hours">6 hours</string>
+    <string name="widget_forecast_12_hours">12 hours</string>
+    <string name="widget_forecast_1_day">1 day</string>
+    <string name="widget_forecast_2_days">2 days</string>
+    <string name="widget_forecast_3_days">3 days</string>
+    <string name="widget_forecast_5_days">5 days</string>
+    <string name="save_widget_settings">Save widget settings</string>
+    <string name="selected_location">Selected</string>
+    <string name="reset_defaults">Reset default settings</string>
     <string name="language">Language</string>
     <string name="color_theme">Color theme</string>
     <string name="system_default">System</string>
@@ -50,4 +71,5 @@
     <string name="analytics_decline">Decline</string>
     <string name="analytics_allow">Allow analytics</string>
     <string name="analytics_consent">Share anonymous usage analytics</string>
+    <string name="privacy_policy">Privacy policy</string>
 </resources>

@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("com.google.gms.google-services")
@@ -6,10 +8,25 @@ plugins {
 
 val weatherApiBaseUrl = providers.gradleProperty("WEATHER_API_BASE_URL")
     .orElse("https://api.weather.vespy.eu/")
+val releaseSigningFile = rootProject.file("keystore.properties")
+val releaseSigningProperties = releaseSigningFile.takeIf { it.isFile }?.inputStream()?.use { stream ->
+    Properties().apply { load(stream) }
+}
 
 android {
     namespace = "eu.vespy.weather"
     compileSdk = 37
+
+    signingConfigs {
+        releaseSigningProperties?.let { properties ->
+            create("release") {
+                storeFile = rootProject.file(properties.getProperty("storeFile"))
+                storePassword = properties.getProperty("storePassword")
+                keyAlias = properties.getProperty("keyAlias")
+                keyPassword = properties.getProperty("keyPassword")
+            }
+        }
+    }
 
     defaultConfig {
         applicationId = "eu.vespy.weather"
@@ -26,6 +43,7 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            signingConfig = signingConfigs.findByName("release")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
