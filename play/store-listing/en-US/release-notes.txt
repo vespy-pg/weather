@@ -1,1 +1,1 @@
-Improves location autocomplete with scrollable results, administrative details, and qualified searches such as "Zawada Kamienica". Also fixes keyboard focus and null labels in search results.
+Adds multi-event weather outlooks, official MeteoAlarm warnings, and a new forecast-and-alert home-screen widget. Improves responsive widget layouts, independent widget themes, location search, and forecast readability.

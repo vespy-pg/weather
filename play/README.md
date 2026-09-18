@@ -1,6 +1,6 @@
 # Google Play release package
 
-This directory contains the material needed to create the first Google Play internal-testing release for `eu.vespy.weather`.
+This directory contains the material needed to release `eu.vespy.weather` through Google Play testing tracks.
 
 ## Store listing
 
@@ -22,6 +22,8 @@ Editable SVGs, raw captures and the original approved icon are in `store-listing
 - `app-content.md` contains proposed Play Console declarations.
 - `data-safety.md` maps actual app behaviour to the Data Safety form.
 - `internal-testing-checklist.md` lists the remaining account and upload steps.
+- `closed-testing-checklist.md` covers the closed-test rollout and production-access requirements.
+- Polish release notes are stored in `store-listing/pl-PL`.
 - The public policy source is `apps/web/privacy.html` and should be deployed at `https://weather.vespy.eu/privacy.html` before submission.
 
 ## Release signing
