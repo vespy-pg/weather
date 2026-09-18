@@ -4,8 +4,14 @@
     <string name="weather">POGODA</string>
     <string name="loading_forecast">Ładowanie prognozy…</string>
     <string name="updated">Aktualizacja: %1$s</string>
-    <string name="next_ten_days">NAJBLIŻSZE 10 DNI</string>
-    <string name="forecast_title">Temperatura, zachmurzenie i opady</string>
+    <string name="forecast_summary_label">NAJBLIŻSZE DNI:</string>
+    <string name="forecast_summary_thunderstorms">Nadchodzą burze</string>
+    <string name="forecast_summary_snow">Nadchodzą opady śniegu</string>
+    <string name="forecast_summary_rain">Nadchodzą opady deszczu</string>
+    <string name="forecast_summary_windy">Zrobi się wietrznie</string>
+    <string name="forecast_summary_warming">Idzie ocieplenie</string>
+    <string name="forecast_summary_cooling">Idzie ochłodzenie</string>
+    <string name="forecast_summary_stable">Pogoda pozostanie stabilna</string>
     <string name="settings">Ustawienia</string>
     <string name="retry">Spróbuj ponownie</string>
     <string name="forecast_unavailable">Nie udało się zaktualizować prognozy</string>

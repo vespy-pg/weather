@@ -51,7 +51,7 @@ class MainActivity : ComponentActivity() {
             longitude = intent.getDoubleExtra("widget_location_longitude", 0.0),
             timezone = intent.getStringExtra("widget_location_timezone") ?: "auto",
         )
-        viewModel.selectLocation(location, true)
+        viewModel.selectLocation(location)
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {

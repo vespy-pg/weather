@@ -65,13 +65,13 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
         refresh()
     }
 
-    fun selectLocation(location: WeatherLocation, darkTheme: Boolean) {
+    fun selectLocation(location: WeatherLocation) {
         if (location == state.location) return
         state = state.copy(location = location, demo = false)
         preferences.saveActiveLocation(location)
         analytics.locationSelected("saved")
         WeatherWidgetProvider.refreshAll(getApplication())
-        refresh(darkTheme)
+        refresh()
     }
 
     fun showDemo() {
@@ -86,17 +86,17 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
         )
     }
 
-    fun addLocation(location: WeatherLocation, darkTheme: Boolean, source: String = "search") {
+    fun addLocation(location: WeatherLocation, source: String = "search") {
         val locations = (state.locations + location).distinctBy { "${it.latitude},${it.longitude}" }
         state = state.copy(locations = locations, location = location)
         preferences.saveLocations(locations)
         preferences.saveActiveLocation(location)
         analytics.locationSelected(source)
         WeatherWidgetProvider.refreshAll(getApplication())
-        refresh(darkTheme)
+        refresh()
     }
 
-    fun removeLocation(location: WeatherLocation, darkTheme: Boolean) {
+    fun removeLocation(location: WeatherLocation) {
         if (state.locations.size <= 1) return
         val removedActiveLocation = state.location.latitude == location.latitude && state.location.longitude == location.longitude
         val locations = state.locations.filterNot { it.latitude == location.latitude && it.longitude == location.longitude }
@@ -105,14 +105,14 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
         preferences.saveLocations(locations)
         preferences.saveActiveLocation(activeLocation)
         WeatherWidgetProvider.refreshAll(getApplication())
-        if (removedActiveLocation) refresh(darkTheme)
+        if (removedActiveLocation) refresh()
     }
 
-    fun addCurrentLocation(latitude: Double, longitude: Double, darkTheme: Boolean) {
+    fun addCurrentLocation(latitude: Double, longitude: Double) {
         viewModelScope.launch {
             val fallback = WeatherLocation("Current location", "", latitude, longitude, "auto")
             val location = runCatching { api.reverseLocation(latitude, longitude, Locale.getDefault().language) }.getOrDefault(fallback)
-            addLocation(location, darkTheme, "device")
+            addLocation(location, "device")
         }
     }
 
@@ -172,7 +172,7 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun refresh(darkTheme: Boolean = true) {
+    fun refresh() {
         val requestedLocation = state.location
         val requestedDemo = state.demo
         state = state.copy(loading = true, error = null)
@@ -183,13 +183,9 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
                     if (state.displaySettings.showHistoricalData) 3 else 0,
                     state.displaySettings.showMushrooms,
                 )
-                val promotions = runCatching {
-                    api.promotions(Locale.getDefault().language, if (darkTheme) "dark" else "light", "forecast_portrait")
-                }.getOrNull()
                 if (state.demo != requestedDemo || (!requestedDemo && state.location != requestedLocation)) return@launch
                 state = state.copy(
                     forecast = forecast,
-                    promotions = promotions?.campaigns.orEmpty(),
                     loading = false,
                 )
                 analytics.forecastLoaded()

@@ -4,8 +4,14 @@
     <string name="weather">WEATHER</string>
     <string name="loading_forecast">Loading forecast…</string>
     <string name="updated">Updated %1$s</string>
-    <string name="next_ten_days">NEXT 10 DAYS</string>
-    <string name="forecast_title">Temperature, clouds and precipitation</string>
+    <string name="forecast_summary_label">NEXT DAYS:</string>
+    <string name="forecast_summary_thunderstorms">Thunderstorms are approaching</string>
+    <string name="forecast_summary_snow">Snow is on the way</string>
+    <string name="forecast_summary_rain">Rain is on the way</string>
+    <string name="forecast_summary_windy">It will become windy</string>
+    <string name="forecast_summary_warming">Warmer weather is on the way</string>
+    <string name="forecast_summary_cooling">Colder weather is on the way</string>
+    <string name="forecast_summary_stable">The weather will remain stable</string>
     <string name="settings">Settings</string>
     <string name="retry">Retry</string>
     <string name="forecast_unavailable">Could not update forecast</string>

@@ -116,11 +116,13 @@ import androidx.activity.result.contract.ActivityResultContracts
 import eu.vespy.weather.R
 import eu.vespy.weather.data.HourlyWeather
 import eu.vespy.weather.data.Promotion
+import eu.vespy.weather.data.ForecastSummary
 import eu.vespy.weather.data.ForecastDisplaySettings
 import eu.vespy.weather.data.TemperatureThresholds
 import eu.vespy.weather.data.WeatherForecast
 import eu.vespy.weather.data.currentIndex
 import eu.vespy.weather.data.groupByHours
+import eu.vespy.weather.data.nextDaysSummary
 import eu.vespy.weather.data.timelineWindow
 import eu.vespy.weather.widget.WeatherWidgetProvider
 import kotlinx.coroutines.delay
@@ -182,7 +184,7 @@ fun VespyWeatherApp(viewModel: WeatherViewModel) {
         val mushroomsChanged = settings.showMushrooms != viewModel.state.displaySettings.showMushrooms
         viewModel.setDisplaySettings(settings)
         if (languageChanged) (context as? Activity)?.recreate()
-        else if (themeChanged || historyChanged || mushroomsChanged) viewModel.refresh(settings.theme == "dark" || settings.theme == "system" && systemDarkTheme)
+        else if (themeChanged || historyChanged || mushroomsChanged) viewModel.refresh()
     }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     MaterialTheme(colorScheme = if (darkTheme) DarkColors else LightColors) {
@@ -197,8 +199,8 @@ fun VespyWeatherApp(viewModel: WeatherViewModel) {
                         ForecastPane(
                             state = state,
                             landscape = true,
-                            onLocation = { viewModel.selectLocation(it, darkTheme) },
-                            onRetry = { viewModel.refresh(darkTheme) },
+                            onLocation = viewModel::selectLocation,
+                            onRetry = viewModel::refresh,
                             onSettings = { showSettings = true },
                             onDisplaySettings = updateDisplaySettings,
                             darkTheme = darkTheme,
@@ -218,8 +220,8 @@ fun VespyWeatherApp(viewModel: WeatherViewModel) {
                         ForecastPane(
                             state = state,
                             landscape = false,
-                            onLocation = { viewModel.selectLocation(it, darkTheme) },
-                            onRetry = { viewModel.refresh(darkTheme) },
+                            onLocation = viewModel::selectLocation,
+                            onRetry = viewModel::refresh,
                             onSettings = { showSettings = true },
                             onDisplaySettings = updateDisplaySettings,
                             darkTheme = darkTheme,
@@ -238,10 +240,10 @@ fun VespyWeatherApp(viewModel: WeatherViewModel) {
                 if (showSettings) SettingsDialog(
                     state = state,
                     onDismiss = { showSettings = false },
-                    onSelectLocation = { viewModel.selectLocation(it, darkTheme) },
-                    onAddLocation = { viewModel.addLocation(it, darkTheme) },
-                    onCurrentLocation = { latitude, longitude -> viewModel.addCurrentLocation(latitude, longitude, darkTheme) },
-                    onRemoveLocation = { viewModel.removeLocation(it, darkTheme) },
+                    onSelectLocation = viewModel::selectLocation,
+                    onAddLocation = viewModel::addLocation,
+                    onCurrentLocation = viewModel::addCurrentLocation,
+                    onRemoveLocation = viewModel::removeLocation,
                     onTemperatureUnit = viewModel::setTemperatureUnit,
                     onDisplaySettings = updateDisplaySettings,
                     onAnalyticsConsent = viewModel::setAnalyticsConsent,
@@ -272,20 +274,17 @@ private fun ForecastPane(
             .statusBarsPadding()
             .padding(horizontal = if (landscape) 10.dp else 14.dp, vertical = 8.dp),
     ) {
-        if (landscape) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                LocationTitle(state.location.name, compact = true)
-                Spacer(Modifier.width(12.dp))
-                LocationDropdown(state.locations, state.location, onLocation, onSettings, Modifier.weight(1f))
-                Spacer(Modifier.width(8.dp))
-                SettingsButton(onSettings)
-            }
-        } else {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                LocationTitle(state.location.name, compact = false, modifier = Modifier.weight(1f))
-                SettingsButton(onSettings)
-            }
-            LocationDropdown(state.locations, state.location, onLocation, onSettings, Modifier.padding(vertical = 9.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            LocationTitleDropdown(
+                locations = state.locations,
+                active = state.location,
+                compact = landscape,
+                onLocation = onLocation,
+                onManage = onSettings,
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.width(8.dp))
+            SettingsButton(onSettings)
         }
 
         when {
@@ -297,23 +296,56 @@ private fun ForecastPane(
 }
 
 @Composable
-private fun LocationTitle(name: String, compact: Boolean, modifier: Modifier = Modifier) {
-    Column(modifier = modifier.widthIn(max = if (compact) 270.dp else Dp.Infinity)) {
-        if (!compact) Text(
-            text = stringResource(R.string.weather),
-            color = MaterialTheme.colorScheme.primary,
-            fontFamily = FontFamily.Monospace,
-            fontSize = 9.sp,
-            fontWeight = FontWeight.Black,
-            letterSpacing = 1.sp,
-        )
-        Text(
-            text = name,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            fontSize = if (compact) 18.sp else 27.sp,
-            fontWeight = FontWeight.ExtraBold,
-        )
+private fun LocationTitleDropdown(
+    locations: List<eu.vespy.weather.data.WeatherLocation>,
+    active: eu.vespy.weather.data.WeatherLocation,
+    compact: Boolean,
+    onLocation: (eu.vespy.weather.data.WeatherLocation) -> Unit,
+    onManage: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box(modifier.widthIn(max = if (compact) 420.dp else Dp.Infinity)) {
+        Column(Modifier.fillMaxWidth().clickable { expanded = true }) {
+            if (!compact) Text(
+                text = stringResource(R.string.weather),
+                color = MaterialTheme.colorScheme.primary,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 1.sp,
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = active.name,
+                    modifier = Modifier.weight(1f, fill = false),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    fontSize = if (compact) 18.sp else 27.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                )
+                Text("▾", modifier = Modifier.padding(start = 7.dp, end = 4.dp), fontSize = if (compact) 13.sp else 16.sp)
+            }
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            locations.forEach { location ->
+                val selected = location.latitude == active.latitude && location.longitude == active.longitude
+                DropdownMenuItem(
+                    text = { Text(location.name, fontSize = 15.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal) },
+                    onClick = {
+                        expanded = false
+                        onLocation(location)
+                    },
+                )
+            }
+            DropdownMenuItem(
+                text = { Text("+ ${stringResource(R.string.saved_locations)}", fontSize = 15.sp) },
+                onClick = {
+                    expanded = false
+                    onManage()
+                },
+            )
+        }
     }
 }
 
@@ -329,51 +361,6 @@ private fun SettingsButton(onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Text("⚙", fontSize = 16.sp)
-    }
-}
-
-@Composable
-private fun LocationDropdown(
-    locations: List<eu.vespy.weather.data.WeatherLocation>,
-    active: eu.vespy.weather.data.WeatherLocation,
-    onLocation: (eu.vespy.weather.data.WeatherLocation) -> Unit,
-    onManage: (() -> Unit)? = null,
-    modifier: Modifier = Modifier,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    Box(modifier) {
-        Button(
-            onClick = { expanded = true },
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-            ),
-        ) {
-            Text(active.name, modifier = Modifier.weight(1f), fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("▾", modifier = Modifier.padding(start = 8.dp), fontSize = 14.sp)
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            locations.forEach { location ->
-                val selected = location.latitude == active.latitude && location.longitude == active.longitude
-                DropdownMenuItem(
-                    text = { Text(location.name, fontSize = 15.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal) },
-                    onClick = {
-                        expanded = false
-                        onLocation(location)
-                    },
-                )
-            }
-            if (onManage != null) {
-                DropdownMenuItem(
-                    text = { Text("+ ${stringResource(R.string.saved_locations)}", fontSize = 15.sp) },
-                    onClick = {
-                        expanded = false
-                        onManage()
-                    },
-                )
-            }
-        }
     }
 }
 
@@ -397,22 +384,12 @@ private fun ForecastCard(
         Column {
             Row(
                 modifier = Modifier.fillMaxWidth()
-                    .heightIn(min = if (landscape) 30.dp else 44.dp)
+                    .heightIn(min = if (landscape) 44.dp else 58.dp)
                     .padding(horizontal = 10.dp, vertical = if (landscape) 3.dp else 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                if (landscape) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        ForecastEyebrow()
-                        Text(stringResource(R.string.forecast_title), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
-                } else {
-                    Column {
-                        ForecastEyebrow()
-                        Text(stringResource(R.string.forecast_title), fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
+                ForecastSummaryHeader(forecast, landscape, Modifier.weight(1f).padding(end = 8.dp))
                 ZoomControls(displaySettings, onDisplaySettings, large = false)
             }
             ForecastTimeline(forecast, landscape, temperatureUnit, displaySettings, darkTheme, demo)
@@ -422,31 +399,44 @@ private fun ForecastCard(
 }
 
 @Composable
-private fun ForecastEyebrow() {
-    Text(
-        stringResource(R.string.next_ten_days),
-        color = MaterialTheme.colorScheme.primary,
-        fontFamily = FontFamily.Monospace,
-        fontSize = 7.sp,
-        fontWeight = FontWeight.Black,
-        letterSpacing = .7.sp,
-    )
+private fun ForecastSummaryHeader(forecast: WeatherForecast, compact: Boolean, modifier: Modifier = Modifier) {
+    val summary = remember(forecast) { forecast.nextDaysSummary() }
+    val summaryText = stringResource(when (summary) {
+        ForecastSummary.THUNDERSTORMS -> R.string.forecast_summary_thunderstorms
+        ForecastSummary.SNOW -> R.string.forecast_summary_snow
+        ForecastSummary.RAIN -> R.string.forecast_summary_rain
+        ForecastSummary.WINDY -> R.string.forecast_summary_windy
+        ForecastSummary.WARMING -> R.string.forecast_summary_warming
+        ForecastSummary.COOLING -> R.string.forecast_summary_cooling
+        ForecastSummary.STABLE -> R.string.forecast_summary_stable
+    })
+    Column(modifier) {
+        Text(
+            stringResource(R.string.forecast_summary_label),
+            color = MaterialTheme.colorScheme.primary,
+            fontFamily = FontFamily.Monospace,
+            fontSize = if (compact) 7.sp else 8.sp,
+            fontWeight = FontWeight.Black,
+            letterSpacing = .7.sp,
+        )
+        Text(summaryText, fontSize = if (compact) 11.sp else 13.sp, lineHeight = if (compact) 12.sp else 15.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+    }
 }
 
 @Composable
 private fun ZoomControls(settings: ForecastDisplaySettings, onChange: (ForecastDisplaySettings) -> Unit, large: Boolean = false) {
     val levels = listOf(.25f, .3f, .5f, .75f, 1f, 2f)
     val index = levels.indexOf(settings.zoom).coerceAtLeast(2)
-    val buttonSize = if (large) 48.dp else 26.dp
-    val valueWidth = if (large) 74.dp else 38.dp
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(if (large) 8.dp else 3.dp)) {
-        ZoomButton("-", index > 0, buttonSize, if (large) 22 else 12) { onChange(settings.copy(zoom = levels[index - 1])) }
+    val buttonSize = if (large) 48.dp else 34.dp
+    val valueWidth = if (large) 74.dp else 52.dp
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(if (large) 8.dp else 5.dp)) {
+        ZoomButton("-", index > 0, buttonSize, if (large) 22 else 17) { onChange(settings.copy(zoom = levels[index - 1])) }
         Box(
             Modifier.height(buttonSize).width(valueWidth).clickable { onChange(settings.copy(zoom = .5f)) }
                 .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .35f), RoundedCornerShape(if (large) 10.dp else 5.dp)),
             contentAlignment = Alignment.Center,
-        ) { Text("${(settings.zoom * 100).roundToInt()}%", color = Muted, fontSize = if (large) 16.sp else 8.sp, fontWeight = if (large) FontWeight.Bold else FontWeight.Normal) }
-        ZoomButton("+", index < levels.lastIndex, buttonSize, if (large) 22 else 12) { onChange(settings.copy(zoom = levels[index + 1])) }
+        ) { Text("${(settings.zoom * 100).roundToInt()}%", color = Muted, fontSize = if (large) 16.sp else 11.sp, fontWeight = FontWeight.Bold) }
+        ZoomButton("+", index < levels.lastIndex, buttonSize, if (large) 22 else 17) { onChange(settings.copy(zoom = levels[index + 1])) }
     }
 }
 

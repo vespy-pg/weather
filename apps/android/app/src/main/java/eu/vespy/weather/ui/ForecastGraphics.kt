@@ -531,6 +531,18 @@ object ForecastGraphics {
             val warmer = apparentStart + apparentEnd >= actualStart + actualEnd
             canvas.drawPath(area, Paint().apply { color = if (warmer) Color.argb(72, 242, 142, 62) else Color.argb(72, 59, 142, 229) })
         }
+        if (showApparentTemperature) {
+            fun drawApparentEdge(left: Float, right: Float, point: HourlyWeather) {
+                val actual = point.temperature ?: return
+                val apparent = point.apparentTemperature ?: actual
+                val warmer = apparent >= actual
+                canvas.drawRect(left, min(y(actual), y(apparent)), right, max(y(actual), y(apparent)), Paint().apply {
+                    color = if (warmer) Color.argb(72, 242, 142, 62) else Color.argb(72, 59, 142, 229)
+                })
+            }
+            drawApparentEdge(bounds.left, x(0), points.first())
+            drawApparentEdge(x(points.lastIndex), bounds.right, points.last())
+        }
 
         points.zipWithNext().forEachIndexed { index, pair ->
             val start = pair.first.temperature ?: return@forEachIndexed
@@ -699,6 +711,11 @@ object ForecastGraphics {
             return (sample(flowCenters, position) + separation + mainWave + secondaryWave + gustWave)
                 .coerceIn(bounds.top + 3f * pixelScale * windScale, bounds.bottom - 3f * pixelScale * windScale)
         }
+        fun lineX(position: Float): Float = when {
+            position <= 0f -> bounds.left
+            position >= points.lastIndex -> bounds.right
+            else -> bounds.left + (position + .5f) * cell
+        }
         val gradientPositions = strength.indices.map { it.toFloat() / max(1, strength.lastIndex) }.toFloatArray()
         val envelopeGradient = LinearGradient(
             bounds.left,
@@ -711,8 +728,8 @@ object ForecastGraphics {
         )
         val envelope = Path()
         for (index in 0 until points.lastIndex) {
-            val startX = bounds.left + (index + .5f) * cell
-            val endX = bounds.left + (index + 1.5f) * cell
+            val startX = lineX(index.toFloat())
+            val endX = lineX(index + 1f)
             val startLines = lanes.indices.map { lineY(index.toFloat(), it) }
             val endLines = lanes.indices.map { lineY(index + 1f, it) }
             val startTop = startLines.min()
@@ -742,11 +759,10 @@ object ForecastGraphics {
         lanes.forEachIndexed { laneIndex, _ ->
             val path = Path().apply {
                 moveTo(bounds.left, lineY(0f, laneIndex))
-                lineTo(bounds.left + .5f * cell, lineY(0f, laneIndex))
                 val samples = (points.size - 1) * 8
                 for (sampleIndex in 1..samples) {
                     val position = sampleIndex / 8f
-                    lineTo(bounds.left + (position + .5f) * cell, lineY(position, laneIndex))
+                    lineTo(lineX(position), lineY(position, laneIndex))
                 }
             }
             canvas.drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -759,10 +775,10 @@ object ForecastGraphics {
             for (index in 0 until points.lastIndex) {
                 val averageStrength = (strength[index] + strength[index + 1]) / 2f
                 val segment = Path().apply {
-                    moveTo(bounds.left + (index + .5f) * cell, lineY(index.toFloat(), laneIndex))
+                    moveTo(lineX(index.toFloat()), lineY(index.toFloat(), laneIndex))
                     for (step in 1..8) {
                         val position = index + step / 8f
-                        lineTo(bounds.left + (position + .5f) * cell, lineY(position, laneIndex))
+                        lineTo(lineX(position), lineY(position, laneIndex))
                     }
                 }
                 val opacity = (.001f + averageStrength.pow(1.22f) * .92f) * (.65f + laneWeights[laneIndex] * .35f)

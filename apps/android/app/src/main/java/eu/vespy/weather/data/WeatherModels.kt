@@ -63,6 +63,38 @@ data class WeatherForecast(
     val daily: List<DailyWeather>,
 )
 
+enum class ForecastSummary {
+    THUNDERSTORMS,
+    SNOW,
+    RAIN,
+    WINDY,
+    WARMING,
+    COOLING,
+    STABLE,
+}
+
+fun WeatherForecast.nextDaysSummary(): ForecastSummary {
+    val currentHour = current.timestamp.take(13)
+    val nextHours = hourly.filter { it.timestamp.take(13) >= currentHour }.take(72)
+    if (nextHours.isEmpty()) return ForecastSummary.STABLE
+    if (nextHours.any { it.tornado || it.weatherCode in setOf(95, 96, 99) }) return ForecastSummary.THUNDERSTORMS
+    if (nextHours.sumOf { it.snowfall ?: 0.0 } >= 1.0 || nextHours.any { it.weatherCode in 71..77 || it.weatherCode in 85..86 }) return ForecastSummary.SNOW
+    if (nextHours.maxOfOrNull { it.windSpeed ?: 0.0 } ?: 0.0 >= 35.0 || nextHours.maxOfOrNull { it.windGusts ?: 0.0 } ?: 0.0 >= 55.0) return ForecastSummary.WINDY
+    if (nextHours.sumOf { it.rain ?: it.precipitation ?: 0.0 } >= 5.0) return ForecastSummary.RAIN
+    val sampleSize = minOf(24, nextHours.size / 2)
+    if (sampleSize < 6) return ForecastSummary.STABLE
+    val initialTemperature = nextHours.take(sampleSize).mapNotNull(HourlyWeather::temperature).averageOrNull()
+    val finalTemperature = nextHours.takeLast(sampleSize).mapNotNull(HourlyWeather::temperature).averageOrNull()
+    val change = if (initialTemperature == null || finalTemperature == null) 0.0 else finalTemperature - initialTemperature
+    return when {
+        change >= 3.0 -> ForecastSummary.WARMING
+        change <= -3.0 -> ForecastSummary.COOLING
+        else -> ForecastSummary.STABLE
+    }
+}
+
+private fun List<Double>.averageOrNull(): Double? = if (isEmpty()) null else average()
+
 data class Promotion(
     val id: String,
     val type: String,

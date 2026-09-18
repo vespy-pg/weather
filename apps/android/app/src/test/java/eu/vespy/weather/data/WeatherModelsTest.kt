@@ -19,6 +19,20 @@ class WeatherModelsTest {
         windGusts = temperature + 2,
     )
 
+    private fun forecast(points: List<HourlyWeather>) = WeatherForecast(
+        location = WeatherLocation("Test", "Test", 0.0, 0.0, "UTC"),
+        current = CurrentWeather(points.first().timestamp, points.first().temperature, points.first().apparentTemperature, 0.0, points.first().windSpeed),
+        hourly = points,
+        daily = emptyList(),
+    )
+
+    private fun summaryPoints(transform: (Int, HourlyWeather) -> HourlyWeather = { _, value -> value }): List<HourlyWeather> =
+        (0 until 72).map { hour ->
+            point("2026-09-${(18 + hour / 24).toString().padStart(2, '0')}T${(hour % 24).toString().padStart(2, '0')}:00", 15.0)
+                .copy(weatherCode = 2, windSpeed = 8.0, windGusts = 14.0)
+                .let { transform(hour, it) }
+        }
+
     @Test
     fun intervalSelectionKeepsExactSourceValues() {
         val points = (0..6).map { index ->
@@ -83,5 +97,24 @@ class WeatherModelsTest {
         assertEquals(points[8].timestamp, window.first().timestamp)
         assertEquals("2026-09-18T23:00", window.last().timestamp)
         assertEquals(3 * 24, window.currentIndex(currentTimestamp))
+    }
+
+    @Test
+    fun nextDaysSummaryDetectsTemperatureTrends() {
+        val warming = summaryPoints { hour, value -> value.copy(temperature = 8.0 + hour / 8.0) }
+        val cooling = summaryPoints { hour, value -> value.copy(temperature = 20.0 - hour / 8.0) }
+
+        assertEquals(ForecastSummary.WARMING, forecast(warming).nextDaysSummary())
+        assertEquals(ForecastSummary.COOLING, forecast(cooling).nextDaysSummary())
+    }
+
+    @Test
+    fun nextDaysSummaryPrioritizesSignificantWeather() {
+        val windy = summaryPoints { hour, value -> if (hour == 36) value.copy(windSpeed = 40.0) else value }
+        val stormy = summaryPoints { hour, value -> if (hour == 36) value.copy(weatherCode = 95, windSpeed = 40.0) else value }
+
+        assertEquals(ForecastSummary.WINDY, forecast(windy).nextDaysSummary())
+        assertEquals(ForecastSummary.THUNDERSTORMS, forecast(stormy).nextDaysSummary())
+        assertEquals(ForecastSummary.STABLE, forecast(summaryPoints()).nextDaysSummary())
     }
 }
