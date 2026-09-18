@@ -8,11 +8,16 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -31,6 +36,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -39,6 +46,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -50,6 +60,10 @@ import eu.vespy.weather.data.WidgetDisplaySettings
 import eu.vespy.weather.ui.DEFAULT_LOCATIONS
 import eu.vespy.weather.ui.LEGACY_DEFAULT_LOCATIONS
 import eu.vespy.weather.ui.LocationControls
+import eu.vespy.weather.ui.WeatherFieldShape
+import eu.vespy.weather.ui.WeatherPanelShape
+import eu.vespy.weather.ui.WeatherSettingsSection
+import eu.vespy.weather.ui.WeatherSupportingText
 import eu.vespy.weather.ui.hideNavigationControls
 
 class WeatherWidgetConfigureActivity : ComponentActivity() {
@@ -79,6 +93,8 @@ class WeatherWidgetConfigureActivity : ComponentActivity() {
                 initialLocation = initialLocation,
                 initialForecastHours = preferences.widgetForecastHours(widgetId),
                 initialWidgetSettings = preferences.widgetDisplaySettings(widgetId),
+                initialAppTheme = preferences.displaySettings().theme,
+                onBack = ::finish,
                 onRemoveLocation = { removed ->
                     val saved = preferences.locations(DEFAULT_LOCATIONS)
                     if (saved.size > 1) preferences.saveLocations(saved.filterNot { it.samePlaceAs(removed) })
@@ -103,16 +119,24 @@ class WeatherWidgetConfigureActivity : ComponentActivity() {
 
 private val widgetDarkColors = darkColorScheme(
     background = Color(0xFF080C12),
-    surfaceVariant = Color(0xFF151C27),
+    surface = Color(0xFF111923),
+    surfaceVariant = Color(0xFF0B1420),
     primary = Color(0xFF58A6FF),
     onPrimary = Color(0xFF07111E),
+    onSurface = Color(0xFFE7EDF7),
+    onSurfaceVariant = Color(0xFF9AA8BA),
+    outline = Color(0xFF3A5672),
 )
 
 private val widgetLightColors = lightColorScheme(
     background = Color(0xFFEDF3F9),
-    surfaceVariant = Color.White,
+    surface = Color.White,
+    surfaceVariant = Color(0xFFF5F8FC),
     primary = Color(0xFF176FC1),
     onPrimary = Color.White,
+    onSurface = Color(0xFF172234),
+    onSurfaceVariant = Color(0xFF5B6B80),
+    outline = Color(0xFF9AAFC4),
 )
 
 @Composable
@@ -121,6 +145,8 @@ private fun WidgetLocationPicker(
     initialLocation: WeatherLocation,
     initialForecastHours: Int,
     initialWidgetSettings: WidgetDisplaySettings,
+    initialAppTheme: String,
+    onBack: () -> Unit,
     onRemoveLocation: (WeatherLocation) -> Unit,
     onSave: (WeatherLocation, Int, WidgetDisplaySettings) -> Unit,
 ) {
@@ -130,7 +156,7 @@ private fun WidgetLocationPicker(
     var selectedLocation by remember { mutableStateOf(initialLocation) }
     var widgetSettings by remember { mutableStateOf(initialWidgetSettings) }
     val systemDark = isSystemInDarkTheme()
-    val dark = when (widgetSettings.theme) {
+    val dark = when (initialAppTheme) {
         "light" -> false
         "system" -> systemDark
         else -> true
@@ -145,75 +171,105 @@ private fun WidgetLocationPicker(
                 modifier = Modifier.statusBarsPadding().navigationBarsPadding(),
             ) {
                 Column(
-                    modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(24.dp),
+                    modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Text(stringResource(R.string.choose_widget_location), fontSize = 26.sp, fontWeight = FontWeight.ExtraBold)
-                    Text(stringResource(R.string.choose_widget_location_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(stringResource(R.string.saved_locations), fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    LocationControls(
-                        locations = savedLocations,
-                        selectedLocation = selectedLocation,
-                        onSelectLocation = { selectedLocation = it },
-                        onSearchResult = { selectedLocation = it },
-                        onRemoveLocation = { removed ->
-                            if (savedLocations.size > 1) {
-                                savedLocations = savedLocations.filterNot { it.samePlaceAs(removed) }
-                                onRemoveLocation(removed)
-                            }
-                        },
-                        enabled = !widgetSettings.demo,
-                    )
-                    Text(stringResource(R.string.widget_forecast_length), fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        Button(
-                            onClick = { forecastMenuExpanded = true },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text("${forecastLengths.first { it.first == forecastHours }.second}  \u25BE")
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("‹", modifier = Modifier.clickable(onClick = onBack).padding(end = 14.dp), fontSize = 38.sp, fontWeight = FontWeight.Light)
+                        Column {
+                            Text(
+                                stringResource(R.string.widget_settings_eyebrow).uppercase(),
+                                color = MaterialTheme.colorScheme.primary,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 1.2.sp,
+                            )
+                            Text(stringResource(R.string.widget_settings_title), fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
                         }
-                        DropdownMenu(
-                            expanded = forecastMenuExpanded,
-                            onDismissRequest = { forecastMenuExpanded = false },
-                        ) {
-                            forecastLengths.forEach { (hours, label) ->
-                                DropdownMenuItem(
-                                    text = { Text(label, fontWeight = if (forecastHours == hours) FontWeight.Bold else FontWeight.Normal) },
-                                    onClick = {
-                                        forecastHours = hours
-                                        forecastMenuExpanded = false
-                                    },
+                    }
+                    Surface(
+                        shape = WeatherPanelShape,
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = .18f)),
+                    ) {
+                        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Surface(
+                                modifier = Modifier.width(122.dp).height(72.dp),
+                                shape = WeatherFieldShape,
+                                color = Color(0xFF09111B),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = .4f)),
+                            ) {
+                                Image(
+                                    painter = painterResource(R.drawable.widget_preview_chart),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.FillBounds,
                                 )
                             }
+                            Column(Modifier.padding(start = 14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(selectedLocation.name, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
+                                WeatherSupportingText(forecastLengths.first { it.first == forecastHours }.second)
+                            }
                         }
                     }
-                    Text(stringResource(R.string.color_theme), fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    WidgetThemeOptions(widgetSettings.theme) { widgetSettings = widgetSettings.copy(theme = it) }
-                    WidgetSwitch(stringResource(R.string.show_hourly_temperatures), widgetSettings.showHourlyTemperatures) {
-                        widgetSettings = widgetSettings.copy(showHourlyTemperatures = it)
+                    WeatherSettingsSection(stringResource(R.string.widget_location_section)) {
+                        LocationControls(
+                            locations = savedLocations,
+                            selectedLocation = selectedLocation,
+                            onSelectLocation = { selectedLocation = it },
+                            onSearchResult = { selectedLocation = it },
+                            onRemoveLocation = { removed ->
+                                if (savedLocations.size > 1) {
+                                    savedLocations = savedLocations.filterNot { it.samePlaceAs(removed) }
+                                    onRemoveLocation(removed)
+                                }
+                            },
+                            enabled = !widgetSettings.demo,
+                        )
+                        WeatherSupportingText(stringResource(R.string.choose_widget_location_description))
                     }
-                    WidgetSwitch(stringResource(R.string.show_apparent_temperature), widgetSettings.showApparentTemperature) {
-                        widgetSettings = widgetSettings.copy(showApparentTemperature = it)
+                    WeatherSettingsSection(stringResource(R.string.widget_forecast_length)) {
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            Button(
+                                onClick = { forecastMenuExpanded = true },
+                                modifier = Modifier.fillMaxWidth().height(52.dp),
+                                shape = WeatherFieldShape,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    contentColor = MaterialTheme.colorScheme.onSurface,
+                                ),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = .28f)),
+                            ) {
+                                Text(forecastLengths.first { it.first == forecastHours }.second, Modifier.weight(1f), fontWeight = FontWeight.Bold)
+                                Text("▾")
+                            }
+                            DropdownMenu(expanded = forecastMenuExpanded, onDismissRequest = { forecastMenuExpanded = false }) {
+                                forecastLengths.forEach { (hours, label) ->
+                                    DropdownMenuItem(
+                                        text = { Text(label, fontWeight = if (forecastHours == hours) FontWeight.Bold else FontWeight.Normal) },
+                                        onClick = { forecastHours = hours; forecastMenuExpanded = false },
+                                    )
+                                }
+                            }
+                        }
                     }
-                    WidgetSwitch(stringResource(R.string.show_precipitation), widgetSettings.showPrecipitation) {
-                        widgetSettings = widgetSettings.copy(showPrecipitation = it)
+                    WeatherSettingsSection(stringResource(R.string.widget_appearance_section)) {
+                        WidgetThemeOptions(widgetSettings.theme) { widgetSettings = widgetSettings.copy(theme = it) }
                     }
-                    WidgetSwitch(stringResource(R.string.show_wind_arrows), widgetSettings.showWindArrows) {
-                        widgetSettings = widgetSettings.copy(showWindArrows = it)
-                    }
-                    WidgetSwitch(stringResource(R.string.show_mushrooms), widgetSettings.showMushrooms) {
-                        widgetSettings = widgetSettings.copy(showMushrooms = it)
-                    }
-                    WidgetDefaultOrOn(stringResource(R.string.show_widget_location), widgetSettings.forceLocationName) {
-                        widgetSettings = widgetSettings.copy(forceLocationName = it)
-                    }
-                    WidgetSwitch(stringResource(R.string.demo_weather), widgetSettings.demo) {
-                        widgetSettings = widgetSettings.copy(demo = it)
+                    WeatherSettingsSection(stringResource(R.string.widget_display_section)) {
+                        WidgetSwitch(stringResource(R.string.show_hourly_temperatures), widgetSettings.showHourlyTemperatures) { widgetSettings = widgetSettings.copy(showHourlyTemperatures = it) }
+                        WidgetSwitch(stringResource(R.string.show_apparent_temperature), widgetSettings.showApparentTemperature) { widgetSettings = widgetSettings.copy(showApparentTemperature = it) }
+                        WidgetSwitch(stringResource(R.string.show_precipitation), widgetSettings.showPrecipitation) { widgetSettings = widgetSettings.copy(showPrecipitation = it) }
+                        WidgetSwitch(stringResource(R.string.show_wind_arrows), widgetSettings.showWindArrows) { widgetSettings = widgetSettings.copy(showWindArrows = it) }
+                        WidgetSwitch(stringResource(R.string.show_mushrooms), widgetSettings.showMushrooms) { widgetSettings = widgetSettings.copy(showMushrooms = it) }
+                        WidgetDefaultOrOn(stringResource(R.string.show_widget_location), widgetSettings.forceLocationName) { widgetSettings = widgetSettings.copy(forceLocationName = it) }
+                        WidgetSwitch(stringResource(R.string.demo_weather), widgetSettings.demo) { widgetSettings = widgetSettings.copy(demo = it) }
                     }
                 }
                 Button(
                     onClick = { onSave(selectedLocation, forecastHours, widgetSettings) },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp).height(52.dp),
+                    shape = RoundedCornerShape(12.dp),
                 ) {
                     Text(stringResource(R.string.save_widget_settings))
                 }

@@ -46,6 +46,7 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -110,6 +111,7 @@ import androidx.compose.ui.zIndex
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.window.DialogWindowProvider
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -142,13 +144,15 @@ import kotlin.math.sin
 
 private val DarkColors = darkColorScheme(
     background = Color(0xFF080C12),
-    surface = Color(0xFF151C27),
-    surfaceVariant = Color(0xFF0D1118),
+    surface = Color(0xFF111923),
+    surfaceVariant = Color(0xFF0B1420),
     primary = Color(0xFF58A6FF),
     onPrimary = Color(0xFF07111E),
     secondary = Color(0xFF45CF88),
     onBackground = Color(0xFFE7EDF7),
     onSurface = Color(0xFFE7EDF7),
+    onSurfaceVariant = Color(0xFF9AA8BA),
+    outline = Color(0xFF3A5672),
 )
 
 private val LightColors = lightColorScheme(
@@ -160,6 +164,8 @@ private val LightColors = lightColorScheme(
     secondary = Color(0xFF23865A),
     onBackground = Color(0xFF172234),
     onSurface = Color(0xFF172234),
+    onSurfaceVariant = Color(0xFF5B6B80),
+    outline = Color(0xFF9AAFC4),
 )
 
 private val ChartLine = Color(0xFF2C3748)
@@ -1011,135 +1017,125 @@ private fun SettingsDialog(
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
-    val configuration = LocalConfiguration.current
-    val landscape = configuration.screenWidthDp > configuration.screenHeightDp
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) useLastKnownLocation(context, onCurrentLocation)
         else Toast.makeText(context, R.string.location_permission_denied, Toast.LENGTH_LONG).show()
     }
-    AlertDialog(
-        modifier = Modifier.fillMaxWidth(if (landscape) .92f else .84f),
-        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
-        containerColor = MaterialTheme.colorScheme.surface,
-        tonalElevation = 0.dp,
+    Dialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.settings), fontWeight = FontWeight.ExtraBold) },
-        text = {
-            HideDialogNavigation()
-            Column(
-                modifier = Modifier.heightIn(max = (configuration.screenHeightDp * if (landscape) .76f else .72f).dp).verticalScroll(rememberScrollState()),
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
+        HideDialogNavigation()
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background,
+            tonalElevation = 0.dp,
+        ) {
+            Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp)) {
+                Text(
+                    stringResource(R.string.weather).uppercase(),
+                    color = MaterialTheme.colorScheme.primary,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 1.2.sp,
+                )
+                Text(stringResource(R.string.settings), fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
+                }
+                Column(
+                modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Text(stringResource(R.string.saved_locations), color = Muted, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                LocationControls(
-                    locations = state.locations,
-                    selectedLocation = state.location,
-                    onSelectLocation = onSelectLocation,
-                    onSearchResult = onAddLocation,
-                    onRemoveLocation = onRemoveLocation,
-                )
-                Button(
-                    onClick = {
-                        if (context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                            useLastKnownLocation(context, onCurrentLocation)
-                        } else permissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text(stringResource(R.string.use_device_location)) }
-                Text(stringResource(R.string.language), color = Muted, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                OptionButtons(
-                    options = listOf("system" to stringResource(R.string.system_default), "en-US" to "English", "pl-PL" to "Polski"),
-                    selected = state.displaySettings.language,
-                ) { onDisplaySettings(state.displaySettings.copy(language = it)) }
-                Text(stringResource(R.string.color_theme), color = Muted, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                OptionButtons(
-                    options = listOf(
-                        "system" to stringResource(R.string.system_default),
-                        "dark" to stringResource(R.string.dark_theme),
-                        "light" to stringResource(R.string.light_theme),
-                    ),
-                    selected = state.displaySettings.theme,
-                ) { onDisplaySettings(state.displaySettings.copy(theme = it)) }
-                Text(stringResource(R.string.temperature_unit), color = Muted, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("C", "F").forEach { unit ->
-                        Button(
-                            onClick = { onTemperatureUnit(unit) },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (state.temperatureUnit == unit) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                                contentColor = if (state.temperatureUnit == unit) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                            ),
-                        ) { Text("°$unit") }
+                WeatherSettingsSection(stringResource(R.string.saved_locations)) {
+                    LocationControls(
+                        locations = state.locations,
+                        selectedLocation = state.location,
+                        onSelectLocation = onSelectLocation,
+                        onSearchResult = onAddLocation,
+                        onRemoveLocation = onRemoveLocation,
+                    )
+                    Button(
+                        onClick = {
+                            if (context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                                useLastKnownLocation(context, onCurrentLocation)
+                            } else permissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = WeatherFieldShape,
+                    ) { Text(stringResource(R.string.use_device_location)) }
+                }
+                WeatherSettingsSection(stringResource(R.string.app_appearance_section)) {
+                    WeatherSupportingText(stringResource(R.string.language))
+                    OptionButtons(
+                        options = listOf("system" to stringResource(R.string.system_default), "en-US" to "English", "pl-PL" to "Polski"),
+                        selected = state.displaySettings.language,
+                    ) { onDisplaySettings(state.displaySettings.copy(language = it)) }
+                    WeatherSupportingText(stringResource(R.string.color_theme))
+                    OptionButtons(
+                        options = listOf(
+                            "system" to stringResource(R.string.system_default),
+                            "dark" to stringResource(R.string.dark_theme),
+                            "light" to stringResource(R.string.light_theme),
+                        ),
+                        selected = state.displaySettings.theme,
+                    ) { onDisplaySettings(state.displaySettings.copy(theme = it)) }
+                }
+                WeatherSettingsSection(stringResource(R.string.app_temperature_section)) {
+                    WeatherSupportingText(stringResource(R.string.temperature_unit))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("C", "F").forEach { unit ->
+                            Button(
+                                onClick = { onTemperatureUnit(unit) },
+                                shape = WeatherFieldShape,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (state.temperatureUnit == unit) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                    contentColor = if (state.temperatureUnit == unit) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                                ),
+                            ) { Text("°$unit") }
+                        }
                     }
+                    WeatherSupportingText(stringResource(R.string.temperature_color_thresholds))
+                    ThresholdSlider(stringResource(R.string.deep_frost), state.displaySettings.temperatureThresholds.deepFrost, -30f..-1f, state.temperatureUnit) { value -> updateThresholds(state, onDisplaySettings, state.displaySettings.temperatureThresholds.copy(deepFrost = value)) }
+                    ThresholdSlider(stringResource(R.string.mild), state.displaySettings.temperatureThresholds.mild, 1f..(state.displaySettings.temperatureThresholds.warm - 1f), state.temperatureUnit) { value -> updateThresholds(state, onDisplaySettings, state.displaySettings.temperatureThresholds.copy(mild = value)) }
+                    ThresholdSlider(stringResource(R.string.warm), state.displaySettings.temperatureThresholds.warm, (state.displaySettings.temperatureThresholds.mild + 1f)..(state.displaySettings.temperatureThresholds.hot - 1f), state.temperatureUnit) { value -> updateThresholds(state, onDisplaySettings, state.displaySettings.temperatureThresholds.copy(warm = value)) }
+                    ThresholdSlider(stringResource(R.string.hot), state.displaySettings.temperatureThresholds.hot, (state.displaySettings.temperatureThresholds.warm + 1f)..45f, state.temperatureUnit) { value -> updateThresholds(state, onDisplaySettings, state.displaySettings.temperatureThresholds.copy(hot = value)) }
                 }
-                Text(stringResource(R.string.temperature_color_thresholds), color = Muted, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                ThresholdSlider(stringResource(R.string.deep_frost), state.displaySettings.temperatureThresholds.deepFrost, -30f..-1f, state.temperatureUnit) { value ->
-                    updateThresholds(state, onDisplaySettings, state.displaySettings.temperatureThresholds.copy(deepFrost = value))
+                WeatherSettingsSection(stringResource(R.string.forecast_display)) {
+                    SettingSwitch(stringResource(R.string.show_hourly_temperatures), state.displaySettings.showHourlyTemperatures) { onDisplaySettings(state.displaySettings.copy(showHourlyTemperatures = it)) }
+                    SettingSwitch(stringResource(R.string.show_apparent_temperature), state.displaySettings.showApparentTemperature) { onDisplaySettings(state.displaySettings.copy(showApparentTemperature = it)) }
+                    SettingSwitch(stringResource(R.string.show_precipitation), state.displaySettings.showPrecipitation) { onDisplaySettings(state.displaySettings.copy(showPrecipitation = it)) }
+                    SettingSwitch(stringResource(R.string.show_wind), state.displaySettings.showWind) { onDisplaySettings(state.displaySettings.copy(showWind = it)) }
+                    SettingSwitch(stringResource(R.string.show_wind_arrows), state.displaySettings.showWindArrows) { onDisplaySettings(state.displaySettings.copy(showWindArrows = it, showWind = if (it) true else state.displaySettings.showWind)) }
+                    SettingSwitch(stringResource(R.string.show_historical_data), state.displaySettings.showHistoricalData) { onDisplaySettings(state.displaySettings.copy(showHistoricalData = it)) }
+                    SettingSwitch(stringResource(R.string.show_dates), state.displaySettings.showDates) { onDisplaySettings(state.displaySettings.copy(showDates = it)) }
+                    SettingSwitch(stringResource(R.string.show_mushrooms), state.displaySettings.showMushrooms) { onDisplaySettings(state.displaySettings.copy(showMushrooms = it)) }
+                    SettingSwitch(stringResource(R.string.show_widget_location), state.displaySettings.showWidgetLocation) { onDisplaySettings(state.displaySettings.copy(showWidgetLocation = it)) }
+                    WeatherSupportingText(stringResource(R.string.default_zoom))
+                    ZoomControls(state.displaySettings, onDisplaySettings, large = true)
                 }
-                ThresholdSlider(stringResource(R.string.mild), state.displaySettings.temperatureThresholds.mild, 1f..(state.displaySettings.temperatureThresholds.warm - 1f), state.temperatureUnit) { value ->
-                    updateThresholds(state, onDisplaySettings, state.displaySettings.temperatureThresholds.copy(mild = value))
+                WeatherSettingsSection(stringResource(R.string.app_privacy_section)) {
+                    Button(
+                        onClick = {
+                            val supported = AppWidgetManager.getInstance(context).requestPinAppWidget(ComponentName(context, WeatherWidgetProvider::class.java), null, null)
+                            if (!supported) Toast.makeText(context, R.string.widget_pin_unavailable, Toast.LENGTH_LONG).show()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = WeatherFieldShape,
+                    ) { Text(stringResource(R.string.add_widget)) }
+                    SettingSwitch(stringResource(R.string.analytics_consent), state.analyticsConsent == true, onAnalyticsConsent)
+                    TextButton(onClick = onResetDefaults, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.reset_defaults)) }
+                    TextButton(onClick = { uriHandler.openUri("https://weather.vespy.eu/privacy.html") }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.privacy_policy)) }
                 }
-                ThresholdSlider(stringResource(R.string.warm), state.displaySettings.temperatureThresholds.warm, (state.displaySettings.temperatureThresholds.mild + 1f)..(state.displaySettings.temperatureThresholds.hot - 1f), state.temperatureUnit) { value ->
-                    updateThresholds(state, onDisplaySettings, state.displaySettings.temperatureThresholds.copy(warm = value))
-                }
-                ThresholdSlider(stringResource(R.string.hot), state.displaySettings.temperatureThresholds.hot, (state.displaySettings.temperatureThresholds.warm + 1f)..45f, state.temperatureUnit) { value ->
-                    updateThresholds(state, onDisplaySettings, state.displaySettings.temperatureThresholds.copy(hot = value))
-                }
-                Text(stringResource(R.string.forecast_display), color = Muted, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                SettingSwitch(stringResource(R.string.show_hourly_temperatures), state.displaySettings.showHourlyTemperatures) {
-                    onDisplaySettings(state.displaySettings.copy(showHourlyTemperatures = it))
-                }
-                SettingSwitch(stringResource(R.string.show_apparent_temperature), state.displaySettings.showApparentTemperature) {
-                    onDisplaySettings(state.displaySettings.copy(showApparentTemperature = it))
-                }
-                SettingSwitch(stringResource(R.string.show_precipitation), state.displaySettings.showPrecipitation) {
-                    onDisplaySettings(state.displaySettings.copy(showPrecipitation = it))
-                }
-                SettingSwitch(stringResource(R.string.show_wind), state.displaySettings.showWind) {
-                    onDisplaySettings(state.displaySettings.copy(showWind = it))
-                }
-                SettingSwitch(stringResource(R.string.show_wind_arrows), state.displaySettings.showWindArrows) {
-                    onDisplaySettings(state.displaySettings.copy(showWindArrows = it, showWind = if (it) true else state.displaySettings.showWind))
-                }
-                SettingSwitch(stringResource(R.string.show_historical_data), state.displaySettings.showHistoricalData) {
-                    onDisplaySettings(state.displaySettings.copy(showHistoricalData = it))
-                }
-                SettingSwitch(stringResource(R.string.show_dates), state.displaySettings.showDates) {
-                    onDisplaySettings(state.displaySettings.copy(showDates = it))
-                }
-                SettingSwitch(stringResource(R.string.show_mushrooms), state.displaySettings.showMushrooms) {
-                    onDisplaySettings(state.displaySettings.copy(showMushrooms = it))
-                }
-                SettingSwitch(stringResource(R.string.show_widget_location), state.displaySettings.showWidgetLocation) {
-                    onDisplaySettings(state.displaySettings.copy(showWidgetLocation = it))
-                }
-                SettingSwitch(stringResource(R.string.analytics_consent), state.analyticsConsent == true, onAnalyticsConsent)
-                Text(stringResource(R.string.default_zoom), color = Muted, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                ZoomControls(state.displaySettings, onDisplaySettings, large = true)
-                Button(
-                    onClick = {
-                        val supported = AppWidgetManager.getInstance(context).requestPinAppWidget(
-                            ComponentName(context, WeatherWidgetProvider::class.java),
-                            null,
-                            null,
-                        )
-                        if (!supported) Toast.makeText(context, R.string.widget_pin_unavailable, Toast.LENGTH_LONG).show()
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text(stringResource(R.string.add_widget)) }
-                TextButton(onClick = onResetDefaults, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.reset_defaults))
-                }
-                TextButton(
-                    onClick = { uriHandler.openUri("https://weather.vespy.eu/privacy.html") },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.privacy_policy))
-                }
+                Spacer(Modifier.height(8.dp))
             }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) } },
-    )
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.align(Alignment.End).padding(horizontal = 20.dp, vertical = 8.dp),
+                ) { Text(stringResource(R.string.close), fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+            }
+        }
+    }
 }
 
 @Composable

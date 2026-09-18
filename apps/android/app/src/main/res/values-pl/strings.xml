@@ -54,6 +54,14 @@
     <string name="show_mushrooms">Warunki dla grzybów</string>
     <string name="show_widget_location">Pokazuj nazwę lokalizacji na widgetach</string>
     <string name="choose_widget_location">Wybierz lokalizację widgetu</string>
+    <string name="widget_settings_eyebrow">Widget ekranu głównego</string>
+    <string name="widget_settings_title">Skonfiguruj widget</string>
+    <string name="widget_location_section">Lokalizacja widgetu</string>
+    <string name="widget_appearance_section">Wygląd</string>
+    <string name="widget_display_section">Wyświetlane informacje</string>
+    <string name="app_appearance_section">Wygląd</string>
+    <string name="app_temperature_section">Temperatura</string>
+    <string name="app_privacy_section">Widget i prywatność</string>
     <string name="choose_widget_location_description">Wyszukaj lub wybierz zapisaną lokalizację. Później możesz ją zmienić z menu widgetu.</string>
     <string name="widget_forecast_length">Długość prognozy</string>
     <string name="widget_forecast_option">%1$d godzin (%2$s dnia)</string>

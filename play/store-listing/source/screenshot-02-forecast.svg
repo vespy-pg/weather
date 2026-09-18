@@ -1,23 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0a1624"/><stop offset=".55" stop-color="#102d49"/><stop offset="1" stop-color="#16446d"/></linearGradient>
-    <filter id="shadow" x="-25%" y="-20%" width="150%" height="160%"><feDropShadow dx="0" dy="25" stdDeviation="30" flood-color="#000" flood-opacity=".48"/></filter>
-    <clipPath id="screen"><rect x="1250" y="55" width="585" height="900" rx="34"/></clipPath>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#091523"/><stop offset=".52" stop-color="#102d49"/><stop offset="1" stop-color="#174b77"/></linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="22" stdDeviation="25" flood-color="#000" flood-opacity=".48"/></filter>
+    <clipPath id="hot"><rect x="75" y="375" width="850" height="650" rx="28"/></clipPath>
+    <clipPath id="cold"><rect x="995" y="375" width="850" height="650" rx="28"/></clipPath>
   </defs>
   <rect width="1920" height="1080" fill="url(#bg)"/>
-  <path d="M0 884c180-34 258-169 441-148 190 22 230 199 446 172 152-19 228-118 371-102" fill="none" stroke="#6ec8ee" stroke-width="18" opacity=".18"/>
-  <text x="110" y="145" fill="#75bdff" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="800" letter-spacing="5">ONE VIEW, EVERY LAYER</text>
-  <text x="110" y="288" fill="#fff" font-family="Inter,Arial,sans-serif" font-size="86" font-weight="800">Read changing</text>
-  <text x="110" y="387" fill="#fff" font-family="Inter,Arial,sans-serif" font-size="86" font-weight="800">conditions in context</text>
-  <text x="115" y="475" fill="#c4d4e6" font-family="Inter,Arial,sans-serif" font-size="33">A continuous timeline makes temperature shifts,</text>
-  <text x="115" y="520" fill="#c4d4e6" font-family="Inter,Arial,sans-serif" font-size="33">daylight, clouds and precipitation easy to compare.</text>
-  <g font-family="Inter,Arial,sans-serif" font-size="28" font-weight="700">
-    <circle cx="126" cy="626" r="9" fill="#ffd83d"/><text x="156" y="636" fill="#e7edf7">Ten detailed days</text>
-    <circle cx="126" cy="701" r="9" fill="#45cf88"/><text x="156" y="711" fill="#e7edf7">Apparent temperature</text>
-    <circle cx="126" cy="776" r="9" fill="#58a6ff"/><text x="156" y="786" fill="#e7edf7">Saved locations</text>
-  </g>
+  <circle cx="280" cy="1120" r="560" fill="#ff9f32" opacity=".08"/>
+  <circle cx="1730" cy="1050" r="560" fill="#75bdff" opacity=".1"/>
+  <text x="94" y="96" fill="#75bdff" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="800" letter-spacing="5">CONDITIONS AT A GLANCE</text>
+  <text x="94" y="220" fill="#fff" font-family="Inter,Arial,sans-serif" font-size="80" font-weight="800">From summer heat to winter frost</text>
+  <text x="99" y="305" fill="#c2d2e4" font-family="Inter,Arial,sans-serif" font-size="32">Colour, sky and precipitation make every change immediately visible.</text>
   <g filter="url(#shadow)">
-    <rect x="1250" y="55" width="585" height="900" rx="34" fill="#0b1018" stroke="#527090" stroke-width="3"/>
-    <image href="forecast-portrait-cropped.png" x="1250" y="55" width="585" height="900" preserveAspectRatio="none" clip-path="url(#screen)"/>
+    <rect x="75" y="375" width="850" height="650" rx="28" fill="#09111b" stroke="#a66d32" stroke-width="3"/>
+    <g clip-path="url(#hot)">
+      <svg x="75" y="375" width="850" height="650" viewBox="690 0 413 316" preserveAspectRatio="xMidYMid meet">
+        <image href="demo-timeline.png" x="0" y="0" width="1871" height="316"/>
+      </svg>
+    </g>
+    <rect x="995" y="375" width="850" height="650" rx="28" fill="#09111b" stroke="#527ca7" stroke-width="3"/>
+    <g clip-path="url(#cold)">
+      <svg x="995" y="375" width="850" height="650" viewBox="1458 0 413 316" preserveAspectRatio="xMidYMid meet">
+        <image href="demo-timeline.png" x="0" y="0" width="1871" height="316"/>
+      </svg>
+    </g>
   </g>
 </svg>

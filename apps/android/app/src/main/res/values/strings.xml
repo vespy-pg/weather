@@ -54,6 +54,14 @@
     <string name="show_mushrooms">Mushroom conditions</string>
     <string name="show_widget_location">Show location name on widgets</string>
     <string name="choose_widget_location">Choose widget location</string>
+    <string name="widget_settings_eyebrow">Home-screen widget</string>
+    <string name="widget_settings_title">Configure widget</string>
+    <string name="widget_location_section">Widget location</string>
+    <string name="widget_appearance_section">Appearance</string>
+    <string name="widget_display_section">Displayed information</string>
+    <string name="app_appearance_section">Appearance</string>
+    <string name="app_temperature_section">Temperature</string>
+    <string name="app_privacy_section">Widget and privacy</string>
     <string name="choose_widget_location_description">Search or choose a saved location. You can edit it later from the widget menu.</string>
     <string name="widget_forecast_length">Forecast length</string>
     <string name="widget_forecast_option">%1$d hours (%2$s days)</string>

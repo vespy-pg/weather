@@ -1,5 +1,6 @@
 package eu.vespy.weather.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
@@ -17,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -80,6 +82,8 @@ fun LocationControls(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant,
                     contentColor = MaterialTheme.colorScheme.onSurface,
                 ),
+                shape = WeatherFieldShape,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = .28f)),
             ) {
                 LocationLabel(selectedLocation, Modifier.weight(1f))
                 Text("▾", fontSize = 15.sp)
@@ -122,6 +126,7 @@ fun LocationControls(
                 enabled = enabled,
                 modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable).fillMaxWidth(),
                 singleLine = true,
+                shape = WeatherFieldShape,
                 label = { Text(stringResource(R.string.search_location), fontSize = 14.sp) },
                 trailingIcon = if (searching) {{ CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) }} else null,
             )
