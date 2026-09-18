@@ -398,10 +398,25 @@ export function renderIndexHtml(template, requestUrl) {
   return html;
 }
 
-export function locationSearchUrl(query, language = DEFAULT_LOCALE) {
+export function locationSearchUrl(query, language = DEFAULT_LOCALE, count = 8) {
   const providerLanguage = PROVIDER_LANGUAGES[normalizeLocale(language)] || PROVIDER_LANGUAGES[DEFAULT_LOCALE];
-  const parameters = new URLSearchParams({name: query, count: '8', language: providerLanguage, format: 'json'});
+  const parameters = new URLSearchParams({name: query, count: String(Math.max(1, Math.min(100, count))), language: providerLanguage, format: 'json'});
   return `https://geocoding-api.open-meteo.com/v1/search?${parameters}`;
+}
+
+function normalizedSearchText(value) {
+  return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+export function locationMatchesQualifiers(location, qualifiers) {
+  const haystack = normalizedSearchText([
+    location.name,
+    location.admin1,
+    location.admin2,
+    location.admin3,
+    location.country
+  ].filter(Boolean).join(' '));
+  return qualifiers.every(qualifier => haystack.includes(normalizedSearchText(qualifier)));
 }
 
 export function postalCodeSearchUrl(query, language = DEFAULT_LOCALE) {
@@ -421,6 +436,7 @@ export function normalizePostalLocations(source) {
     country: source.country,
     admin1: item.state || null,
     admin2: null,
+    admin3: null,
     postalCode: source['post code'] || null,
     latitude: Number(item.latitude),
     longitude: Number(item.longitude),
@@ -431,19 +447,34 @@ export function normalizePostalLocations(source) {
 async function locations(requestUrl, response) {
   const query = requestUrl.searchParams.get('q')?.trim();
   if (!query || query.length < 2) return json(response, 400, {error: 'Enter at least two characters.'});
-  const source = await cachedFetch(locationSearchUrl(query, requestUrl.searchParams.get('language')));
-  let results = (source.results || []).map(item => ({
+  const language = requestUrl.searchParams.get('language');
+  const resultLimit = Math.max(1, Math.min(50, Number.parseInt(requestUrl.searchParams.get('limit') || '8', 10) || 8));
+  const commaParts = query.split(',').map(value => value.trim()).filter(Boolean);
+  const fetchLocations = async (value, count = resultLimit + 1) => (await cachedFetch(locationSearchUrl(value, language, count))).results || [];
+  let providerResults;
+  if (commaParts.length > 1) {
+    providerResults = (await fetchLocations(commaParts[0], 100)).filter(item => locationMatchesQualifiers(item, commaParts.slice(1)));
+  } else {
+    providerResults = await fetchLocations(query);
+    const words = query.split(/\s+/).filter(Boolean);
+    for (let split = words.length - 1; providerResults.length === 0 && split > 0; split -= 1) {
+      const candidates = await fetchLocations(words.slice(0, split).join(' '), 100);
+      providerResults = candidates.filter(item => locationMatchesQualifiers(item, words.slice(split)));
+    }
+  }
+  let results = providerResults.map(item => ({
     id: item.id,
     name: item.name,
     country: item.country,
     admin1: item.admin1 || null,
     admin2: item.admin2 || null,
+    admin3: item.admin3 || null,
     postalCode: item.postcodes?.[0] || null,
     latitude: item.latitude,
     longitude: item.longitude,
     timezone: item.timezone
   }));
-  const postalUrl = results.length ? null : postalCodeSearchUrl(query, requestUrl.searchParams.get('language'));
+  const postalUrl = results.length ? null : postalCodeSearchUrl(query, language);
   if (postalUrl) {
     try {
       results = normalizePostalLocations(await cachedFetch(postalUrl));
@@ -451,7 +482,8 @@ async function locations(requestUrl, response) {
       if (error.message !== 'Upstream returned 404') throw error;
     }
   }
-  return json(response, 200, {results});
+  const hasMore = results.length > resultLimit;
+  return json(response, 200, {results: results.slice(0, resultLimit), hasMore});
 }
 
 export function preferredLanguageForCountry(countryCode) {
@@ -503,6 +535,7 @@ export function normalizeReverseLocation(source, fallback) {
     country: address.country || fallback.country || '',
     admin1: address.state || address.region || null,
     admin2: address.county || address.state_district || null,
+    admin3: address.municipality || address.city_district || null,
     postalCode: address.postcode || null
   };
 }

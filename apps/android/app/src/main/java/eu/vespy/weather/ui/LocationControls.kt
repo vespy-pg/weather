@@ -10,6 +10,9 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -33,6 +36,7 @@ import kotlinx.coroutines.delay
 import java.util.Locale
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun LocationControls(
     locations: List<WeatherLocation>,
     selectedLocation: WeatherLocation,
@@ -45,6 +49,7 @@ fun LocationControls(
     var locationMenuExpanded by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
     var results by remember { mutableStateOf(emptyList<WeatherLocation>()) }
+    var hasMoreResults by remember { mutableStateOf(false) }
     var searching by remember { mutableStateOf(false) }
     val api = remember { WeatherApi() }
     val availableLocations = (locations + selectedLocation).distinctBy { "${it.latitude},${it.longitude}" }
@@ -53,12 +58,15 @@ fun LocationControls(
         val normalizedQuery = query.trim()
         if (!enabled || normalizedQuery.length < 2) {
             results = emptyList()
+            hasMoreResults = false
             searching = false
             return@LaunchedEffect
         }
         delay(350)
         searching = true
-        results = runCatching { api.locations(normalizedQuery, Locale.getDefault().language) }.getOrDefault(emptyList())
+        val response = runCatching { api.locations(normalizedQuery, Locale.getDefault().language) }.getOrNull()
+        results = response?.locations.orEmpty()
+        hasMoreResults = response?.hasMore == true
         searching = false
     }
 
@@ -99,20 +107,30 @@ fun LocationControls(
                 }
             }
         }
-        Box(Modifier.fillMaxWidth()) {
+        ExposedDropdownMenuBox(
+            expanded = enabled && query.trim().length >= 2 && !searching && results.isNotEmpty(),
+            onExpandedChange = {},
+            modifier = Modifier.fillMaxWidth(),
+        ) {
             OutlinedTextField(
                 value = query,
-                onValueChange = { query = it },
+                onValueChange = {
+                    query = it
+                    results = emptyList()
+                    hasMoreResults = false
+                },
                 enabled = enabled,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable).fillMaxWidth(),
                 singleLine = true,
                 label = { Text(stringResource(R.string.search_location), fontSize = 14.sp) },
                 trailingIcon = if (searching) {{ CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) }} else null,
             )
-            DropdownMenu(
+            ExposedDropdownMenu(
                 expanded = enabled && query.trim().length >= 2 && !searching && results.isNotEmpty(),
-                onDismissRequest = { results = emptyList() },
-                modifier = Modifier.fillMaxWidth(),
+                onDismissRequest = {
+                    results = emptyList()
+                    hasMoreResults = false
+                },
             ) {
                 results.forEach { location ->
                     DropdownMenuItem(
@@ -121,7 +139,15 @@ fun LocationControls(
                             onSearchResult(location)
                             query = ""
                             results = emptyList()
+                            hasMoreResults = false
                         },
+                    )
+                }
+                if (hasMoreResults) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.more_locations_available), fontSize = 12.sp) },
+                        enabled = false,
+                        onClick = {},
                     )
                 }
             }
@@ -141,7 +167,7 @@ private fun LocationLabel(location: WeatherLocation, modifier: Modifier = Modifi
 
 private fun WeatherLocation.details(): String? {
     val seen = mutableSetOf(name.lowercase(Locale.ROOT))
-    return listOf(postalCode, admin2, admin1, country)
+    return listOf(postalCode, admin3, admin2, admin1, country)
         .mapNotNull { value -> value?.trim()?.takeIf(String::isNotEmpty) }
         .filter { seen.add(it.lowercase(Locale.ROOT)) }
         .joinToString(", ")

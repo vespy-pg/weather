@@ -8,6 +8,8 @@ plugins {
 
 val weatherApiBaseUrl = providers.gradleProperty("WEATHER_API_BASE_URL")
     .orElse("https://api.weather.vespy.eu/")
+val weatherAllowCleartext = providers.gradleProperty("WEATHER_ALLOW_CLEARTEXT")
+    .orElse("false")
 val releaseSigningFile = rootProject.file("keystore.properties")
 val releaseSigningProperties = releaseSigningFile.takeIf { it.isFile }?.inputStream()?.use { stream ->
     Properties().apply { load(stream) }
@@ -32,10 +34,11 @@ android {
         applicationId = "eu.vespy.weather"
         minSdk = 26
         targetSdk = 37
-        versionCode = 3
-        versionName = "0.1.2"
+        versionCode = 4
+        versionName = "0.1.3"
 
         buildConfigField("String", "API_BASE_URL", "\"${weatherApiBaseUrl.get()}\"")
+        manifestPlaceholders["usesCleartextTraffic"] = weatherAllowCleartext.get()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

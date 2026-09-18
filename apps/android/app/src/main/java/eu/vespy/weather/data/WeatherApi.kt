@@ -10,28 +10,32 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 class WeatherApi(private val baseUrl: String = BuildConfig.API_BASE_URL) {
-    suspend fun locations(query: String, language: String): List<WeatherLocation> = withContext(Dispatchers.IO) {
+    suspend fun locations(query: String, language: String): LocationSearchResults = withContext(Dispatchers.IO) {
         val url = endpoint("locations").buildUpon()
             .appendQueryParameter("q", query)
             .appendQueryParameter("language", language)
+            .appendQueryParameter("limit", "50")
             .build()
-        val results = request(url).optJSONArray("results") ?: JSONArray()
-        buildList {
-            for (index in 0 until results.length()) {
+        val response = request(url)
+        val results = response.optJSONArray("results") ?: JSONArray()
+        val locations = buildList {
+            for (index in 0 until minOf(results.length(), 50)) {
                 val item = results.optJSONObject(index) ?: continue
-                val name = item.optString("name").takeIf(String::isNotBlank) ?: continue
+                val name = item.optNullableString("name") ?: continue
                 add(WeatherLocation(
                     name = name,
-                    country = item.optString("country"),
+                    country = item.optNullableString("country").orEmpty(),
                     latitude = item.optDouble("latitude"),
                     longitude = item.optDouble("longitude"),
                     timezone = item.optString("timezone").takeIf(String::isNotBlank) ?: "auto",
-                    admin1 = item.optString("admin1").takeIf(String::isNotBlank),
-                    admin2 = item.optString("admin2").takeIf(String::isNotBlank),
-                    postalCode = item.optString("postalCode").takeIf(String::isNotBlank),
+                    admin1 = item.optNullableString("admin1"),
+                    admin2 = item.optNullableString("admin2"),
+                    admin3 = item.optNullableString("admin3"),
+                    postalCode = item.optNullableString("postalCode"),
                 ))
             }
         }
+        LocationSearchResults(locations, response.optBoolean("hasMore", results.length() > 50))
     }
 
     suspend fun forecast(location: WeatherLocation, pastDays: Int = 0, includeMushrooms: Boolean = false): WeatherForecast = withContext(Dispatchers.IO) {
@@ -60,9 +64,10 @@ class WeatherApi(private val baseUrl: String = BuildConfig.API_BASE_URL) {
             latitude = item.optDouble("latitude", latitude),
             longitude = item.optDouble("longitude", longitude),
             timezone = item.optString("timezone").ifBlank { "auto" },
-            admin1 = item.optString("admin1").takeIf(String::isNotBlank),
-            admin2 = item.optString("admin2").takeIf(String::isNotBlank),
-            postalCode = item.optString("postalCode").takeIf(String::isNotBlank),
+            admin1 = item.optNullableString("admin1"),
+            admin2 = item.optNullableString("admin2"),
+            admin3 = item.optNullableString("admin3"),
+            postalCode = item.optNullableString("postalCode"),
         )
     }
 

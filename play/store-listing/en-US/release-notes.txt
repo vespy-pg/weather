@@ -1,1 +1,1 @@
-Fixes an app startup crash in the initial internal testing release.
+Improves location autocomplete with scrollable results, administrative details, and qualified searches such as "Zawada Kamienica". Also fixes keyboard focus and null labels in search results.

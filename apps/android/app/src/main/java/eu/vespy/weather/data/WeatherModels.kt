@@ -8,7 +8,13 @@ data class WeatherLocation(
     val timezone: String,
     val admin1: String? = null,
     val admin2: String? = null,
+    val admin3: String? = null,
     val postalCode: String? = null,
+)
+
+data class LocationSearchResults(
+    val locations: List<WeatherLocation>,
+    val hasMore: Boolean,
 )
 
 data class CurrentWeather(

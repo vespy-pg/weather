@@ -24,6 +24,7 @@
     <string name="close">Close</string>
     <string name="temperature_unit">Temperature unit</string>
     <string name="no_locations">No locations found</string>
+    <string name="more_locations_available">More results are available. Refine your search.</string>
     <string name="saved_locations">Saved locations</string>
     <string name="remove">Remove</string>
     <string name="forecast_display">Forecast display</string>

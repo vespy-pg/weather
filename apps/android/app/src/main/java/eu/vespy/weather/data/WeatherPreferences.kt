@@ -186,6 +186,7 @@ class WeatherPreferences(context: Context) {
         put("timezone", timezone)
         put("admin1", admin1)
         put("admin2", admin2)
+        put("admin3", admin3)
         put("postalCode", postalCode)
     }
 
@@ -203,6 +204,7 @@ class WeatherPreferences(context: Context) {
             timezone = optString("timezone").takeIf(String::isNotBlank) ?: "auto",
             admin1 = optString("admin1").takeIf(String::isNotBlank),
             admin2 = optString("admin2").takeIf(String::isNotBlank),
+            admin3 = optString("admin3").takeIf(String::isNotBlank),
             postalCode = optString("postalCode").takeIf(String::isNotBlank),
         )
     }

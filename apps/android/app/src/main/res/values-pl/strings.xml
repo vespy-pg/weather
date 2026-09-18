@@ -24,6 +24,7 @@
     <string name="close">Zamknij</string>
     <string name="temperature_unit">Skala temperatury</string>
     <string name="no_locations">Nie znaleziono miejscowości</string>
+    <string name="more_locations_available">Dostępne są kolejne wyniki. Doprecyzuj wyszukiwanie.</string>
     <string name="saved_locations">Zapisane lokalizacje</string>
     <string name="remove">Usuń</string>
     <string name="forecast_display">Wygląd prognozy</string>

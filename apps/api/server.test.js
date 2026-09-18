@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {forecastUrl, isForecastRoutePath, locationSearchUrl, mushroomCondition, mushroomObservationsUrl, normalizeForecast, normalizeGoogleAnalyticsId, normalizeLocale, normalizeMushroomObservations, normalizePostalLocations, normalizeReverseLocation, postalCodeSearchUrl, preferredLanguageForCountry, promotionFeed, renderIndexHtml, selectCapitalResult, seoPageMetadata, staticCacheControl} from './server.js';
+import {forecastUrl, isForecastRoutePath, locationMatchesQualifiers, locationSearchUrl, mushroomCondition, mushroomObservationsUrl, normalizeForecast, normalizeGoogleAnalyticsId, normalizeLocale, normalizeMushroomObservations, normalizePostalLocations, normalizeReverseLocation, postalCodeSearchUrl, preferredLanguageForCountry, promotionFeed, renderIndexHtml, selectCapitalResult, seoPageMetadata, staticCacheControl} from './server.js';
 
 test('forces application assets and the service worker to revalidate', () => {
   assert.equal(staticCacheControl('/assets/app.js'), 'no-cache');
@@ -173,7 +173,22 @@ test('selectCapitalResult prefers the matching national capital', () => {
 test('locationSearchUrl supports postal codes and the selected language', () => {
   const url = new URL(locationSearchUrl('00-001', 'pl-PL'));
   assert.equal(url.searchParams.get('name'), '00-001');
+  assert.equal(url.searchParams.get('count'), '8');
   assert.equal(url.searchParams.get('language'), 'pl');
+  assert.equal(new URL(locationSearchUrl('Zawada', 'pl-PL', 51)).searchParams.get('count'), '51');
+});
+
+test('location qualifiers match administrative areas without diacritics', () => {
+  const zawada = {
+    name: 'Zawada',
+    admin1: 'Województwo śląskie',
+    admin2: 'Powiat częstochowski',
+    admin3: 'Kamienica Polska',
+    country: 'Polska'
+  };
+  assert.equal(locationMatchesQualifiers(zawada, ['kamienica']), true);
+  assert.equal(locationMatchesQualifiers(zawada, ['slaskie', 'kamienica']), true);
+  assert.equal(locationMatchesQualifiers(zawada, ['myszkow']), false);
 });
 
 test('postal code fallback supports localized Polish and US formats', () => {
@@ -191,6 +206,7 @@ test('postal code fallback supports localized Polish and US formats', () => {
     country: 'Poland',
     admin1: 'Mazowieckie',
     admin2: null,
+    admin3: null,
     postalCode: '00-001',
     latitude: 52.25,
     longitude: 21,
@@ -224,6 +240,7 @@ test('normalizeReverseLocation uses the nearest named locality and country', () 
     country: 'Poland',
     admin1: 'Śląskie',
     admin2: 'Myszkowski',
+    admin3: null,
     postalCode: '42-310'
   });
 });
