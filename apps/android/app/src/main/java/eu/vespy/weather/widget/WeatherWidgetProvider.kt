@@ -202,10 +202,17 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
         })
         canvas.save()
         canvas.clipPath(android.graphics.Path().apply { addRoundRect(bounds, radius, radius, android.graphics.Path.Direction.CW) })
-        val footerHeight = if (advisoryText != null) min(124f * density, height * .82f) else 0f
+        val footerHeight = if (advisoryText != null) {
+            val maximumFooterHeight = if (rows >= 3) 124f else 108f
+            min(maximumFooterHeight * density, height * .82f)
+        } else 0f
         val chartHeight = height - footerHeight
         val expanded = rows >= 3
-        val labelHeight = chartHeight * if (rows == 1) .38f else .24f
+        val labelHeight = when {
+            rows == 1 -> chartHeight * .38f
+            rows == 2 -> min(50f * density, chartHeight * .36f)
+            else -> chartHeight * .24f
+        }
         val contentHeight = chartHeight - labelHeight
         val skyHeight = if (expanded) min(68f * density, contentHeight * .36f) else min(56f * density, contentHeight * .3f)
         val windHeight = if (expanded) min(42f * density, contentHeight * .22f) else min(34f * density, contentHeight * .18f)
