@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" role="img" aria-labelledby="slide-title slide-description">
+  <title id="slide-title">Read the sky. See the wind.</title>
+  <desc id="slide-description">Three aligned Vespy Weather sections showing sky conditions, temperature and wind.</desc>
+
+  <style>
+    .text-eyebrow {
+      fill: #75bdff;
+      font-family: Inter, Arial, sans-serif;
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: 5px;
+    }
+
+    .text-title {
+      fill: #ffffff;
+      font-family: Inter, Arial, sans-serif;
+      font-size: 78px;
+      font-weight: 800;
+      letter-spacing: -1.5px;
+    }
+
+    .text-subtitle {
+      fill: #c2d2e4;
+      font-family: Inter, Arial, sans-serif;
+      font-size: 31px;
+      font-weight: 400;
+    }
+
+    .text-section-title {
+      fill: #ffffff;
+      font-family: Inter, Arial, sans-serif;
+      font-size: 31px;
+      font-weight: 800;
+    }
+
+    .text-section-description {
+      fill: #aebfd1;
+      font-family: Inter, Arial, sans-serif;
+      font-size: 21px;
+      font-weight: 400;
+    }
+  </style>
+
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#173854"/>
+      <stop offset=".5" stop-color="#0c2635"/>
+      <stop offset="1" stop-color="#07151d"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-25%" width="120%" height="160%">
+      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#000000" flood-opacity=".42"/>
+    </filter>
+    <clipPath id="sky-clip"><rect x="324" y="390" width="1490" height="151" rx="14"/></clipPath>
+    <clipPath id="temperature-clip"><rect x="324" y="594" width="1490" height="212" rx="14"/></clipPath>
+    <clipPath id="wind-clip"><rect x="324" y="882" width="1490" height="62" rx="14"/></clipPath>
+  </defs>
+
+  <rect width="1920" height="1080" fill="url(#background)"/>
+  <circle cx="1780" cy="-180" r="590" fill="#58a6ff" opacity=".08"/>
+  <circle cx="1740" cy="1240" r="620" fill="#45cf88" opacity=".05"/>
+
+  <text class="text-eyebrow" x="94" y="82">FORECAST LAYERS</text>
+  <text class="text-title" x="94" y="190">Read the sky. See the wind.</text>
+  <text class="text-subtitle" x="99" y="270">Temperature, precipitation and gusts stay aligned on one continuous timeline.</text>
+
+  <g filter="url(#shadow)">
+    <rect x="75" y="368" width="1770" height="195" rx="28" fill="#142333" stroke="#2f5575" stroke-width="2"/>
+    <text class="text-section-title" x="112" y="445">Sky</text>
+    <text class="text-section-description" x="112" y="480">Clouds, rain and snow</text>
+    <image href="sky.png" x="324" y="390" width="1490" height="151" preserveAspectRatio="xMidYMid meet" clip-path="url(#sky-clip)"/>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="75" y="583" width="1770" height="234" rx="28" fill="#142333" stroke="#2f5575" stroke-width="2"/>
+    <text class="text-section-title" x="112" y="670">Temperature</text>
+    <text class="text-section-description" x="112" y="705">Colour-coded curve</text>
+    <image href="temperature.png" x="324" y="594" width="1490" height="212" preserveAspectRatio="xMidYMid meet" clip-path="url(#temperature-clip)"/>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="75" y="837" width="1770" height="151" rx="28" fill="#142333" stroke="#2f5575" stroke-width="2"/>
+    <text class="text-section-title" x="112" y="900">Wind</text>
+    <text class="text-section-description" x="112" y="935">Strength and gusts</text>
+    <image href="wind.png" x="324" y="882" width="1490" height="62" preserveAspectRatio="xMidYMid meet" clip-path="url(#wind-clip)"/>
+  </g>
+</svg>
