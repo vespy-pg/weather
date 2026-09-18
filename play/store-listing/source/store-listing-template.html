@@ -167,7 +167,7 @@
       height: 936px;
       flex-direction: column;
       justify-content: space-between;
-      padding: 24px;
+      padding: 20px;
       overflow: hidden;
       border: 3px solid var(--border);
       border-radius: var(--corner);
@@ -175,11 +175,19 @@
       box-shadow: 0 22px 28px rgb(0 0 0 / 50%);
     }
 
-    .widget-gallery img {
+    .widget-preview-card {
+      padding: 10px;
+      overflow: hidden;
+      border: 2px solid var(--border-muted);
+      border-radius: 24px;
+      background: var(--surface-raised);
+      box-shadow: 0 10px 16px rgb(0 0 0 / 32%);
+    }
+
+    .widget-preview-card img {
       display: block;
       width: 100%;
       height: auto;
-      filter: drop-shadow(0 18px 18px rgb(0 0 0 / 42%));
     }
 
     .feature-list {
@@ -340,9 +348,15 @@
   -->
   <main class="store-slide layout-split-left">
     <div class="widget-gallery" aria-label="Three Vespy Weather home-screen widgets">
-      <img src="widget-timeline-isolated.png" alt="Weather timeline widget">
-      <img src="widget-advisory-isolated.png" alt="Weather and warnings widget">
-      <img src="widget-sky-wind-isolated.png" alt="Sky and wind widget">
+      <div class="widget-preview-card">
+        <img src="widget-timeline-isolated.png" alt="Weather timeline widget">
+      </div>
+      <div class="widget-preview-card">
+        <img src="widget-advisory-isolated.png" alt="Weather and warnings widget">
+      </div>
+      <div class="widget-preview-card">
+        <img src="widget-sky-wind-isolated.png" alt="Sky and wind widget">
+      </div>
     </div>
 
     <section class="slide-copy">
