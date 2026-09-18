@@ -200,7 +200,7 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
         })
         canvas.save()
         canvas.clipPath(android.graphics.Path().apply { addRoundRect(bounds, radius, radius, android.graphics.Path.Direction.CW) })
-        val footerHeight = if (advisoryText != null) min(58f * density, height * .42f) else 0f
+        val footerHeight = if (advisoryText != null) min(78f * density, height * .58f) else 0f
         val chartHeight = height - footerHeight
         val expanded = rows >= 3
         val labelHeight = chartHeight * if (rows == 1) .38f else .24f
@@ -272,16 +272,16 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
             color = if (dark) Color.rgb(20, 28, 40) else Color.rgb(238, 244, 251)
         })
         canvas.drawRect(0f, top, width.toFloat(), top + max(1f, density), Paint(Paint.ANTI_ALIAS_FLAG).apply { color = accent })
-        val prefixWidth = if (alert) 28f * density else 10f * density
-        if (alert) canvas.drawText("!", 14f * density, top + footerHeight * .62f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val prefixWidth = if (alert) 34f * density else 12f * density
+        if (alert) canvas.drawText("!", 17f * density, top + footerHeight * .62f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = accent
             textAlign = Paint.Align.CENTER
-            textSize = 22f * density
+            textSize = 28f * density
             typeface = android.graphics.Typeface.DEFAULT_BOLD
         })
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = if (dark) Color.rgb(231, 237, 247) else Color.rgb(23, 34, 52)
-            textSize = 12f * density
+            textSize = 18f * density
             typeface = android.graphics.Typeface.DEFAULT_BOLD
         }
         val availableWidth = width - prefixWidth - 10f * density
@@ -296,9 +296,9 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
         val secondLength = paint.breakText(remainder, true, availableWidth, null).coerceAtLeast(0)
         val secondLine = if (remainder.length > secondLength && secondLength > 1) remainder.take(secondLength - 1).trimEnd() + "…" else remainder
         val x = prefixWidth
-        val baseline = top + if (secondLine.isBlank()) footerHeight * .6f else footerHeight * .43f
+        val baseline = top + if (secondLine.isBlank()) footerHeight * .62f else footerHeight * .4f
         canvas.drawText(firstLine, x, baseline, paint)
-        if (secondLine.isNotBlank()) canvas.drawText(secondLine, x, baseline + 16f * density, paint)
+        if (secondLine.isNotBlank()) canvas.drawText(secondLine, x, baseline + 23f * density, paint)
     }
 
     companion object {
