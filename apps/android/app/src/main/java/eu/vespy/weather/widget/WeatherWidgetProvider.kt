@@ -276,7 +276,7 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
             color = if (dark) Color.rgb(20, 28, 40) else Color.rgb(238, 244, 251)
         })
         canvas.drawRect(0f, top, width.toFloat(), top + max(1f, density), Paint(Paint.ANTI_ALIAS_FLAG).apply { color = accent })
-        canvas.drawText(label, 12f * density, top + 16f * density, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        canvas.drawText(label, 12f * density, top + 20f * density, Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = accent
             textSize = 11f * density
             typeface = android.graphics.Typeface.DEFAULT_BOLD
@@ -306,7 +306,7 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
         val secondLength = paint.breakText(remainder, true, availableWidth, null).coerceAtLeast(0)
         val secondLine = if (remainder.length > secondLength && secondLength > 1) remainder.take(secondLength - 1).trimEnd() + "…" else remainder
         val x = prefixWidth
-        val baseline = top + if (secondLine.isBlank()) footerHeight * .68f else footerHeight * .46f
+        val baseline = top + if (secondLine.isBlank()) footerHeight * .74f else footerHeight * .52f
         canvas.drawText(firstLine, x, baseline, paint)
         if (secondLine.isNotBlank()) {
             val lineSpacing = if (rows >= 3) 37f else 30f
