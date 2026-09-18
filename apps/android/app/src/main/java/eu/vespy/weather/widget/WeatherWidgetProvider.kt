@@ -254,7 +254,7 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
             canvas.drawText(displayedLabel, width - 7f * density, chartHeight - windHeight - mushroomHeight - 7f * density, labelPaint)
         }
         canvas.restore()
-        if (advisoryText != null) drawAdvisoryFooter(canvas, width, height, footerHeight, advisoryLabel, advisoryText, advisoryIsAlert, dark, density)
+        if (advisoryText != null) drawAdvisoryFooter(canvas, width, height, footerHeight, advisoryLabel, advisoryText, advisoryIsAlert, dark, density, rows)
         return bitmap
     }
 
@@ -268,6 +268,7 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
         alert: Boolean,
         dark: Boolean,
         density: Float,
+        rows: Int,
     ) {
         val top = height - footerHeight
         val accent = if (alert) Color.rgb(230, 182, 47) else if (dark) Color.rgb(88, 166, 255) else Color.rgb(23, 111, 193)
@@ -287,9 +288,10 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
             textSize = 28f * density
             typeface = android.graphics.Typeface.DEFAULT_BOLD
         })
+        val descriptionTextSize = if (rows >= 3) 30f else 24f
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = if (dark) Color.rgb(231, 237, 247) else Color.rgb(23, 34, 52)
-            textSize = 30f * density
+            textSize = descriptionTextSize * density
             typeface = android.graphics.Typeface.DEFAULT_BOLD
         }
         val availableWidth = width - prefixWidth - 10f * density
@@ -306,7 +308,10 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
         val x = prefixWidth
         val baseline = top + if (secondLine.isBlank()) footerHeight * .68f else footerHeight * .46f
         canvas.drawText(firstLine, x, baseline, paint)
-        if (secondLine.isNotBlank()) canvas.drawText(secondLine, x, baseline + 37f * density, paint)
+        if (secondLine.isNotBlank()) {
+            val lineSpacing = if (rows >= 3) 37f else 30f
+            canvas.drawText(secondLine, x, baseline + lineSpacing * density, paint)
+        }
     }
 
     companion object {
