@@ -763,7 +763,7 @@ export function createServer() {
         response.writeHead(204, {'Access-Control-Allow-Origin': process.env.WEATHER_ALLOWED_ORIGIN || '*'});
         return response.end();
       }
-      if (request.method !== 'GET') return json(response, 405, {error: 'Method not allowed.'});
+      if (request.method !== 'GET' && request.method !== 'HEAD') return json(response, 405, {error: 'Method not allowed.'});
       if (requestUrl.pathname === '/health') return json(response, 200, {status: 'ok'});
       if (requestUrl.pathname === '/client-config') return json(response, 200, {
         googleAnalyticsId: normalizeGoogleAnalyticsId(process.env.GOOGLE_ANALYTICS_ID)

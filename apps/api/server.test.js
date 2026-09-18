@@ -1,6 +1,23 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {forecastUrl, isForecastRoutePath, locationMatchesQualifiers, locationSearchUrl, locationSearchVariants, mushroomCondition, mushroomObservationsUrl, normalizeForecast, normalizeGoogleAnalyticsId, normalizeLocale, normalizeMushroomObservations, normalizePostalLocations, normalizeReverseLocation, normalizedSearchText, postalCodeSearchUrl, preferredLanguageForCountry, promotionFeed, rankLocationCandidates, renderIndexHtml, selectCapitalResult, seoPageMetadata, staticCacheControl} from './server.js';
+import {createServer, forecastUrl, isForecastRoutePath, locationMatchesQualifiers, locationSearchUrl, locationSearchVariants, mushroomCondition, mushroomObservationsUrl, normalizeForecast, normalizeGoogleAnalyticsId, normalizeLocale, normalizeMushroomObservations, normalizePostalLocations, normalizeReverseLocation, normalizedSearchText, postalCodeSearchUrl, preferredLanguageForCountry, promotionFeed, rankLocationCandidates, renderIndexHtml, selectCapitalResult, seoPageMetadata, staticCacheControl} from './server.js';
+
+test('serves static resources to HEAD requests without a response body', async () => {
+  const server = createServer();
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  try {
+    const {port} = server.address();
+    const response = await fetch(`http://127.0.0.1:${port}/sitemap.xml`, {method: 'HEAD'});
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('content-type'), 'application/xml; charset=utf-8');
+    assert.equal(await response.text(), '');
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+  }
+});
 
 test('forces application assets and the service worker to revalidate', () => {
   assert.equal(staticCacheControl('/assets/app.js'), 'no-cache');
