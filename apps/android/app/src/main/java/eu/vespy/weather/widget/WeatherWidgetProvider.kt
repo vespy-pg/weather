@@ -90,6 +90,7 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
                                 forecast.alerts.firstOrNull()?.let { localizedContext.getString(R.string.widget_alert_prefix, it.headline) }
                                     ?: forecastSummaryText(localizedContext, forecast)
                             } else null,
+                            advisoryLabel = localizedContext.getString(R.string.forecast_summary_label),
                             advisoryIsAlert = advisoryFooter && forecast.alerts.isNotEmpty(),
                         )
                         views(context, bitmap, widgetId, location, widgetSettings.demo)
@@ -189,6 +190,7 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
         locationLabel: String?,
         widgetSettings: eu.vespy.weather.data.WidgetDisplaySettings,
         advisoryText: String?,
+        advisoryLabel: String,
         advisoryIsAlert: Boolean,
     ): Bitmap {
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
@@ -200,7 +202,7 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
         })
         canvas.save()
         canvas.clipPath(android.graphics.Path().apply { addRoundRect(bounds, radius, radius, android.graphics.Path.Direction.CW) })
-        val footerHeight = if (advisoryText != null) min(78f * density, height * .58f) else 0f
+        val footerHeight = if (advisoryText != null) min(124f * density, height * .82f) else 0f
         val chartHeight = height - footerHeight
         val expanded = rows >= 3
         val labelHeight = chartHeight * if (rows == 1) .38f else .24f
@@ -252,7 +254,7 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
             canvas.drawText(displayedLabel, width - 7f * density, chartHeight - windHeight - mushroomHeight - 7f * density, labelPaint)
         }
         canvas.restore()
-        if (advisoryText != null) drawAdvisoryFooter(canvas, width, height, footerHeight, advisoryText, advisoryIsAlert, dark, density)
+        if (advisoryText != null) drawAdvisoryFooter(canvas, width, height, footerHeight, advisoryLabel, advisoryText, advisoryIsAlert, dark, density)
         return bitmap
     }
 
@@ -261,6 +263,7 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
         width: Int,
         height: Int,
         footerHeight: Float,
+        label: String,
         text: String,
         alert: Boolean,
         dark: Boolean,
@@ -272,6 +275,11 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
             color = if (dark) Color.rgb(20, 28, 40) else Color.rgb(238, 244, 251)
         })
         canvas.drawRect(0f, top, width.toFloat(), top + max(1f, density), Paint(Paint.ANTI_ALIAS_FLAG).apply { color = accent })
+        canvas.drawText(label, 12f * density, top + 16f * density, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accent
+            textSize = 11f * density
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        })
         val prefixWidth = if (alert) 34f * density else 12f * density
         if (alert) canvas.drawText("!", 17f * density, top + footerHeight * .62f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = accent
@@ -281,7 +289,7 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
         })
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = if (dark) Color.rgb(231, 237, 247) else Color.rgb(23, 34, 52)
-            textSize = 18f * density
+            textSize = 36f * density
             typeface = android.graphics.Typeface.DEFAULT_BOLD
         }
         val availableWidth = width - prefixWidth - 10f * density
@@ -296,9 +304,9 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
         val secondLength = paint.breakText(remainder, true, availableWidth, null).coerceAtLeast(0)
         val secondLine = if (remainder.length > secondLength && secondLength > 1) remainder.take(secondLength - 1).trimEnd() + "…" else remainder
         val x = prefixWidth
-        val baseline = top + if (secondLine.isBlank()) footerHeight * .62f else footerHeight * .4f
+        val baseline = top + if (secondLine.isBlank()) footerHeight * .68f else footerHeight * .46f
         canvas.drawText(firstLine, x, baseline, paint)
-        if (secondLine.isNotBlank()) canvas.drawText(secondLine, x, baseline + 23f * density, paint)
+        if (secondLine.isNotBlank()) canvas.drawText(secondLine, x, baseline + 43f * density, paint)
     }
 
     companion object {
