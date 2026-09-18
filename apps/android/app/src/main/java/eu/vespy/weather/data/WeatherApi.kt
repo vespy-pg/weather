@@ -8,6 +8,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.Locale
 
 class WeatherApi(private val baseUrl: String = BuildConfig.API_BASE_URL) {
     suspend fun locations(query: String, language: String): LocationSearchResults = withContext(Dispatchers.IO) {
@@ -28,6 +29,7 @@ class WeatherApi(private val baseUrl: String = BuildConfig.API_BASE_URL) {
                     latitude = item.optDouble("latitude"),
                     longitude = item.optDouble("longitude"),
                     timezone = item.optString("timezone").takeIf(String::isNotBlank) ?: "auto",
+                    countryCode = item.optNullableString("countryCode"),
                     admin1 = item.optNullableString("admin1"),
                     admin2 = item.optNullableString("admin2"),
                     admin3 = item.optNullableString("admin3"),
@@ -38,12 +40,23 @@ class WeatherApi(private val baseUrl: String = BuildConfig.API_BASE_URL) {
         LocationSearchResults(locations, response.optBoolean("hasMore", results.length() > 50))
     }
 
-    suspend fun forecast(location: WeatherLocation, pastDays: Int = 0, includeMushrooms: Boolean = false): WeatherForecast = withContext(Dispatchers.IO) {
+    suspend fun forecast(
+        location: WeatherLocation,
+        pastDays: Int = 0,
+        includeMushrooms: Boolean = false,
+        language: String = Locale.getDefault().toLanguageTag(),
+    ): WeatherForecast = withContext(Dispatchers.IO) {
         val url = endpoint("weather").buildUpon()
             .appendQueryParameter("latitude", location.latitude.toString())
             .appendQueryParameter("longitude", location.longitude.toString())
             .appendQueryParameter("timezone", location.timezone)
             .appendQueryParameter("name", location.name)
+            .appendQueryParameter("language", language)
+            .appendQueryParameter("country", location.country)
+            .appendQueryParameter("country_code", location.countryCode.orEmpty())
+            .appendQueryParameter("admin1", location.admin1.orEmpty())
+            .appendQueryParameter("admin2", location.admin2.orEmpty())
+            .appendQueryParameter("admin3", location.admin3.orEmpty())
             .appendQueryParameter("past_days", pastDays.coerceIn(0, 3).toString())
             .appendQueryParameter("mushrooms", if (includeMushrooms) "1" else "0")
             .build()
@@ -64,6 +77,7 @@ class WeatherApi(private val baseUrl: String = BuildConfig.API_BASE_URL) {
             latitude = item.optDouble("latitude", latitude),
             longitude = item.optDouble("longitude", longitude),
             timezone = item.optString("timezone").ifBlank { "auto" },
+            countryCode = item.optNullableString("countryCode"),
             admin1 = item.optNullableString("admin1"),
             admin2 = item.optNullableString("admin2"),
             admin3 = item.optNullableString("admin3"),
@@ -139,6 +153,11 @@ class WeatherApi(private val baseUrl: String = BuildConfig.API_BASE_URL) {
             latitude = locationSource?.optDouble("latitude") ?: fallbackLocation.latitude,
             longitude = locationSource?.optDouble("longitude") ?: fallbackLocation.longitude,
             timezone = locationSource?.optString("timezone")?.takeIf(String::isNotBlank) ?: fallbackLocation.timezone,
+            countryCode = locationSource?.optNullableString("countryCode") ?: fallbackLocation.countryCode,
+            admin1 = locationSource?.optNullableString("admin1") ?: fallbackLocation.admin1,
+            admin2 = locationSource?.optNullableString("admin2") ?: fallbackLocation.admin2,
+            admin3 = locationSource?.optNullableString("admin3") ?: fallbackLocation.admin3,
+            postalCode = locationSource?.optNullableString("postalCode") ?: fallbackLocation.postalCode,
         )
         val currentSource = source.getJSONObject("current")
         val current = CurrentWeather(
@@ -190,7 +209,28 @@ class WeatherApi(private val baseUrl: String = BuildConfig.API_BASE_URL) {
                 ))
             }
         }
-        return WeatherForecast(location, current, hourly, daily)
+        val alertsSource = source.optJSONArray("alerts") ?: JSONArray()
+        val alerts = buildList {
+            for (index in 0 until alertsSource.length()) {
+                val item = alertsSource.optJSONObject(index) ?: continue
+                val id = item.optNullableString("id") ?: continue
+                val headline = item.optNullableString("headline") ?: item.optNullableString("event") ?: continue
+                add(WeatherAlert(
+                    id = id,
+                    event = item.optNullableString("event") ?: headline,
+                    headline = headline,
+                    description = item.optNullableString("description"),
+                    instruction = item.optNullableString("instruction"),
+                    area = item.optNullableString("area"),
+                    severity = item.optNullableString("severity") ?: "moderate",
+                    onset = item.optNullableString("onset"),
+                    expires = item.optNullableString("expires"),
+                    source = item.optNullableString("source") ?: "MeteoAlarm",
+                    sourceUrl = item.optNullableString("sourceUrl") ?: "https://meteoalarm.org/",
+                ))
+            }
+        }
+        return WeatherForecast(location, current, hourly, daily, alerts)
     }
 }
 

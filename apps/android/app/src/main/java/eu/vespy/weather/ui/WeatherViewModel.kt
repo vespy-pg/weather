@@ -182,6 +182,7 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
                     requestedLocation,
                     if (state.displaySettings.showHistoricalData) 3 else 0,
                     state.displaySettings.showMushrooms,
+                    state.displaySettings.language.takeUnless { it == "system" } ?: Locale.getDefault().toLanguageTag(),
                 )
                 if (state.demo != requestedDemo || (!requestedDemo && state.location != requestedLocation)) return@launch
                 state = state.copy(

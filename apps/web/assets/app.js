@@ -3,6 +3,7 @@ import {initializeAnalytics, trackEvent} from './analytics.js';
 import {createWeatherDemo} from './weather-demo.js';
 import {escapeHtml, formatForecastDate, formatTime, measurement, numericValue, shortTemperature, temperature} from './components.js';
 import {forecastSkyLayout, groupHourlyForecast, hoursPerGroup, resistedHistoryPosition, stopTimelineAtNow, temperatureRange, timelineCurrentIndex, timelineHourlyWindow, withinTimelineMagnet} from './forecast-view.js';
+import {forecastSummaryEvents} from './forecast-summary.js';
 import {applyWidgetQuery, widgetBoolean, widgetDays, widgetQuery} from './embed-options.js';
 import {normalizeLanguage, preferredSupportedLanguage, setLanguage, supportedLanguages, t} from './i18n.js';
 import {
@@ -936,12 +937,13 @@ function renderForecast() {
   const current = weather?.current;
   if (!weather?.available || !current) return;
   const condition = weatherPresentation(current.weatherCode);
-  const rangeKey = IS_DEMO
-    ? EMBED_DAYS === 1 ? 'forecast.demoDay' : 'forecast.demoDays'
-    : EMBED_DAYS === 1 ? 'forecast.nextDay' : 'forecast.nextDays';
-  document.getElementById('forecastRangeLabel').textContent = t(rangeKey, {days: EMBED_DAYS});
+  document.getElementById('forecastRangeLabel').textContent = t('forecast.summaryLabel');
+  document.getElementById('forecastSummary').textContent = forecastSummaryEvents(weather)
+    .map(code => t(`forecast.summary.${code}`))
+    .join(' ');
   document.getElementById('locationTitle').textContent = weather.location?.name || settings.location.name;
   document.getElementById('updatedAt').textContent = t('status.updated', {time: formatTime(current.timestamp)});
+  renderWeatherAlert();
   document.getElementById('currentWeather').innerHTML = [
     [t('metric.weather'), `${condition[0]} ${temperature(current.temperature)}`, condition[1]],
     [t('metric.feels'), temperature(current.apparentTemperature), t('metric.apparent')],
@@ -961,6 +963,19 @@ function renderForecast() {
     </article>`;
   }).join('');
   drawForecast();
+}
+
+function renderWeatherAlert() {
+  const banner = document.getElementById('weatherAlert');
+  const alert = weather?.alerts?.[0];
+  banner.hidden = !alert;
+  if (!alert) return;
+  banner.dataset.severity = alert.severity || 'moderate';
+  document.getElementById('weatherAlertHeadline').textContent = alert.headline || alert.event || t('alert.title');
+  document.getElementById('weatherAlertDescription').textContent = alert.description || alert.instruction || '';
+  const source = document.getElementById('weatherAlertSource');
+  source.textContent = t('alert.source', {source: alert.source || 'MeteoAlarm'});
+  source.href = /^https:\/\//.test(alert.sourceUrl || '') ? alert.sourceUrl : 'https://meteoalarm.org/';
 }
 
 function renderError(message) {
@@ -999,6 +1014,12 @@ async function requestWeather(requestedLocation, {signal} = {}) {
     longitude: requestedLocation.longitude,
     timezone: requestedLocation.timezone || 'auto',
     name: requestedLocation.name,
+    language: settings.language,
+    country: requestedLocation.country || '',
+    country_code: requestedLocation.countryCode || '',
+    admin1: requestedLocation.admin1 || '',
+    admin2: requestedLocation.admin2 || '',
+    admin3: requestedLocation.admin3 || '',
     mushrooms: settings.showMushrooms ? '1' : '0',
     past_days: String(settings.showHistoricalData ? WEATHER_HISTORY_DAYS : 0)
   });
@@ -1121,6 +1142,7 @@ function refreshWeatherIfNeeded() {
 
 function renderLocationLoading(status = t('status.loading')) {
   document.body.classList.add('location-loading');
+  document.getElementById('weatherAlert').hidden = true;
   document.getElementById('locationTitle').textContent = '';
   document.getElementById('updatedAt').textContent = status;
   document.querySelector('.forecast-panel').setAttribute('aria-busy', 'true');

@@ -11,6 +11,7 @@ import {
   SUPPORTED_LOCALES
 } from './generated/i18n-config.js';
 import {MESSAGES} from '../web/assets/generated/i18n.js';
+import {meteoAlarmWarnings} from './meteoalarm.js';
 
 const PORT = Number(process.env.PORT || 8080);
 const CACHE_TTL_MS = Number(process.env.WEATHER_CACHE_TTL_MS || 10 * 60 * 1000);
@@ -99,6 +100,17 @@ async function cachedFetch(url) {
   if (!response.ok) throw new Error(`Upstream returned ${response.status}`);
   const value = await response.json();
   cache.set(url, {expiresAt: Date.now() + CACHE_TTL_MS, value});
+  return value;
+}
+
+async function cachedFetchText(url) {
+  const cacheKey = `text:${url}`;
+  const cached = cache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  const response = await fetch(url, {headers: {'User-Agent': 'weather/0.1 (https://weather.vespy.eu/)'}});
+  if (!response.ok) throw new Error(`Upstream returned ${response.status}`);
+  const value = await response.text();
+  cache.set(cacheKey, {expiresAt: Date.now() + CACHE_TTL_MS, value});
   return value;
 }
 
@@ -487,6 +499,7 @@ export function normalizePostalLocations(source) {
     id: `postal-${source['country abbreviation']}-${source['post code']}-${index}`,
     name: item['place name'],
     country: source.country,
+    countryCode: source['country abbreviation'] || null,
     admin1: item.state || null,
     admin2: null,
     admin3: null,
@@ -534,6 +547,7 @@ async function locations(requestUrl, response) {
     id: item.id,
     name: item.name,
     country: item.country,
+    countryCode: item.country_code || null,
     admin1: item.admin1 || null,
     admin2: item.admin2 || null,
     admin3: item.admin3 || null,
@@ -578,6 +592,7 @@ async function bootstrapLocation(request, response) {
     id: `capital-${countryCode}`,
     name: capital.name,
     country: country.name,
+    countryCode,
     latitude: capital.latitude,
     longitude: capital.longitude,
     timezone: capital.timezone || 'auto'
@@ -601,11 +616,28 @@ export function normalizeReverseLocation(source, fallback) {
     ...fallback,
     name,
     country: address.country || fallback.country || '',
+    countryCode: String(address.country_code || fallback.countryCode || '').toUpperCase() || null,
     admin1: address.state || address.region || null,
     admin2: address.county || address.state_district || null,
     admin3: address.municipality || address.city_district || null,
     postalCode: address.postcode || null
   };
+}
+
+async function resolvedWeatherLocation(location, language) {
+  if (location.countryCode && (location.admin2 || location.admin3)) return location;
+  const providerLanguage = PROVIDER_LANGUAGES[normalizeLocale(language)] || PROVIDER_LANGUAGES[DEFAULT_LOCALE];
+  const parameters = new URLSearchParams({
+    format: 'jsonv2',
+    lat: Number(location.latitude).toFixed(5),
+    lon: Number(location.longitude).toFixed(5),
+    zoom: '14',
+    addressdetails: '1',
+    'accept-language': providerLanguage
+  });
+  const source = await cachedFetch(`https://nominatim.openstreetmap.org/reverse?${parameters}`);
+  const resolved = normalizeReverseLocation(source, location);
+  return {...resolved, name: location.name, timezone: location.timezone};
 }
 
 async function reverseLocation(requestUrl, response) {
@@ -643,14 +675,29 @@ async function weather(requestUrl, response) {
   }
   const timezone = requestUrl.searchParams.get('timezone') || 'auto';
   const name = requestUrl.searchParams.get('name') || `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`;
+  const language = normalizeLocale(requestUrl.searchParams.get('language'));
   const pastDays = Math.max(0, Math.min(3, Math.trunc(Number(requestUrl.searchParams.get('past_days')) || 0)));
-  const location = {name, latitude, longitude, timezone};
-  const source = await cachedFetch(forecastUrl({
+  const location = {
+    name,
+    latitude,
+    longitude,
+    timezone,
+    country: requestUrl.searchParams.get('country') || '',
+    countryCode: requestUrl.searchParams.get('country_code')?.toUpperCase() || null,
+    admin1: requestUrl.searchParams.get('admin1') || null,
+    admin2: requestUrl.searchParams.get('admin2') || null,
+    admin3: requestUrl.searchParams.get('admin3') || null
+  };
+  const [source, resolvedLocation] = await Promise.all([
+    cachedFetch(forecastUrl({
     ...location,
     includeMushrooms: ['1', 'true'].includes(requestUrl.searchParams.get('mushrooms')),
     pastDays
-  }));
-  return json(response, 200, normalizeForecast(source, location, {pastDays}));
+    })),
+    resolvedWeatherLocation(location, language).catch(() => location)
+  ]);
+  const alerts = await meteoAlarmWarnings(resolvedLocation, language, cachedFetchText).catch(() => []);
+  return json(response, 200, {...normalizeForecast(source, resolvedLocation, {pastDays}), alerts});
 }
 
 async function mushroomObservations(requestUrl, response) {

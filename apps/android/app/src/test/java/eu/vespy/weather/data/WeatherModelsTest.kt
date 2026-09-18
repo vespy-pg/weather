@@ -117,4 +117,34 @@ class WeatherModelsTest {
         assertEquals(ForecastSummary.THUNDERSTORMS, forecast(stormy).nextDaysSummary())
         assertEquals(ForecastSummary.STABLE, forecast(summaryPoints()).nextDaysSummary())
     }
+
+    @Test
+    fun nextDaysSummariesDescribeEasingWindAndLaterRain() {
+        val points = summaryPoints { hour, value -> value.copy(
+            windSpeed = if (hour < 24) 32.0 else 12.0,
+            windGusts = if (hour < 24) 48.0 else 22.0,
+            weatherCode = if (hour >= 36) 61 else 2,
+            rain = if (hour >= 36) .4 else 0.0,
+            precipitation = if (hour >= 36) .4 else 0.0,
+        ) }
+
+        assertEquals(
+            listOf(ForecastSummary.WIND_EASING, ForecastSummary.RAIN),
+            forecast(points).nextDaysSummaries(),
+        )
+    }
+
+    @Test
+    fun nextDaysSummariesPrioritizeFreezingPrecipitation() {
+        val points = summaryPoints { hour, value -> when (hour) {
+            12 -> value.copy(weatherCode = 67)
+            30 -> value.copy(weatherCode = 95)
+            else -> value
+        } }
+
+        assertEquals(
+            listOf(ForecastSummary.FREEZING_PRECIPITATION, ForecastSummary.THUNDERSTORMS),
+            forecast(points).nextDaysSummaries(),
+        )
+    }
 }

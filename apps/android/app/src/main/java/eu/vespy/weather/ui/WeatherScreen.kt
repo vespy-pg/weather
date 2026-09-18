@@ -116,13 +116,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import eu.vespy.weather.R
 import eu.vespy.weather.data.HourlyWeather
 import eu.vespy.weather.data.Promotion
-import eu.vespy.weather.data.ForecastSummary
 import eu.vespy.weather.data.ForecastDisplaySettings
 import eu.vespy.weather.data.TemperatureThresholds
+import eu.vespy.weather.data.WeatherAlert
 import eu.vespy.weather.data.WeatherForecast
 import eu.vespy.weather.data.currentIndex
 import eu.vespy.weather.data.groupByHours
-import eu.vespy.weather.data.nextDaysSummary
 import eu.vespy.weather.data.timelineWindow
 import eu.vespy.weather.widget.WeatherWidgetProvider
 import kotlinx.coroutines.delay
@@ -290,7 +289,42 @@ private fun ForecastPane(
         when {
             state.loading && state.forecast == null -> LoadingState(Modifier.weight(1f))
             state.error != null && state.forecast == null -> ErrorState(onRetry, Modifier.weight(1f))
-            state.forecast != null -> ForecastCard(state.forecast, landscape, state.temperatureUnit, state.displaySettings, onDisplaySettings, darkTheme, state.demo)
+            state.forecast != null -> {
+                state.forecast.alerts.firstOrNull()?.let { WeatherAlertBanner(it, landscape) }
+                ForecastCard(state.forecast, landscape, state.temperatureUnit, state.displaySettings, onDisplaySettings, darkTheme, state.demo)
+            }
+        }
+    }
+}
+
+@Composable
+private fun WeatherAlertBanner(alert: WeatherAlert, compact: Boolean) {
+    val uriHandler = LocalUriHandler.current
+    val accent = when (alert.severity) {
+        "extreme" -> Color(0xFFE5484D)
+        "severe" -> Color(0xFFF47B32)
+        else -> Color(0xFFE6B62F)
+    }
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(top = 7.dp, bottom = 7.dp)
+            .clickable(enabled = alert.sourceUrl.startsWith("https://")) { uriHandler.openUri(alert.sourceUrl) },
+        shape = RoundedCornerShape(10.dp),
+        border = androidx.compose.foundation.BorderStroke(2.dp, accent),
+        color = MaterialTheme.colorScheme.surface,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = if (compact) 10.dp else 14.dp, vertical = if (compact) 7.dp else 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.size(if (compact) 28.dp else 36.dp).background(accent, RoundedCornerShape(50)), contentAlignment = Alignment.Center) {
+                Text("!", color = Color(0xFF111820), fontSize = if (compact) 18.sp else 23.sp, fontWeight = FontWeight.Black)
+            }
+            Column(Modifier.weight(1f).padding(start = 10.dp)) {
+                Text(stringResource(R.string.weather_alert_label), color = accent, fontFamily = FontFamily.Monospace, fontSize = 8.sp, fontWeight = FontWeight.Black)
+                Text(alert.headline, fontSize = if (compact) 11.sp else 14.sp, lineHeight = if (compact) 12.sp else 16.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (!compact) Text(alert.description ?: alert.instruction.orEmpty(), color = Muted, fontSize = 11.sp, lineHeight = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(stringResource(R.string.weather_alert_source, alert.source), color = MaterialTheme.colorScheme.primary, fontSize = 9.sp)
+            }
         }
     }
 }
@@ -400,16 +434,7 @@ private fun ForecastCard(
 
 @Composable
 private fun ForecastSummaryHeader(forecast: WeatherForecast, compact: Boolean, modifier: Modifier = Modifier) {
-    val summary = remember(forecast) { forecast.nextDaysSummary() }
-    val summaryText = stringResource(when (summary) {
-        ForecastSummary.THUNDERSTORMS -> R.string.forecast_summary_thunderstorms
-        ForecastSummary.SNOW -> R.string.forecast_summary_snow
-        ForecastSummary.RAIN -> R.string.forecast_summary_rain
-        ForecastSummary.WINDY -> R.string.forecast_summary_windy
-        ForecastSummary.WARMING -> R.string.forecast_summary_warming
-        ForecastSummary.COOLING -> R.string.forecast_summary_cooling
-        ForecastSummary.STABLE -> R.string.forecast_summary_stable
-    })
+    val summaryText = forecastSummaryText(LocalContext.current, forecast)
     Column(modifier) {
         Text(
             stringResource(R.string.forecast_summary_label),

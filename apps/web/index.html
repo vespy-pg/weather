@@ -33,7 +33,7 @@
       if (query.get('share') !== '1' && localStorage.getItem('weather.share-prompt.v1') === 'collapsed') document.documentElement.dataset.sharePrompt = 'collapsed';
     } catch { document.documentElement.dataset.theme = 'dark'; }
   </script>
-  <link rel="stylesheet" href="/assets/app.css?v=53">
+  <link rel="stylesheet" href="/assets/app.css?v=54">
 </head>
 <body>
   <main class="shell">
@@ -83,6 +83,16 @@
       </div>
     </header>
 
+    <aside class="weather-alert" id="weatherAlert" role="alert" aria-live="polite" hidden>
+      <span class="weather-alert-icon" aria-hidden="true">!</span>
+      <div class="weather-alert-copy">
+        <p class="eyebrow" data-i18n="alert.eyebrow">OFFICIAL WEATHER WARNING</p>
+        <strong id="weatherAlertHeadline"></strong>
+        <p id="weatherAlertDescription"></p>
+        <a id="weatherAlertSource" href="https://meteoalarm.org/" target="_blank" rel="noopener noreferrer">Source: MeteoAlarm</a>
+      </div>
+    </aside>
+
     <aside class="stale-weather-warning" id="staleWeatherWarning" role="status" aria-live="polite" hidden>
       <span class="stale-weather-warning-icon" aria-hidden="true">!</span>
       <div>
@@ -94,8 +104,8 @@
     <section class="panel forecast-panel">
       <div class="section-heading">
         <div id="forecastHeadingLink">
-          <p class="eyebrow" id="forecastRangeLabel" data-i18n="forecast.next">NEXT 10 DAYS</p>
-          <h2 data-i18n="forecast.title">Temperature, clouds and precipitation</h2>
+          <p class="eyebrow" id="forecastRangeLabel" data-i18n="forecast.summaryLabel">NEXT DAYS:</p>
+          <h2 id="forecastSummary" data-i18n="forecast.summary.stable">Stable weather is expected.</h2>
         </div>
         <div class="forecast-heading-tools">
           <span class="muted" data-i18n="forecast.range">Temperature scale follows the forecast</span>
@@ -247,7 +257,7 @@
       <div class="daily-grid" id="dailyForecast"></div>
     </section>
 
-    <footer class="data-attribution"><span data-i18n="app.dataSources">Data sources:</span> <a href="https://open-meteo.com/" rel="external">Open-Meteo</a> · <a href="https://www.openstreetmap.org/copyright" rel="external">OpenStreetMap contributors</a><span id="mushroomAttribution" hidden> · <a href="https://www.inaturalist.org/" rel="external" data-i18n="mushroom.source">iNaturalist observations</a></span></footer>
+    <footer class="data-attribution"><span data-i18n="app.dataSources">Data sources:</span> <a href="https://open-meteo.com/" rel="external">Open-Meteo</a> · <a href="https://meteoalarm.org/" rel="external">MeteoAlarm</a> · <a href="https://www.openstreetmap.org/copyright" rel="external">OpenStreetMap contributors</a><span id="mushroomAttribution" hidden> · <a href="https://www.inaturalist.org/" rel="external" data-i18n="mushroom.source">iNaturalist observations</a></span></footer>
   </main>
 
   <aside class="app-notification" id="appNotification" role="alert" aria-live="assertive" hidden>
@@ -421,6 +431,6 @@
     </form>
   </dialog>
 
-  <script src="/assets/app.js?v=53" type="module"></script>
+  <script src="/assets/app.js?v=54" type="module"></script>
 </body>
 </html>

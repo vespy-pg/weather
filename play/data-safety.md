@@ -14,7 +14,7 @@ Verify every answer against the production build and the current Play Console wo
 ### Approximate location
 
 - Collected: Yes. A searched or device-derived location is sent to the Weather API to obtain forecasts.
-- Shared: Service-provider processing may apply for Open-Meteo and OpenStreetMap Nominatim. Use Play Console's service-provider exception where applicable.
+- Shared: Service-provider processing may apply for Open-Meteo and OpenStreetMap Nominatim. Official warnings are retrieved from MeteoAlarm country feeds without sending the selected coordinates to MeteoAlarm. Use Play Console's service-provider exception where applicable.
 - Purpose: App functionality.
 - Processing: Required for a selected forecast. Device permission itself is optional because users can search manually.
 

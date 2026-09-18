@@ -75,6 +75,17 @@ h2 { margin-bottom: 2px; font-size: 18px; }
 .shell { width: calc(100% - 32px); margin: 16px auto 48px; }
 .topbar, .section-heading, .dialog-heading { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 16px; }
 .topbar { margin-bottom: 12px; }
+.weather-alert { display: grid; grid-template-columns: 42px minmax(0, 1fr); align-items: center; gap: 12px; margin: 10px 0 12px; padding: 14px 16px; border: 2px solid #e6b62f; border-radius: 10px; background: color-mix(in srgb, #e6b62f 14%, var(--panel)); color: var(--text); }
+.weather-alert[data-severity="severe"] { border-color: var(--orange); background: color-mix(in srgb, var(--orange) 15%, var(--panel)); }
+.weather-alert[data-severity="extreme"] { border-color: #e5484d; background: color-mix(in srgb, #e5484d 16%, var(--panel)); }
+.weather-alert-icon { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 50%; background: #e6b62f; color: #111820; font: 900 24px/1 ui-monospace, monospace; }
+.weather-alert[data-severity="severe"] .weather-alert-icon { background: var(--orange); }
+.weather-alert[data-severity="extreme"] .weather-alert-icon { background: #e5484d; color: white; }
+.weather-alert-copy { min-width: 0; }
+.weather-alert-copy .eyebrow { color: inherit; }
+.weather-alert-copy strong { display: block; font-size: 16px; }
+.weather-alert-copy p:not(.eyebrow) { margin: 4px 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
+.weather-alert-copy a { color: var(--blue); font-size: 11px; font-weight: 800; }
 .stale-weather-warning { display: grid; grid-template-columns: 42px minmax(0, 1fr); align-items: center; gap: 12px; margin: 10px 0 12px; padding: 14px 16px; border: 2px solid var(--orange); border-radius: 10px; background: color-mix(in srgb, var(--orange) 14%, var(--panel)); box-shadow: 0 8px 28px color-mix(in srgb, var(--orange) 14%, transparent); color: var(--text); }
 .stale-weather-warning-icon { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 50%; background: var(--orange); color: #111820; font: 900 24px/1 ui-monospace, monospace; }
 .stale-weather-warning strong { display: block; color: var(--orange); font-size: 16px; }

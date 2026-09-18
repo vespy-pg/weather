@@ -228,6 +228,7 @@ test('postal code fallback supports localized Polish and US formats', () => {
     id: 'postal-PL-00-001-0',
     name: 'Warszawa',
     country: 'Poland',
+    countryCode: 'PL',
     admin1: 'Mazowieckie',
     admin2: null,
     admin3: null,
@@ -257,11 +258,12 @@ test('normalizeReverseLocation uses the nearest named locality and country', () 
   assert.deepEqual(normalizeReverseLocation({
     addresstype: 'hamlet',
     name: 'Jastrząb Rozparcelowany',
-    address: {hamlet: 'Jastrząb Rozparcelowany', village: 'Jastrząb', county: 'Myszkowski', state: 'Śląskie', postcode: '42-310', country: 'Poland'}
+    address: {hamlet: 'Jastrząb Rozparcelowany', village: 'Jastrząb', county: 'Myszkowski', state: 'Śląskie', postcode: '42-310', country: 'Poland', country_code: 'pl'}
   }, fallback), {
     ...fallback,
     name: 'Jastrząb Rozparcelowany',
     country: 'Poland',
+    countryCode: 'PL',
     admin1: 'Śląskie',
     admin2: 'Myszkowski',
     admin3: null,

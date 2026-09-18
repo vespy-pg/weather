@@ -6,6 +6,7 @@ data class WeatherLocation(
     val latitude: Double,
     val longitude: Double,
     val timezone: String,
+    val countryCode: String? = null,
     val admin1: String? = null,
     val admin2: String? = null,
     val admin3: String? = null,
@@ -61,37 +62,91 @@ data class WeatherForecast(
     val current: CurrentWeather,
     val hourly: List<HourlyWeather>,
     val daily: List<DailyWeather>,
+    val alerts: List<WeatherAlert> = emptyList(),
+)
+
+data class WeatherAlert(
+    val id: String,
+    val event: String,
+    val headline: String,
+    val description: String?,
+    val instruction: String?,
+    val area: String?,
+    val severity: String,
+    val onset: String?,
+    val expires: String?,
+    val source: String,
+    val sourceUrl: String,
 )
 
 enum class ForecastSummary {
+    FREEZING_PRECIPITATION,
     THUNDERSTORMS,
     SNOW,
     RAIN,
     WINDY,
+    WIND_EASING,
+    WIND_INCREASING,
     WARMING,
     COOLING,
     STABLE,
 }
 
-fun WeatherForecast.nextDaysSummary(): ForecastSummary {
+private data class ForecastSummaryCandidate(val summary: ForecastSummary, val priority: Int, val start: Int)
+
+fun WeatherForecast.nextDaysSummaries(limit: Int = 2): List<ForecastSummary> {
     val currentHour = current.timestamp.take(13)
     val nextHours = hourly.filter { it.timestamp.take(13) >= currentHour }.take(72)
-    if (nextHours.isEmpty()) return ForecastSummary.STABLE
-    if (nextHours.any { it.tornado || it.weatherCode in setOf(95, 96, 99) }) return ForecastSummary.THUNDERSTORMS
-    if (nextHours.sumOf { it.snowfall ?: 0.0 } >= 1.0 || nextHours.any { it.weatherCode in 71..77 || it.weatherCode in 85..86 }) return ForecastSummary.SNOW
-    if (nextHours.maxOfOrNull { it.windSpeed ?: 0.0 } ?: 0.0 >= 35.0 || nextHours.maxOfOrNull { it.windGusts ?: 0.0 } ?: 0.0 >= 55.0) return ForecastSummary.WINDY
-    if (nextHours.sumOf { it.rain ?: it.precipitation ?: 0.0 } >= 5.0) return ForecastSummary.RAIN
-    val sampleSize = minOf(24, nextHours.size / 2)
-    if (sampleSize < 6) return ForecastSummary.STABLE
-    val initialTemperature = nextHours.take(sampleSize).mapNotNull(HourlyWeather::temperature).averageOrNull()
-    val finalTemperature = nextHours.takeLast(sampleSize).mapNotNull(HourlyWeather::temperature).averageOrNull()
-    val change = if (initialTemperature == null || finalTemperature == null) 0.0 else finalTemperature - initialTemperature
-    return when {
-        change >= 3.0 -> ForecastSummary.WARMING
-        change <= -3.0 -> ForecastSummary.COOLING
-        else -> ForecastSummary.STABLE
+    if (nextHours.isEmpty()) return listOf(ForecastSummary.STABLE)
+    val candidates = mutableListOf<ForecastSummaryCandidate>()
+    fun add(summary: ForecastSummary, priority: Int, predicate: (HourlyWeather) -> Boolean) {
+        val index = nextHours.indexOfFirst(predicate).takeIf { it >= 0 } ?: nextHours.lastIndex
+        candidates += ForecastSummaryCandidate(summary, priority, index)
     }
+    val freezing: (HourlyWeather) -> Boolean = { it.weatherCode in setOf(56, 57, 66, 67) }
+    val storm: (HourlyWeather) -> Boolean = { it.tornado || it.weatherCode in setOf(95, 96, 99) }
+    val snow: (HourlyWeather) -> Boolean = { (it.snowfall ?: 0.0) > 0.0 || it.weatherCode in 71..77 || it.weatherCode in 85..86 }
+    val rain: (HourlyWeather) -> Boolean = { (it.rain ?: it.precipitation ?: 0.0) > 0.0 || it.weatherCode in setOf(51, 53, 55, 61, 63, 65, 80, 81, 82) }
+    if (nextHours.any(freezing)) add(ForecastSummary.FREEZING_PRECIPITATION, 100, freezing)
+    if (nextHours.any(storm)) add(ForecastSummary.THUNDERSTORMS, 95, storm)
+    if (nextHours.sumOf { it.snowfall ?: 0.0 } >= 1.0 || nextHours.any(snow)) add(ForecastSummary.SNOW, 85, snow)
+    if (nextHours.sumOf { it.rain ?: it.precipitation ?: 0.0 } >= 5.0 || nextHours.any { it.weatherCode in setOf(51, 53, 55, 61, 63, 65, 80, 81, 82) }) {
+        add(ForecastSummary.RAIN, 75, rain)
+    }
+    val sampleSize = minOf(24, nextHours.size / 2)
+    if (sampleSize >= 6) {
+        val initial = nextHours.take(sampleSize)
+        val final = nextHours.takeLast(sampleSize)
+        val initialWind = initial.mapNotNull(HourlyWeather::windSpeed).averageOrNull() ?: 0.0
+        val finalWind = final.mapNotNull(HourlyWeather::windSpeed).averageOrNull() ?: 0.0
+        val initialGust = initial.maxOfOrNull { it.windGusts ?: 0.0 } ?: 0.0
+        val finalGust = final.maxOfOrNull { it.windGusts ?: 0.0 } ?: 0.0
+        val windCurrentlyStrong = initialWind >= 25.0 || initialGust >= 40.0
+        val windLaterStrong = finalWind >= 25.0 || finalGust >= 40.0
+        when {
+            windCurrentlyStrong && initialWind - finalWind >= 8.0 && initialGust - finalGust >= 10.0 ->
+                candidates += ForecastSummaryCandidate(ForecastSummary.WIND_EASING, 80, 0)
+            windLaterStrong && finalWind - initialWind >= 8.0 && finalGust - initialGust >= 10.0 ->
+                candidates += ForecastSummaryCandidate(ForecastSummary.WIND_INCREASING, 80, sampleSize)
+            (nextHours.maxOfOrNull { it.windSpeed ?: 0.0 } ?: 0.0) >= 35.0 || (nextHours.maxOfOrNull { it.windGusts ?: 0.0 } ?: 0.0) >= 55.0 ->
+                add(ForecastSummary.WINDY, 80) { (it.windSpeed ?: 0.0) >= 35.0 || (it.windGusts ?: 0.0) >= 55.0 }
+        }
+        val initialTemperature = initial.mapNotNull(HourlyWeather::temperature).averageOrNull()
+        val finalTemperature = final.mapNotNull(HourlyWeather::temperature).averageOrNull()
+        val change = if (initialTemperature == null || finalTemperature == null) 0.0 else finalTemperature - initialTemperature
+        when {
+            change >= 3.0 -> candidates += ForecastSummaryCandidate(ForecastSummary.WARMING, 50, sampleSize)
+            change <= -3.0 -> candidates += ForecastSummaryCandidate(ForecastSummary.COOLING, 50, sampleSize)
+        }
+    }
+    if (candidates.isEmpty()) return listOf(ForecastSummary.STABLE)
+    return candidates.sortedWith(compareByDescending<ForecastSummaryCandidate> { it.priority }.thenBy { it.start })
+        .take(limit.coerceAtLeast(1))
+        .sortedWith(compareBy<ForecastSummaryCandidate> { it.start }.thenByDescending { it.priority })
+        .map(ForecastSummaryCandidate::summary)
 }
+
+fun WeatherForecast.nextDaysSummary(): ForecastSummary = nextDaysSummaries(1).first()
 
 private fun List<Double>.averageOrNull(): Double? = if (isEmpty()) null else average()
 

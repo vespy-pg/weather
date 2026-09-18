@@ -184,6 +184,7 @@ class WeatherPreferences(context: Context) {
         put("latitude", latitude)
         put("longitude", longitude)
         put("timezone", timezone)
+        put("countryCode", countryCode)
         put("admin1", admin1)
         put("admin2", admin2)
         put("admin3", admin3)
@@ -202,6 +203,7 @@ class WeatherPreferences(context: Context) {
             latitude = latitude,
             longitude = longitude,
             timezone = optString("timezone").takeIf(String::isNotBlank) ?: "auto",
+            countryCode = optString("countryCode").takeIf(String::isNotBlank),
             admin1 = optString("admin1").takeIf(String::isNotBlank),
             admin2 = optString("admin2").takeIf(String::isNotBlank),
             admin3 = optString("admin3").takeIf(String::isNotBlank),

@@ -11,6 +11,11 @@ export function normalizeStoredLocation(item) {
     || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) return null;
   return {
     ...(item?.id === undefined || item?.id === null ? {} : {id: String(item.id)}),
+    ...(item?.countryCode ? {countryCode: String(item.countryCode)} : {}),
+    ...(item?.admin1 ? {admin1: String(item.admin1)} : {}),
+    ...(item?.admin2 ? {admin2: String(item.admin2)} : {}),
+    ...(item?.admin3 ? {admin3: String(item.admin3)} : {}),
+    ...(item?.postalCode ? {postalCode: String(item.postalCode)} : {}),
     name,
     country: String(item?.country || ''),
     latitude,

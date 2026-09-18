@@ -19,11 +19,13 @@ import android.util.SizeF
 import android.widget.RemoteViews
 import eu.vespy.weather.MainActivity
 import eu.vespy.weather.R
+import eu.vespy.weather.withSavedAppLocale
 import eu.vespy.weather.data.WeatherApi
 import eu.vespy.weather.data.WeatherPreferences
 import eu.vespy.weather.data.forWidgetForecast
 import eu.vespy.weather.ui.DEFAULT_LOCATIONS
 import eu.vespy.weather.ui.ForecastGraphics
+import eu.vespy.weather.ui.forecastSummaryText
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -32,7 +34,9 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-class WeatherWidgetProvider : AppWidgetProvider() {
+open class WeatherWidgetProvider : AppWidgetProvider() {
+    protected open val advisoryFooter = false
+
     override fun onUpdate(context: Context, manager: AppWidgetManager, appWidgetIds: IntArray) {
         val result = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
@@ -43,12 +47,16 @@ class WeatherWidgetProvider : AppWidgetProvider() {
                 val widgetLocations = appWidgetIds.associateWith { preferences.widgetLocation(it, fallbackLocation) }
                 val temperatureUnit = preferences.temperatureUnit()
                 val displaySettings = preferences.displaySettings()
+                val localizedContext = context.withSavedAppLocale()
+                val language = displaySettings.language.takeUnless { it == "system" }
+                    ?: localizedContext.resources.configuration.locales[0].toLanguageTag()
                 val forecasts = mutableMapOf<Pair<Double, Double>, eu.vespy.weather.data.WeatherForecast>()
                 appWidgetIds.forEach { widgetId ->
                     val location = widgetLocations.getValue(widgetId)
                     val widgetSettings = preferences.widgetDisplaySettings(widgetId, displaySettings)
                     val locationKey = location.latitude to location.longitude
-                    val forecast = if (widgetSettings.demo) widgetDemoForecast() else forecasts[locationKey] ?: WeatherApi().forecast(location).also { forecasts[locationKey] = it }
+                    val forecast = if (widgetSettings.demo) widgetDemoForecast() else forecasts[locationKey]
+                        ?: WeatherApi().forecast(location, language = language).also { forecasts[locationKey] = it }
                     val options = manager.getAppWidgetOptions(widgetId)
                     val density = context.resources.displayMetrics.density.coerceAtMost(2.5f)
                     val forecastHours = preferences.widgetForecastHours(widgetId)
@@ -78,6 +86,11 @@ class WeatherWidgetProvider : AppWidgetProvider() {
                             temperatureThresholds = displaySettings.temperatureThresholds,
                             locationLabel = location.name.takeIf { !widgetSettings.demo && (displaySettings.showWidgetLocation || widgetSettings.forceLocationName) },
                             widgetSettings = widgetSettings,
+                            advisoryText = if (advisoryFooter) {
+                                forecast.alerts.firstOrNull()?.let { localizedContext.getString(R.string.widget_alert_prefix, it.headline) }
+                                    ?: forecastSummaryText(localizedContext, forecast)
+                            } else null,
+                            advisoryIsAlert = advisoryFooter && forecast.alerts.isNotEmpty(),
                         )
                         views(context, bitmap, widgetId, location, widgetSettings.demo)
                     }
@@ -175,6 +188,8 @@ class WeatherWidgetProvider : AppWidgetProvider() {
         temperatureThresholds: eu.vespy.weather.data.TemperatureThresholds,
         locationLabel: String?,
         widgetSettings: eu.vespy.weather.data.WidgetDisplaySettings,
+        advisoryText: String?,
+        advisoryIsAlert: Boolean,
     ): Bitmap {
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
@@ -185,14 +200,16 @@ class WeatherWidgetProvider : AppWidgetProvider() {
         })
         canvas.save()
         canvas.clipPath(android.graphics.Path().apply { addRoundRect(bounds, radius, radius, android.graphics.Path.Direction.CW) })
+        val footerHeight = if (advisoryText != null) min(58f * density, height * .42f) else 0f
+        val chartHeight = height - footerHeight
         val expanded = rows >= 3
-        val labelHeight = height * if (rows == 1) .38f else .24f
-        val contentHeight = height - labelHeight
+        val labelHeight = chartHeight * if (rows == 1) .38f else .24f
+        val contentHeight = chartHeight - labelHeight
         val skyHeight = if (expanded) min(68f * density, contentHeight * .36f) else min(56f * density, contentHeight * .3f)
         val windHeight = if (expanded) min(42f * density, contentHeight * .22f) else min(34f * density, contentHeight * .18f)
         val mushroomHeight = if (widgetSettings.showMushrooms && expanded) min(34f * density, contentHeight * .18f) else 0f
         ForecastGraphics.drawTimeline(
-            canvas, bounds, points, days, dark, todayLabel, labelHeight, skyHeight, windHeight,
+            canvas, RectF(0f, 0f, width.toFloat(), chartHeight), points, days, dark, todayLabel, labelHeight, skyHeight, windHeight,
             pixelScale = density,
             textScale = when {
                 expanded -> 1.6f
@@ -232,10 +249,56 @@ class WeatherWidgetProvider : AppWidgetProvider() {
             } else {
                 locationLabel
             }
-            canvas.drawText(displayedLabel, width - 7f * density, height - windHeight - mushroomHeight - 7f * density, labelPaint)
+            canvas.drawText(displayedLabel, width - 7f * density, chartHeight - windHeight - mushroomHeight - 7f * density, labelPaint)
         }
         canvas.restore()
+        if (advisoryText != null) drawAdvisoryFooter(canvas, width, height, footerHeight, advisoryText, advisoryIsAlert, dark, density)
         return bitmap
+    }
+
+    private fun drawAdvisoryFooter(
+        canvas: Canvas,
+        width: Int,
+        height: Int,
+        footerHeight: Float,
+        text: String,
+        alert: Boolean,
+        dark: Boolean,
+        density: Float,
+    ) {
+        val top = height - footerHeight
+        val accent = if (alert) Color.rgb(230, 182, 47) else if (dark) Color.rgb(88, 166, 255) else Color.rgb(23, 111, 193)
+        canvas.drawRect(0f, top, width.toFloat(), height.toFloat(), Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (dark) Color.rgb(20, 28, 40) else Color.rgb(238, 244, 251)
+        })
+        canvas.drawRect(0f, top, width.toFloat(), top + max(1f, density), Paint(Paint.ANTI_ALIAS_FLAG).apply { color = accent })
+        val prefixWidth = if (alert) 28f * density else 10f * density
+        if (alert) canvas.drawText("!", 14f * density, top + footerHeight * .62f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accent
+            textAlign = Paint.Align.CENTER
+            textSize = 22f * density
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        })
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (dark) Color.rgb(231, 237, 247) else Color.rgb(23, 34, 52)
+            textSize = 12f * density
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        }
+        val availableWidth = width - prefixWidth - 10f * density
+        val firstLength = paint.breakText(text, true, availableWidth, null).coerceAtLeast(1)
+        var firstLine = text.take(firstLength).trimEnd()
+        var remainder = text.drop(firstLength).trimStart()
+        if (remainder.isNotEmpty() && firstLine.contains(' ')) {
+            val split = firstLine.lastIndexOf(' ')
+            remainder = (firstLine.drop(split + 1) + " " + remainder).trim()
+            firstLine = firstLine.take(split)
+        }
+        val secondLength = paint.breakText(remainder, true, availableWidth, null).coerceAtLeast(0)
+        val secondLine = if (remainder.length > secondLength && secondLength > 1) remainder.take(secondLength - 1).trimEnd() + "…" else remainder
+        val x = prefixWidth
+        val baseline = top + if (secondLine.isBlank()) footerHeight * .6f else footerHeight * .43f
+        canvas.drawText(firstLine, x, baseline, paint)
+        if (secondLine.isNotBlank()) canvas.drawText(secondLine, x, baseline + 16f * density, paint)
     }
 
     companion object {
@@ -243,17 +306,20 @@ class WeatherWidgetProvider : AppWidgetProvider() {
 
         fun refreshAll(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
-            val component = ComponentName(context, WeatherWidgetProvider::class.java)
-            val widgetIds = manager.getAppWidgetIds(component)
-            if (widgetIds.isEmpty()) return
-            context.sendBroadcast(Intent(context, WeatherWidgetProvider::class.java).apply {
-                action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, widgetIds)
-            })
+            listOf(WeatherWidgetProvider::class.java, WeatherAdvisoryWidgetProvider::class.java).forEach { providerClass ->
+                val component = ComponentName(context, providerClass)
+                val widgetIds = manager.getAppWidgetIds(component)
+                if (widgetIds.isNotEmpty()) context.sendBroadcast(Intent(context, providerClass).apply {
+                    action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, widgetIds)
+                })
+            }
         }
 
         fun refresh(context: Context, widgetId: Int) {
-            context.sendBroadcast(Intent(context, WeatherWidgetProvider::class.java).apply {
+            val component = AppWidgetManager.getInstance(context).getAppWidgetInfo(widgetId)?.provider
+                ?: ComponentName(context, WeatherWidgetProvider::class.java)
+            context.sendBroadcast(Intent().setComponent(component).apply {
                 action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
                 putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, intArrayOf(widgetId))
             })

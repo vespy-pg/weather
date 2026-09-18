@@ -125,6 +125,33 @@ paths:
           schema:
             type: string
         - in: query
+          name: language
+          schema:
+            type: string
+            enum: [en-US, pl-PL]
+        - in: query
+          name: country_code
+          description: ISO 3166-1 alpha-2 country code used to select the official MeteoAlarm feed.
+          schema:
+            type: string
+            pattern: '^[A-Z]{2}$'
+        - in: query
+          name: country
+          schema:
+            type: string
+        - in: query
+          name: admin1
+          schema:
+            type: string
+        - in: query
+          name: admin2
+          schema:
+            type: string
+        - in: query
+          name: admin3
+          schema:
+            type: string
+        - in: query
           name: mushrooms
           description: Include mushroom suitability data derived from seven days of weather history.
           schema:
@@ -138,7 +165,7 @@ paths:
             maximum: 3
       responses:
         '200':
-          description: Normalized current, hourly, and daily forecast
+          description: Normalized current, hourly, and daily forecast with matching official warnings
   /mushroom-observations:
     get:
       operationId: getMushroomObservations
@@ -169,6 +196,36 @@ paths:
           description: Invalid coordinates
 components:
   schemas:
+    WeatherAlert:
+      type: object
+      required: [id, event, headline, severity, source, sourceUrl]
+      properties:
+        id:
+          type: string
+        event:
+          type: string
+        headline:
+          type: string
+        description:
+          type: [string, 'null']
+        instruction:
+          type: [string, 'null']
+        area:
+          type: [string, 'null']
+        severity:
+          type: string
+          enum: [minor, moderate, severe, extreme]
+        onset:
+          type: [string, 'null']
+          format: date-time
+        expires:
+          type: [string, 'null']
+          format: date-time
+        source:
+          type: string
+        sourceUrl:
+          type: string
+          format: uri
     PromotionFeed:
       type: object
       required: [schemaVersion, platform, placement, rotationSeconds, cacheSeconds, campaigns]
