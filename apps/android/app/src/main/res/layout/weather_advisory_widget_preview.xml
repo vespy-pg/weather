@@ -1,48 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ImageView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_preview_background"
-    android:orientation="vertical"
-    android:padding="12dp">
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="TODAY"
-        android:textColor="#E7EDF7"
-        android:textSize="13sp"
-        android:textStyle="bold" />
-
-    <ImageView
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:contentDescription="@string/advisory_widget_description"
-        android:scaleType="fitXY"
-        android:src="@drawable/widget_preview_chart" />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="108dp"
-        android:orientation="vertical"
-        android:paddingTop="12dp"
-        >
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/forecast_summary_label"
-            android:textColor="#58A6FF"
-            android:textSize="11sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/forecast_summary_stable"
-            android:textColor="#E7EDF7"
-            android:textSize="24sp"
-            android:textStyle="bold" />
-    </LinearLayout>
-</LinearLayout>
+    android:contentDescription="@string/advisory_widget_description"
+    android:scaleType="fitXY"
+    android:src="@drawable/widget_advisory_preview" />

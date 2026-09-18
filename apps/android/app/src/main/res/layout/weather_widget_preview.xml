@@ -1,31 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ImageView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_preview_background"
-    android:orientation="vertical"
-    android:padding="12dp">
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="TODAY"
-        android:textColor="#E7EDF7"
-        android:textSize="13sp"
-        android:textStyle="bold" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="12   16   20   00"
-        android:textColor="#8D98AA"
-        android:textSize="10sp" />
-
-    <ImageView
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:contentDescription="@string/widget_description"
-        android:scaleType="fitXY"
-        android:src="@drawable/widget_preview_chart" />
-</LinearLayout>
+    android:contentDescription="@string/widget_description"
+    android:scaleType="fitXY"
+    android:src="@drawable/widget_timeline_preview" />

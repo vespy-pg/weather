@@ -32,7 +32,7 @@
     <string name="widget_name">Oś pogody</string>
     <string name="advisory_widget_name">Pogoda i ostrzeżenia</string>
     <string name="advisory_widget_description">Oś pogody z oficjalnym ostrzeżeniem lub opisem wielu zjawisk</string>
-    <string name="strip_widget_name">Niebo i wiatr</string>
+    <string name="strip_widget_name">Pogoda - niebo i wiatr</string>
     <string name="strip_widget_description">Kompaktowa oś pogody z niebem, opadami i wiatrem</string>
     <string name="add_widget">Dodaj widget do ekranu głównego</string>
     <string name="widget_pin_unavailable">Dodaj widget z listy widgetów launchera</string>

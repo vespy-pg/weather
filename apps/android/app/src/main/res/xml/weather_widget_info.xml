@@ -8,7 +8,7 @@
     android:minResizeWidth="110dp"
     android:minResizeHeight="40dp"
     android:previewLayout="@layout/weather_widget_preview"
-    android:previewImage="@drawable/widget_preview_chart"
+    android:previewImage="@drawable/widget_timeline_preview"
     android:resizeMode="horizontal|vertical"
     android:targetCellWidth="2"
     android:targetCellHeight="1"
