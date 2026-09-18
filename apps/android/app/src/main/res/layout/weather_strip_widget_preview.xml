@@ -4,5 +4,5 @@
     android:layout_height="match_parent"
     android:background="@drawable/widget_preview_background"
     android:contentDescription="@string/strip_widget_description"
-    android:scaleType="fitXY"
+    android:scaleType="centerCrop"
     android:src="@drawable/widget_strip_preview" />
