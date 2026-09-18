@@ -2,6 +2,9 @@ import {drawForecastSky, drawWeatherChart, drawWindFlow} from './charts.js';
 import {groupHourlyForecast, temperatureRange} from './forecast-view.js';
 import {createWeatherDemo} from './weather-demo.js';
 
+const previewParameters = new URLSearchParams(window.location.search);
+document.documentElement.classList.toggle('capture', previewParameters.has('capture'));
+
 const device = document.getElementById('device');
 const forecastView = document.getElementById('forecastView');
 const widgetView = document.getElementById('widgetView');
@@ -59,14 +62,8 @@ document.querySelectorAll('[data-orientation]').forEach(button => button.addEven
   requestAnimationFrame(drawForecast);
 }));
 
-document.querySelectorAll('.favorite-locations button[data-location]').forEach(button => button.addEventListener('click', () => {
-  activateButton(button);
-  document.getElementById('activeLocation').textContent = button.dataset.location;
-}));
-
-document.getElementById('configLocations').addEventListener('click', event => {
-  const button = event.target.closest('button');
-  if (button) activateButton(button);
+document.getElementById('favoriteLocationSelect').addEventListener('change', event => {
+  document.getElementById('activeLocation').textContent = event.target.value;
 });
 
 document.querySelectorAll('.segmented').forEach(group => group.addEventListener('click', event => {
@@ -93,7 +90,6 @@ document.getElementById('configColumns').addEventListener('change', updateWidget
 document.getElementById('configRows').addEventListener('change', updateWidgetSummary);
 window.addEventListener('resize', () => requestAnimationFrame(drawForecast));
 
-const previewParameters = new URLSearchParams(window.location.search);
 if (previewParameters.get('orientation') === 'landscape') document.querySelector('[data-orientation="landscape"]').click();
 if (previewParameters.get('screen') === 'widget') document.querySelector('[data-screen="widget"]').click();
 requestAnimationFrame(drawForecast);

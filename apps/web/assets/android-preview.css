@@ -28,10 +28,8 @@ button, select { font: inherit; }
 .app-bar strong { font-size: 25px; line-height: 1.05; }
 .app-bar small, .config-card small { color: #8997aa; font-size: 9px; line-height: 1.35; }
 .app-bar button, .config-bar button { width: 34px; height: 34px; border: 1px solid #34445a; border-radius: 10px; background: #141f2e; color: #dce7f5; cursor: pointer; }
-.favorite-locations { display: flex; gap: 6px; margin: 12px 0; overflow: auto; scrollbar-width: none; }
-.favorite-locations button, .location-choice button { flex: none; padding: 6px 10px; border: 1px solid #2d3d52; border-radius: 999px; background: #101925; color: #93a1b5; font-size: 9px; cursor: pointer; }
-.favorite-locations button.active, .location-choice button.active { border-color: #3b91e6; background: #173557; color: #fff; }
-.favorite-locations .add-location { width: 27px; padding: 0; font-size: 15px; }
+.location-dropdown { display: grid; gap: 5px; margin: 12px 0; color: #8997aa; font-size: 11px; }
+.location-dropdown select, .location-select { width: 100%; padding: 9px 11px; border: 1px solid #365273; border-radius: 9px; background: #101925; color: #dce7f5; font-size: 14px; }
 .forecast-card { overflow: hidden; border: 1px solid #2a384b; border-radius: 13px; background: #0d131d; }
 .forecast-card-heading { display: flex; align-items: center; justify-content: space-between; padding: 9px 11px; }
 .forecast-card-heading > div { display: grid; gap: 2px; }
@@ -81,8 +79,7 @@ button, select { font: inherit; }
 .landscape .app-kicker, .landscape .app-bar small { display: none; }
 .landscape .app-bar strong { font-size: 19px; }
 .landscape .app-bar button { width: 30px; height: 30px; border-radius: 8px; }
-.landscape .favorite-locations { grid-column: 2; align-items: center; margin: 0; }
-.landscape .favorite-locations button { padding: 5px 9px; }
+.landscape .location-dropdown { grid-column: 2; grid-template-columns: auto minmax(180px, 1fr); align-items: center; margin: 0; }
 .landscape .forecast-card { grid-column: 1 / -1; display: grid; grid-template-rows: 28px minmax(0, 1fr); min-height: 0; border-radius: 10px; }
 .landscape .forecast-card-heading { padding: 4px 9px; }
 .landscape .forecast-card-heading > div { display: flex; align-items: baseline; gap: 9px; }
@@ -113,7 +110,7 @@ button, select { font: inherit; }
 .behavior-result { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0 8px; }
 .behavior-result span { display: grid; gap: 3px; padding: 8px; border-radius: 8px; background: #0c141e; color: #8392a7; font-size: 8px; }
 .behavior-result strong { color: #dce7f5; font-size: 10px; }
-.location-choice { display: flex; gap: 6px; margin: 10px 0 8px; overflow: auto; }
+.location-select { margin: 10px 0 8px; }
 .wide-button { width: 100%; padding: 8px; border: 1px solid #365273; border-radius: 8px; background: #142840; color: #dcecff; font-size: 10px; cursor: pointer; }
 .setting-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; color: #c2cedd; font-size: 10px; }
 .segmented { display: inline-flex; padding: 2px; border: 1px solid #314158; border-radius: 8px; background: #0d151f; }
@@ -140,3 +137,10 @@ button, select { font: inherit; }
   .device-stage { padding: 8px; }
   .device.portrait { width: 374px; max-width: calc(100vw - 34px); }
 }
+
+html.capture, html.capture body { width: 100%; height: 100%; overflow: hidden; background: #0b1018; }
+.capture .prototype-shell { width: 100%; margin: 0; padding: 0; }
+.capture .prototype-heading, .capture .prototype-controls, .capture .prototype-notes { display: none; }
+.capture .device-stage { display: block; min-height: 0; padding: 0; overflow: hidden; border: 0; border-radius: 0; background: transparent; }
+.capture .device { max-width: none; border: 0; border-radius: 0; box-shadow: none; }
+.capture .device-camera { display: none; }

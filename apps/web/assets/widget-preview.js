@@ -21,6 +21,7 @@ const HEADER_HEIGHT = 20;
 const MAX_SKY_HEIGHT = (CELL_HEIGHT * 4 - HEADER_HEIGHT) * .2;
 
 const previewParameters = new URLSearchParams(window.location.search);
+document.documentElement.classList.toggle('capture', previewParameters.has('capture'));
 const requestedColumns = Number(previewParameters.get('columns'));
 const requestedRows = Number(previewParameters.get('rows'));
 if (requestedColumns >= 2 && requestedColumns <= 8) columnsControl.value = String(requestedColumns);

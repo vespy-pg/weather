@@ -44,12 +44,14 @@
                 <button type="button" aria-label="Open settings">⚙</button>
               </header>
 
-              <nav class="favorite-locations" aria-label="Favorite locations">
-                <button class="active" type="button" data-location="Jastrząb Rozparcelowany">Jastrząb Rozparcelowany</button>
-                <button type="button" data-location="Katowice">Katowice</button>
-                <button type="button" data-location="London">London</button>
-                <button class="add-location" type="button" aria-label="Add location">+</button>
-              </nav>
+              <label class="location-dropdown">
+                <span>Saved location</span>
+                <select id="favoriteLocationSelect">
+                  <option>Jastrząb Rozparcelowany</option>
+                  <option>Katowice</option>
+                  <option>London</option>
+                </select>
+              </label>
 
               <section class="forecast-card">
                 <div class="forecast-card-heading">
@@ -139,9 +141,9 @@
 
             <section class="config-card">
               <span class="config-label">WIDGET LOCATION</span>
-              <div class="location-choice" id="configLocations">
-                <button class="active" type="button">Warsaw</button><button type="button">Katowice</button><button type="button">London</button>
-              </div>
+              <select class="location-select" id="configLocationSelect">
+                <option>Washington</option><option>Katowice</option><option>London</option>
+              </select>
               <button class="wide-button" type="button">Search or add location</button>
               <small>Favorites are shared with the app. Each widget instance keeps its own selected location.</small>
             </section>
@@ -154,9 +156,9 @@
 
             <section class="config-card system-settings">
               <span class="config-label">SYSTEM DEFAULTS</span>
-              <p><span>Language</span><strong>Polish</strong><small>from system</small></p>
-              <p><span>Country</span><strong>Poland</strong><small>from system region</small></p>
-              <p><span>Initial location</span><strong>Warsaw</strong><small>country capital</small></p>
+              <p><span>Language</span><strong>English</strong><small>from system</small></p>
+              <p><span>Country</span><strong>United States</strong><small>from system region</small></p>
+              <p><span>Initial location</span><strong>Washington</strong><small>country capital</small></p>
             </section>
 
             <button class="save-widget" type="button">Save widget</button>

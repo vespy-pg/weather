@@ -499,3 +499,11 @@ body.embedded .data-attribution { display: none; }
   .web-promotion-description { font-size: 10px; }
   .web-promotion-action { grid-column: 2; justify-self: start; padding: 0; border: 0; }
 }
+
+body.embedded-roomy .forecast-panel { padding: 18px; }
+body.embedded-roomy .forecast-weather-canvas { height: 170px; }
+body.embedded-roomy #forecastChart { height: 240px; }
+body.embedded-roomy .forecast-wind-visual { height: 90px; }
+body.embedded-roomy .forecast-sky-symbols { height: 118px; }
+body.embedded-roomy .forecast-temperature-symbol svg { height: 190px; }
+body.embedded-roomy .forecast-wind-symbol { width: 48px; height: 48px; }

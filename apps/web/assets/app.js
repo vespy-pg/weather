@@ -44,6 +44,7 @@ const ROUTE_COORDINATES = parseCoordinatePair(QUERY.get('ll'));
 const IS_GITHUB_PAGES = location.hostname.endsWith('.github.io');
 const IS_DEMO = QUERY.get('demo') === '1' || IS_GITHUB_PAGES;
 const IS_EMBEDDED = QUERY.get('embed') === '1';
+const IS_ROOMY_EMBED = IS_EMBEDDED && widgetBoolean(QUERY.get('roomy'), false);
 const EMBED_DAYS = IS_EMBEDDED ? widgetDays(QUERY.get('days')) : 10;
 const EMBED_LEGEND = !IS_EMBEDDED || widgetBoolean(QUERY.get('legend'), true);
 const API_ROOT = IS_GITHUB_PAGES
@@ -1796,6 +1797,7 @@ window.addEventListener('resize', () => {
 });
 
 document.body.classList.toggle('embedded', IS_EMBEDDED);
+document.body.classList.toggle('embedded-roomy', IS_ROOMY_EMBED);
 document.body.classList.toggle('embedded-without-legend', IS_EMBEDDED && !EMBED_LEGEND);
 if (document.documentElement.dataset.sharePrompt === 'collapsed') collapseSharePrompt(false);
 renderLanguageOptions();
