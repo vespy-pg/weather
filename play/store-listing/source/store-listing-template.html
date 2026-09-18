@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vespy Weather - store listing template</title>
+  <style>
+    :root {
+      --canvas-width: 1920px;
+      --canvas-height: 1080px;
+      --background-start: #173854;
+      --background-middle: #0c2635;
+      --background-end: #07151d;
+      --surface: #09111b;
+      --surface-raised: #142333;
+      --border: #527090;
+      --border-muted: #2f5575;
+      --accent: #75bdff;
+      --text: #ffffff;
+      --text-muted: #c2d2e4;
+      --text-soft: #aebfd1;
+      --yellow: #ffd83d;
+      --green: #45cf88;
+      --blue: #58a6ff;
+      --corner: 38px;
+      --font: Inter, Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      min-height: 100%;
+      margin: 0;
+      background: #050c12;
+      font-family: var(--font);
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+    }
+
+    /* Capture this element at exactly 1920 x 1080 pixels. */
+    .store-slide {
+      position: relative;
+      width: var(--canvas-width);
+      height: var(--canvas-height);
+      overflow: hidden;
+      isolation: isolate;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 93% -17%, rgb(88 166 255 / 8%) 0 590px, transparent 592px),
+        linear-gradient(135deg, var(--background-start), var(--background-middle) 50%, var(--background-end));
+    }
+
+    .store-slide::after {
+      position: absolute;
+      z-index: -1;
+      right: -230px;
+      bottom: -430px;
+      width: 840px;
+      height: 840px;
+      border-radius: 50%;
+      background: rgb(69 207 136 / 5%);
+      content: "";
+    }
+
+    /* Text styles. Keep copy separate from presentation by reusing these classes. */
+    .text-eyebrow {
+      margin: 0;
+      color: var(--accent);
+      font-size: 23px;
+      font-weight: 800;
+      letter-spacing: 5px;
+      line-height: 1.2;
+      text-transform: uppercase;
+    }
+
+    .text-title {
+      margin: 0;
+      color: var(--text);
+      font-size: 70px;
+      font-weight: 800;
+      letter-spacing: -1.5px;
+      line-height: 1.1;
+    }
+
+    .text-subtitle {
+      margin: 0;
+      color: var(--text-muted);
+      font-size: 28px;
+      font-weight: 400;
+      line-height: 1.4;
+    }
+
+    .text-card-title {
+      margin: 0;
+      color: var(--text);
+      font-size: 31px;
+      font-weight: 800;
+      line-height: 1.2;
+    }
+
+    .text-card-description {
+      margin: 0;
+      color: var(--text-soft);
+      font-size: 25px;
+      font-weight: 400;
+      line-height: 1.35;
+    }
+
+    .text-footer {
+      margin: 0;
+      color: var(--accent);
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      line-height: 1.2;
+      text-transform: uppercase;
+    }
+
+    .slide-copy {
+      position: absolute;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .slide-copy .text-title {
+      margin-top: 86px;
+    }
+
+    .slide-copy .text-subtitle {
+      margin-top: 40px;
+    }
+
+    .screenshot-frame {
+      position: absolute;
+      z-index: 1;
+      margin: 0;
+      overflow: hidden;
+      border: 3px solid var(--border);
+      border-radius: var(--corner);
+      background: var(--surface);
+      box-shadow: 0 22px 28px rgb(0 0 0 / 50%);
+    }
+
+    .screenshot-frame img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+    }
+
+    .feature-list {
+      display: grid;
+      gap: 30px;
+      margin-top: 58px;
+    }
+
+    .feature-card {
+      display: grid;
+      grid-template-columns: 68px 1fr;
+      gap: 30px;
+      align-items: center;
+      min-height: 150px;
+      padding: 24px 38px 24px 30px;
+      border: 2px solid var(--border-muted);
+      border-radius: 24px;
+      background: var(--surface-raised);
+    }
+
+    .feature-number {
+      display: grid;
+      width: 68px;
+      height: 68px;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--blue);
+      color: #07111e;
+      font-size: 32px;
+      font-weight: 900;
+    }
+
+    .feature-copy {
+      display: grid;
+      gap: 10px;
+    }
+
+    .slide-footer {
+      position: absolute;
+      z-index: 2;
+    }
+
+    /* Left screenshot and right copy, used for widgets and configuration screens. */
+    .layout-split-left .screenshot-frame {
+      top: 48px;
+      left: 76px;
+      width: 780px;
+      height: 936px;
+    }
+
+    .layout-split-left .slide-copy {
+      top: 105px;
+      left: 930px;
+      width: 850px;
+    }
+
+    .layout-split-left .feature-list {
+      gap: 24px;
+      margin-top: 50px;
+    }
+
+    .layout-split-left .feature-card {
+      min-height: 130px;
+    }
+
+    .layout-split-left .slide-footer {
+      bottom: 90px;
+      left: 934px;
+    }
+
+    /* Copy above a wide screenshot. */
+    .layout-wide-bottom .slide-copy {
+      top: 92px;
+      left: 94px;
+      width: 1732px;
+    }
+
+    .layout-wide-bottom .slide-copy .text-title {
+      margin-top: 82px;
+      font-size: 84px;
+    }
+
+    .layout-wide-bottom .slide-copy .text-subtitle {
+      margin-top: 40px;
+      font-size: 33px;
+    }
+
+    .layout-wide-bottom .screenshot-frame {
+      top: 386px;
+      left: 75px;
+      width: 1770px;
+      height: 690px;
+      border-radius: 30px;
+    }
+
+    /* Phone portrait on the left with a short feature list on the right. */
+    .layout-phone-left .screenshot-frame {
+      top: 55px;
+      left: 85px;
+      width: 585px;
+      height: 900px;
+      border-radius: 34px;
+    }
+
+    .layout-phone-left .slide-copy {
+      top: 175px;
+      left: 790px;
+      width: 1035px;
+    }
+
+    .layout-phone-left .slide-copy .text-title {
+      margin-top: 110px;
+      font-size: 85px;
+    }
+
+    .layout-phone-left .slide-copy .text-subtitle {
+      margin-top: 62px;
+      font-size: 33px;
+    }
+
+    .bullet-list {
+      display: grid;
+      gap: 34px;
+      margin: 60px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .bullet-item {
+      display: grid;
+      grid-template-columns: 18px 1fr;
+      gap: 22px;
+      align-items: center;
+      color: #e7edf7;
+      font-size: 28px;
+      font-weight: 700;
+    }
+
+    .bullet-dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--bullet-color, var(--accent));
+    }
+  </style>
+</head>
+<body>
+  <!--
+    Change only the layout class, copy and image path for each store image.
+
+    Available layouts:
+    - layout-split-left
+    - layout-wide-bottom
+    - layout-phone-left
+
+    For a clean source screenshot, replace widgets-home.png below. The image is
+    clipped by the frame and never synthesized or redrawn by this template.
+  -->
+  <main class="store-slide layout-split-left">
+    <figure class="screenshot-frame">
+      <img src="widgets-home.png" alt="Vespy Weather widgets on an Android home screen">
+    </figure>
+
+    <section class="slide-copy">
+      <p class="text-eyebrow">Home-screen widgets</p>
+      <h1 class="text-title">One forecast.<br>Three levels of detail.</h1>
+      <p class="text-subtitle">Pick the view that fits your home screen.</p>
+
+      <div class="feature-list">
+        <article class="feature-card">
+          <div class="feature-number">1</div>
+          <div class="feature-copy">
+            <h2 class="text-card-title">Weather timeline</h2>
+            <p class="text-card-description">Temperature chart + sky + wind</p>
+          </div>
+        </article>
+
+        <article class="feature-card">
+          <div class="feature-number">2</div>
+          <div class="feature-copy">
+            <h2 class="text-card-title">Weather and warnings</h2>
+            <p class="text-card-description">Full timeline + multi-event outlook</p>
+          </div>
+        </article>
+
+        <article class="feature-card">
+          <div class="feature-number">3</div>
+          <div class="feature-copy">
+            <h2 class="text-card-title">Sky and wind</h2>
+            <p class="text-card-description">Compact one-row forecast</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <footer class="slide-footer text-footer">
+      Resizable width - independent location - light or dark
+    </footer>
+  </main>
+</body>
+</html>
