@@ -1,5 +1,6 @@
 import http from 'node:http';
-import {readFile, stat} from 'node:fs/promises';
+import {mkdir, readFile, readdir, stat, writeFile} from 'node:fs/promises';
+import {randomUUID, timingSafeEqual} from 'node:crypto';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {findByIso2} from 'country-list-js';
@@ -20,6 +21,10 @@ const WEB_ORIGIN = 'https://weather.vespy.eu';
 const MUSHROOM_OBSERVATION_DAYS = 30;
 const MUSHROOM_OBSERVATION_RADIUS_KM = 30;
 const cache = new Map();
+const issueReportRateLimits = new Map();
+const MAX_ISSUE_REPORT_BYTES = 12 * 1024 * 1024;
+const MAX_ISSUE_ATTACHMENT_BYTES = 3 * 1024 * 1024;
+const MAX_ISSUE_ATTACHMENTS = 8;
 
 export function normalizeGoogleAnalyticsId(value) {
   const id = String(value || '').trim().toUpperCase();
@@ -54,6 +59,265 @@ function json(response, status, body, additionalHeaders = {}) {
     ...additionalHeaders
   });
   response.end(JSON.stringify(body));
+}
+
+async function jsonRequestBody(request, maximumBytes) {
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of request) {
+    size += chunk.length;
+    if (size > maximumBytes) {
+      const error = new Error('Request body is too large.');
+      error.statusCode = 413;
+      throw error;
+    }
+    chunks.push(chunk);
+  }
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  } catch {
+    const error = new Error('Invalid JSON body.');
+    error.statusCode = 400;
+    throw error;
+  }
+}
+
+async function requestBody(request, maximumBytes) {
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of request) {
+    size += chunk.length;
+    if (size > maximumBytes) {
+      const error = new Error('Request body is too large.');
+      error.statusCode = 413;
+      throw error;
+    }
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks).toString('utf8');
+}
+
+export function normalizeIssueReport(source) {
+  const description = String(source?.description || '').trim();
+  if (description.length < 10 || description.length > 4000) {
+    const error = new Error('Description must contain between 10 and 4000 characters.');
+    error.statusCode = 400;
+    throw error;
+  }
+  const sourceAttachments = Array.isArray(source?.attachments) ? source.attachments : [];
+  if (sourceAttachments.length > MAX_ISSUE_ATTACHMENTS) {
+    const error = new Error('Too many attachments.');
+    error.statusCode = 400;
+    throw error;
+  }
+  let totalAttachmentBytes = 0;
+  const attachments = sourceAttachments.map((attachment, index) => {
+    const contentType = ['image/png', 'image/jpeg'].includes(attachment?.contentType) ? attachment.contentType : null;
+    const encoded = String(attachment?.base64 || '');
+    const bytes = /^[A-Za-z0-9+/]*={0,2}$/.test(encoded) ? Buffer.from(encoded, 'base64') : Buffer.alloc(0);
+    if (!contentType || !bytes.length || bytes.length > MAX_ISSUE_ATTACHMENT_BYTES) {
+      const error = new Error(`Attachment ${index + 1} is invalid.`);
+      error.statusCode = 400;
+      throw error;
+    }
+    totalAttachmentBytes += bytes.length;
+    if (totalAttachmentBytes > 8 * 1024 * 1024) {
+      const error = new Error('Attachments are too large.');
+      error.statusCode = 400;
+      throw error;
+    }
+    const extension = contentType === 'image/png' ? 'png' : 'jpg';
+    const baseName = String(attachment?.name || `attachment-${index + 1}`)
+      .replace(/\.[^.]+$/, '')
+      .replace(/[^a-zA-Z0-9_-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 60) || `attachment-${index + 1}`;
+    return {name: `${baseName}.${extension}`, contentType, bytes};
+  });
+  return {
+    metadata: {
+      schemaVersion: 1,
+      description,
+      submittedAt: new Date().toISOString(),
+      clientSubmittedAt: typeof source?.submittedAt === 'string' ? source.submittedAt.slice(0, 40) : null,
+      app: source?.app && typeof source.app === 'object' ? source.app : {},
+      device: source?.device && typeof source.device === 'object' ? source.device : {},
+      activeLocation: source?.activeLocation && typeof source.activeLocation === 'object' ? source.activeLocation : null,
+      widgets: Array.isArray(source?.widgets) ? source.widgets.slice(0, 50) : [],
+      attachments: attachments.map(({name, contentType, bytes}) => ({name, contentType, bytes: bytes.length}))
+    },
+    attachments
+  };
+}
+
+function issueReportClientKey(request) {
+  const forwarded = String(request.headers['x-forwarded-for'] || '').split(',')[0].trim();
+  return forwarded || request.socket.remoteAddress || 'unknown';
+}
+
+function allowIssueReport(request, now = Date.now()) {
+  const key = issueReportClientKey(request);
+  const recent = (issueReportRateLimits.get(key) || []).filter(timestamp => now - timestamp < 60 * 60 * 1000);
+  if (recent.length >= 5) return false;
+  recent.push(now);
+  issueReportRateLimits.set(key, recent);
+  return true;
+}
+
+async function issueReport(request, response) {
+  if (!allowIssueReport(request)) return json(response, 429, {error: 'Too many reports. Try again later.'});
+  const source = await jsonRequestBody(request, MAX_ISSUE_REPORT_BYTES);
+  const report = normalizeIssueReport(source);
+  const reportId = `${new Date().toISOString().slice(0, 10)}-${randomUUID()}`;
+  const root = path.resolve(process.env.WEATHER_REPORT_DIRECTORY || '/tmp/weather-issue-reports');
+  const reportDirectory = path.join(root, reportId);
+  await mkdir(reportDirectory, {recursive: true, mode: 0o700});
+  await Promise.all([
+    writeFile(path.join(reportDirectory, 'report.json'), `${JSON.stringify({...report.metadata, reportId, status: 'new'}, null, 2)}\n`, {mode: 0o600}),
+    ...report.attachments.map(attachment => writeFile(path.join(reportDirectory, attachment.name), attachment.bytes, {mode: 0o600}))
+  ]);
+  void notifyIssueReport(reportId, report.metadata).catch(error => console.error('Issue report notification failed:', error));
+  return json(response, 201, {reportId});
+}
+
+function issueReportRoot() {
+  return path.resolve(process.env.WEATHER_REPORT_DIRECTORY || '/tmp/weather-issue-reports');
+}
+
+async function notifyIssueReport(reportId, metadata) {
+  const notificationUrl = String(process.env.WEATHER_REPORT_NTFY_URL || '').trim();
+  if (!notificationUrl) return;
+  const parsedUrl = new URL(notificationUrl);
+  if (parsedUrl.protocol !== 'https:') throw new Error('Notification URL must use HTTPS.');
+  const adminOrigin = String(process.env.WEATHER_REPORT_ADMIN_ORIGIN || 'https://api.weather.vespy.eu').replace(/\/$/, '');
+  const version = String(metadata.app?.versionName || 'unknown');
+  const response = await fetch(parsedUrl, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      title: 'New Vespy Weather issue report',
+      message: `Report ${reportId} from app version ${version}`,
+      priority: 4,
+      tags: ['bug'],
+      click: `${adminOrigin}/admin/issues/${encodeURIComponent(reportId)}`
+    })
+  });
+  if (!response.ok) throw new Error(`Notification provider returned ${response.status}`);
+}
+
+function secureEqual(left, right) {
+  const leftBuffer = Buffer.from(String(left));
+  const rightBuffer = Buffer.from(String(right));
+  return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function issueAdminAuthorized(request) {
+  const expectedUser = process.env.WEATHER_REPORT_ADMIN_USER;
+  const expectedPassword = process.env.WEATHER_REPORT_ADMIN_PASSWORD;
+  if (!expectedUser || !expectedPassword) return false;
+  const authorization = String(request.headers.authorization || '');
+  if (!authorization.startsWith('Basic ')) return false;
+  const decoded = Buffer.from(authorization.slice(6), 'base64').toString('utf8');
+  const separator = decoded.indexOf(':');
+  return separator >= 0
+    && secureEqual(decoded.slice(0, separator), expectedUser)
+    && secureEqual(decoded.slice(separator + 1), expectedPassword);
+}
+
+function requireIssueAdmin(request, response) {
+  if (issueAdminAuthorized(request)) return true;
+  response.writeHead(401, {
+    'Cache-Control': 'no-store',
+    'Content-Type': 'text/plain; charset=utf-8',
+    'WWW-Authenticate': 'Basic realm="Vespy Weather reports", charset="UTF-8"',
+    'X-Content-Type-Options': 'nosniff'
+  });
+  response.end('Authentication required.');
+  return false;
+}
+
+function issueReportId(value) {
+  return /^\d{4}-\d{2}-\d{2}-[0-9a-f-]{36}$/i.test(String(value || '')) ? String(value) : null;
+}
+
+async function readStoredIssueReport(reportId) {
+  const validId = issueReportId(reportId);
+  if (!validId) return null;
+  return JSON.parse(await readFile(path.join(issueReportRoot(), validId, 'report.json'), 'utf8'));
+}
+
+function adminHtml(title, content) {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${escapeHtml(title)}</title><style>
+  :root{color-scheme:dark;font-family:ui-sans-serif,system-ui,sans-serif;background:#080c12;color:#e7edf7}body{margin:0}main{width:min(100% - 32px,1100px);margin:auto;padding:32px 0 64px}a{color:#79bbff}header{display:flex;align-items:center;justify-content:space-between;gap:16px}section,.report{background:#111923;border:1px solid #29384b;border-radius:12px;padding:16px;margin:12px 0}.report{display:grid;grid-template-columns:1fr auto;gap:8px 16px}.new{border-color:#58a6ff}.muted{color:#9aa8ba}.status{font-weight:700;text-transform:uppercase;font-size:12px}img{max-width:100%;height:auto;border-radius:8px;border:1px solid #29384b}pre{overflow:auto;white-space:pre-wrap;word-break:break-word;background:#080c12;padding:12px;border-radius:8px}button{background:#176fc1;color:#fff;border:0;border-radius:8px;padding:10px 14px;font-weight:700;cursor:pointer}form{display:inline-block;margin-right:8px}@media(max-width:600px){.report{grid-template-columns:1fr}}
+  </style></head><body><main>${content}</main></body></html>`;
+}
+
+function html(response, status, body) {
+  response.writeHead(status, {
+    'Cache-Control': 'no-store',
+    'Content-Security-Policy': "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+    'Content-Type': 'text/html; charset=utf-8',
+    'X-Content-Type-Options': 'nosniff'
+  });
+  response.end(body);
+}
+
+async function issueAdmin(request, requestUrl, response) {
+  if (!requireIssueAdmin(request, response)) return;
+  const parts = requestUrl.pathname.split('/').filter(Boolean).map(decodeURIComponent);
+  if (parts.length === 2) {
+    if (request.method !== 'GET' && request.method !== 'HEAD') return json(response, 405, {error: 'Method not allowed.'});
+    await mkdir(issueReportRoot(), {recursive: true, mode: 0o700});
+    const reports = (await readdir(issueReportRoot(), {withFileTypes: true}))
+      .filter(entry => entry.isDirectory() && issueReportId(entry.name))
+      .map(entry => entry.name)
+      .sort().reverse();
+    const loaded = (await Promise.all(reports.slice(0, 500).map(id => readStoredIssueReport(id).catch(() => null)))).filter(Boolean);
+    const newCount = loaded.filter(report => report.status === 'new').length;
+    const cards = loaded.map(report => `<a class="report ${report.status === 'new' ? 'new' : ''}" href="/admin/issues/${encodeURIComponent(report.reportId)}"><span><strong>${escapeHtml(report.description || 'No description')}</strong><br><span class="muted">${escapeHtml(report.submittedAt || '')} - ${escapeHtml(report.app?.versionName || 'unknown version')} - ${escapeHtml(report.device?.model || 'no diagnostics')}</span></span><span class="status">${escapeHtml(report.status || 'new')}</span></a>`).join('');
+    return html(response, 200, adminHtml('Issue reports', `<header><div><h1>Issue reports</h1><p class="muted">${newCount} new - ${loaded.length} stored</p></div></header>${cards || '<section>No reports yet.</section>'}`));
+  }
+  const reportId = issueReportId(parts[2]);
+  if (!reportId) return html(response, 404, adminHtml('Not found', '<h1>Report not found</h1>'));
+  const reportPath = path.join(issueReportRoot(), reportId, 'report.json');
+  const report = await readStoredIssueReport(reportId).catch(() => null);
+  if (!report) return html(response, 404, adminHtml('Not found', '<h1>Report not found</h1>'));
+
+  if (parts.length === 4 && parts[3] === 'status') {
+    if (request.method !== 'POST') return json(response, 405, {error: 'Method not allowed.'});
+    const form = new URLSearchParams(await requestBody(request, 10_000));
+    const status = ['new', 'seen', 'resolved'].includes(form.get('status')) ? form.get('status') : null;
+    if (!status) return json(response, 400, {error: 'Invalid status.'});
+    await writeFile(reportPath, `${JSON.stringify({...report, status}, null, 2)}\n`, {mode: 0o600});
+    response.writeHead(303, {Location: `/admin/issues/${encodeURIComponent(reportId)}`});
+    return response.end();
+  }
+
+  if (parts.length === 5 && parts[3] === 'attachments') {
+    if (request.method !== 'GET' && request.method !== 'HEAD') return json(response, 405, {error: 'Method not allowed.'});
+    const attachment = report.attachments?.find(item => item.name === parts[4]);
+    if (!attachment) return json(response, 404, {error: 'Attachment not found.'});
+    const body = await readFile(path.join(issueReportRoot(), reportId, attachment.name));
+    response.writeHead(200, {
+      'Cache-Control': 'no-store',
+      'Content-Length': body.length,
+      'Content-Type': attachment.contentType,
+      'Content-Security-Policy': "default-src 'none'; sandbox",
+      'X-Content-Type-Options': 'nosniff'
+    });
+    return request.method === 'HEAD' ? response.end() : response.end(body);
+  }
+
+  if (parts.length !== 3 || (request.method !== 'GET' && request.method !== 'HEAD')) return json(response, 405, {error: 'Method not allowed.'});
+  if (report.status === 'new') {
+    report.status = 'seen';
+    await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, {mode: 0o600});
+  }
+  const images = (report.attachments || []).map(attachment => `<section><h2>${escapeHtml(attachment.name)}</h2><a href="/admin/issues/${encodeURIComponent(reportId)}/attachments/${encodeURIComponent(attachment.name)}"><img src="/admin/issues/${encodeURIComponent(reportId)}/attachments/${encodeURIComponent(attachment.name)}" alt="${escapeHtml(attachment.name)}"></a></section>`).join('');
+  const metadata = {...report};
+  delete metadata.description;
+  const content = `<header><div><a href="/admin/issues">Back to reports</a><h1>${escapeHtml(reportId)}</h1></div><span class="status">${escapeHtml(report.status)}</span></header><section><h2>Description</h2><p>${escapeHtml(report.description).replaceAll('\n', '<br>')}</p><form method="post" action="/admin/issues/${encodeURIComponent(reportId)}/status"><input type="hidden" name="status" value="resolved"><button>Mark resolved</button></form><form method="post" action="/admin/issues/${encodeURIComponent(reportId)}/status"><input type="hidden" name="status" value="new"><button>Mark new</button></form></section>${images}<section><h2>Diagnostics</h2><pre>${escapeHtml(JSON.stringify(metadata, null, 2))}</pre></section>`;
+  return html(response, 200, adminHtml(`Issue ${reportId}`, content));
 }
 
 export function promotionFeed({platform = 'web', placement = 'web_forecast', language = DEFAULT_LOCALE, theme = 'dark'} = {}) {
@@ -760,9 +1024,15 @@ export function createServer() {
     const requestUrl = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
     try {
       if (request.method === 'OPTIONS') {
-        response.writeHead(204, {'Access-Control-Allow-Origin': process.env.WEATHER_ALLOWED_ORIGIN || '*'});
+        response.writeHead(204, {
+          'Access-Control-Allow-Origin': process.env.WEATHER_ALLOWED_ORIGIN || '*',
+          'Access-Control-Allow-Headers': 'Content-Type',
+          'Access-Control-Allow-Methods': 'GET, HEAD, POST, OPTIONS'
+        });
         return response.end();
       }
+      if (requestUrl.pathname === '/admin/issues' || requestUrl.pathname.startsWith('/admin/issues/')) return await issueAdmin(request, requestUrl, response);
+      if (request.method === 'POST' && requestUrl.pathname === '/issue-reports') return await issueReport(request, response);
       if (request.method !== 'GET' && request.method !== 'HEAD') return json(response, 405, {error: 'Method not allowed.'});
       if (requestUrl.pathname === '/health') return json(response, 200, {status: 'ok'});
       if (requestUrl.pathname === '/client-config') return json(response, 200, {
@@ -777,6 +1047,7 @@ export function createServer() {
       return await staticFile(requestUrl, response);
     } catch (error) {
       console.error(error);
+      if (error.statusCode) return json(response, error.statusCode, {error: error.message});
       return json(response, 502, {error: 'Weather provider is temporarily unavailable.'});
     }
   });

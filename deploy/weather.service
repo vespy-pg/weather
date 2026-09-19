@@ -8,9 +8,11 @@ Wants=network-online.target
 Restart=always
 RestartSec=5
 Environment=WEATHER_ALLOWED_ORIGIN=https://weather.vespy.eu
+Environment=WEATHER_REPORT_DIRECTORY=/var/lib/weather/issues
 EnvironmentFile=-/etc/weather.env
+ExecStartPre=/usr/bin/mkdir -p /var/lib/weather/issues
 ExecStartPre=-/usr/bin/docker rm -f weather
-ExecStart=/usr/bin/docker run --name weather --read-only --tmpfs /tmp:rw,noexec,nosuid,size=16m -p 127.0.0.1:18080:8080 -e WEATHER_ALLOWED_ORIGIN -e GOOGLE_ANALYTICS_ID weather:latest
+ExecStart=/usr/bin/docker run --name weather --read-only --tmpfs /tmp:rw,noexec,nosuid,size=16m -v /var/lib/weather/issues:/var/lib/weather/issues:rw -p 127.0.0.1:18080:8080 -e WEATHER_ALLOWED_ORIGIN -e WEATHER_REPORT_DIRECTORY -e WEATHER_REPORT_ADMIN_USER -e WEATHER_REPORT_ADMIN_PASSWORD -e WEATHER_REPORT_ADMIN_ORIGIN -e WEATHER_REPORT_NTFY_URL -e GOOGLE_ANALYTICS_ID weather:latest
 ExecStop=/usr/bin/docker stop -t 10 weather
 ExecStopPost=-/usr/bin/docker rm -f weather
 TimeoutStartSec=0

@@ -1,24 +1,22 @@
 package eu.vespy.weather.ui
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -27,6 +25,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -45,6 +45,7 @@ fun LocationControls(
     onSelectLocation: (WeatherLocation) -> Unit,
     onSearchResult: (WeatherLocation) -> Unit,
     modifier: Modifier = Modifier,
+    onShareLocation: ((WeatherLocation) -> Unit)? = null,
     onRemoveLocation: ((WeatherLocation) -> Unit)? = null,
     enabled: Boolean = true,
 ) {
@@ -58,7 +59,7 @@ fun LocationControls(
 
     LaunchedEffect(query, enabled) {
         val normalizedQuery = query.trim()
-        if (!enabled || normalizedQuery.length < 2) {
+        if (!enabled || normalizedQuery.length < 3) {
             results = emptyList()
             hasMoreResults = false
             searching = false
@@ -73,11 +74,15 @@ fun LocationControls(
     }
 
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Box(Modifier.fillMaxWidth()) {
+        ExposedDropdownMenuBox(
+            expanded = locationMenuExpanded && enabled,
+            onExpandedChange = { if (enabled) locationMenuExpanded = it },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
             Button(
                 onClick = { locationMenuExpanded = true },
                 enabled = enabled,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant,
                     contentColor = MaterialTheme.colorScheme.onSurface,
@@ -88,20 +93,37 @@ fun LocationControls(
                 LocationLabel(selectedLocation, Modifier.weight(1f))
                 Text("▾", fontSize = 15.sp)
             }
-            DropdownMenu(
+            ExposedDropdownMenu(
                 expanded = locationMenuExpanded && enabled,
                 onDismissRequest = { locationMenuExpanded = false },
+                modifier = Modifier.exposedDropdownSize(matchAnchorWidth = true),
             ) {
                 availableLocations.forEach { location ->
                     val selected = location.samePlaceAs(selectedLocation)
                     val saved = locations.any { it.samePlaceAs(location) }
                     DropdownMenuItem(
                         text = { LocationLabel(location, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal) },
-                        trailingIcon = if (onRemoveLocation != null && saved && locations.size > 1) {{
-                            TextButton(onClick = {
-                                onRemoveLocation(location)
-                                if (selected) locationMenuExpanded = false
-                            }) { Text(stringResource(R.string.remove)) }
+                        trailingIcon = if (onShareLocation != null || (onRemoveLocation != null && saved)) {{
+                            Row {
+                                onShareLocation?.let { share ->
+                                    LocationActionButton(
+                                        label = stringResource(R.string.share_location),
+                                        symbol = "↗",
+                                        onClick = { share(location) },
+                                    )
+                                }
+                                if (onRemoveLocation != null && saved) {
+                                    LocationActionButton(
+                                        label = stringResource(R.string.remove_location),
+                                        symbol = "×",
+                                        enabled = locations.size > 1,
+                                        onClick = {
+                                            onRemoveLocation(location)
+                                            if (selected) locationMenuExpanded = false
+                                        },
+                                    )
+                                }
+                            }
                         }} else null,
                         onClick = {
                             locationMenuExpanded = false
@@ -112,7 +134,7 @@ fun LocationControls(
             }
         }
         ExposedDropdownMenuBox(
-            expanded = enabled && query.trim().length >= 2 && !searching && results.isNotEmpty(),
+            expanded = enabled && query.trim().length >= 3 && !searching && results.isNotEmpty(),
             onExpandedChange = {},
             modifier = Modifier.fillMaxWidth(),
         ) {
@@ -131,11 +153,12 @@ fun LocationControls(
                 trailingIcon = if (searching) {{ CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) }} else null,
             )
             ExposedDropdownMenu(
-                expanded = enabled && query.trim().length >= 2 && !searching && results.isNotEmpty(),
+                expanded = enabled && query.trim().length >= 3 && !searching && results.isNotEmpty(),
                 onDismissRequest = {
                     results = emptyList()
                     hasMoreResults = false
                 },
+                modifier = Modifier.exposedDropdownSize(matchAnchorWidth = true),
             ) {
                 results.forEach { location ->
                     DropdownMenuItem(
@@ -157,6 +180,22 @@ fun LocationControls(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun LocationActionButton(
+    label: String,
+    symbol: String,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.semantics { contentDescription = label },
+    ) {
+        Text(symbol, fontSize = 21.sp, fontWeight = FontWeight.Bold)
     }
 }
 

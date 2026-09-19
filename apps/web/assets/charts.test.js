@@ -58,6 +58,21 @@ test('does not paint a precipitation lane over the complete sky when its positio
   assert.deepEqual(drawWithPrecipitationLane(60).at(-1), [0, 60, 100, 40]);
 });
 
+test('caps canvas resolution on very high density displays', () => {
+  const {canvas} = forecastCanvas();
+  globalThis.window = {devicePixelRatio: 4};
+  globalThis.document = {documentElement: {dataset: {theme: 'dark'}}};
+  globalThis.getComputedStyle = () => ({getPropertyValue: () => ''});
+  drawForecastSky(canvas, [{
+    timestamp: '2026-09-15T12:00',
+    cloudCover: 0,
+    precipitationProbability: 0,
+    weatherCode: 0
+  }], [], {showDayLabels: false, showHourlyTemperatures: false, showHours: false});
+  assert.equal(canvas.width, 200);
+  assert.equal(canvas.height, 200);
+});
+
 test('labels the actual current day as today and keeps all day names neutral', () => {
   const {canvas, labels} = forecastCanvas();
   canvas.getBoundingClientRect = () => ({width: 600, height: 100});

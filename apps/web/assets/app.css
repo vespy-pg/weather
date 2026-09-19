@@ -157,7 +157,11 @@ html[lang="pl-PL"] .google-play-badge-pl { display: block; }
 .share-forecast > div:first-child { min-width: 0; }
 .share-forecast h2 { margin: 0; font-size: clamp(21px, 2.3vw, 30px); line-height: 1.08; letter-spacing: -.025em; }
 .share-forecast p { margin: 7px 0 0; color: var(--muted); font-size: 12px; line-height: 1.35; }
-.share-forecast-action { display: grid; flex: 0 0 auto; justify-items: center; gap: 5px; }
+.share-forecast-action { display: flex; flex: 0 0 auto; align-items: center; gap: 10px; }
+.header-google-play-link, .topbar-google-play-link { display: none; flex: 0 0 auto; border-radius: 8px; transition: filter .15s ease, transform .15s ease; }
+.header-google-play-link:hover, .topbar-google-play-link:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.header-google-play-link:focus-visible, .topbar-google-play-link:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.header-google-play-link .google-play-badge, .topbar-google-play-link .google-play-badge { width: 145px; }
 .share-forecast-button { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 9px 14px; border: 1px solid var(--blue); border-radius: 8px; background: color-mix(in srgb, var(--blue) 14%, var(--control)); color: var(--text); font-weight: 850; cursor: pointer; white-space: nowrap; }
 .share-forecast-button:hover { background: color-mix(in srgb, var(--blue) 24%, var(--control)); }
 .share-forecast-button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -468,8 +472,17 @@ body.embedded .data-attribution { display: none; }
   .share-forecast h2 { font-size: 18px; }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 1050px) {
   .topbar-actions .language-control, .topbar-actions .theme-button { display: none; }
+}
+
+@media (min-width: 761px) {
+  .android-app-promotion { display: none; }
+  .header-google-play-link { display: block; }
+  html[data-share-prompt="collapsed"] .topbar-google-play-link { display: block; }
+}
+
+@media (max-width: 640px) {
   .settings-dialog { inset: 0; width: 100vw; max-width: none; height: 100dvh; max-height: none; margin: 0; border: 0; border-radius: 0; }
   .settings-content { min-height: 100dvh; padding: 16px max(14px, env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
   .settings-google-play-link { margin-bottom: 12px; }
@@ -497,7 +510,8 @@ body.embedded .data-attribution { display: none; }
   .topbar-actions { gap: 4px; }
   .android-app-promotion { min-height: 52px; margin-bottom: 5px; padding: 2px 10px; }
   .google-play-badge { width: 150px; }
-  .topbar-actions .theme-button, .topbar-actions .settings-button { display: grid; width: 30px; height: 30px; place-items: center; padding: 0; }
+  .topbar-actions .theme-button, .topbar-actions .settings-button { width: 30px; height: 30px; place-items: center; padding: 0; }
+  .topbar-actions .settings-button { display: grid; }
   .topbar-actions .theme-button #themeLabel, .topbar-actions .settings-button span { display: none; }
   .language-control { height: 30px; padding: 2px 5px; }
   .language-control select { max-width: 76px; font-size: 10px; }

@@ -237,6 +237,7 @@ object ForecastGraphics {
         demoEveryDay: Boolean = false,
         pointOffset: Int = 0,
         lightningScale: Float = 1f,
+        inlineCompactHeader: Boolean = false,
     ) {
         if (points.isEmpty() || bounds.width() <= 0f || bounds.height() <= 0f) return
         val palette = palette(dark)
@@ -255,6 +256,7 @@ object ForecastGraphics {
             pixelScale, textScale, showHours, temperatureStep.coerceAtLeast(1), precipitationScale,
             showWeekdayNames, fullWeekdayNames, dayLabelTextSize, hourTextSize, temperatureTextSize,
             showTemperatureValues, showPrecipitation, temperatureThresholds, currentTimestamp, showDates,
+            inlineCompactHeader,
         )
         if (showTemperatureChart) {
             drawTemperature(canvas, temperature, points, palette, pixelScale, showApparentTemperature, temperatureThresholds, temperatureMinimum, temperatureMaximum, lightningScale)
@@ -334,6 +336,7 @@ object ForecastGraphics {
         temperatureThresholds: TemperatureThresholds,
         currentTimestamp: String?,
         showDates: Boolean,
+        inlineCompactHeader: Boolean,
     ) {
         val cell = bounds.width() / points.size
         val daylightByDate = days.associateBy({ it.date }, { day ->
@@ -358,7 +361,7 @@ object ForecastGraphics {
             canvas, bounds, points, palette, todayLabel, labelHeight, cell, temperatureUnit,
             textScale, showHours, temperatureStep, pixelScale, showWeekdayNames, fullWeekdayNames,
             dayLabelTextSize, hourTextSize, temperatureTextSize, showTemperatureValues, temperatureThresholds,
-            currentTimestamp, showDates,
+            currentTimestamp, showDates, inlineCompactHeader,
         )
         val weatherLine = bounds.top + labelHeight
         val weatherDepth = (bounds.height() - labelHeight) * .58f
@@ -426,6 +429,7 @@ object ForecastGraphics {
         temperatureThresholds: TemperatureThresholds,
         currentTimestamp: String?,
         showDates: Boolean,
+        inlineCompactHeader: Boolean,
     ) {
         val mono = Typeface.create("monospace", Typeface.BOLD)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = mono; textAlign = Paint.Align.CENTER }
@@ -445,7 +449,11 @@ object ForecastGraphics {
                     " " + dateTime.format(DateTimeFormatter.ofPattern("d MMM", Locale.getDefault()))
                 } else ""
                 val label = dayName + dateLabel
-                val labelBaseline = bounds.top + max(2f * pixelScale, height * .01f) - paint.fontMetrics.top
+                val labelBaseline = if (inlineCompactHeader) {
+                    bounds.top + height - max(2f * pixelScale, height * .08f)
+                } else {
+                    bounds.top + max(2f * pixelScale, height * .01f) - paint.fontMetrics.top
+                }
                 val nextDayIndex = ((index + 1) until points.size).firstOrNull { points[it].timestamp.take(10) != point.timestamp.take(10) } ?: points.size
                 canvas.save()
                 canvas.clipRect(bounds.left + index * cell, bounds.top, bounds.left + nextDayIndex * cell, bounds.top + paint.textSize + 4f * pixelScale)
@@ -458,7 +466,7 @@ object ForecastGraphics {
                 paint.textSize = hourTextSize ?: height * .2f * textScale
                 canvas.drawText(dateTime?.let { "%02d".format(it.hour) } ?: "--", bounds.left + (index + .5f) * cell, bounds.top + height * .55f, paint)
             }
-            if (showTemperatureValues && index % temperatureStep == 0) {
+            if (showTemperatureValues && index % temperatureStep == 0 && !(inlineCompactHeader && newDay)) {
                 paint.color = temperatureColor(point.temperature, temperatureThresholds)
                 val desiredSize = if (showHours) height * .24f * textScale else height * .28f * textScale
                 paint.textSize = temperatureTextSize ?: desiredSize
@@ -466,7 +474,9 @@ object ForecastGraphics {
                 val center = bounds.left + (index + .72f) * cell
                 val halfWidth = paint.measureText(temperature) / 2f
                 val textX = center.coerceIn(bounds.left + halfWidth + 3f * pixelScale, bounds.right - halfWidth - 3f * pixelScale)
-                val temperatureBaseline = if (showHours) {
+                val temperatureBaseline = if (inlineCompactHeader) {
+                    bounds.top + height - max(2f * pixelScale, height * .08f)
+                } else if (showHours) {
                     bounds.top + height * .91f
                 } else {
                     bounds.top + height - max(3f * pixelScale, height * .08f)

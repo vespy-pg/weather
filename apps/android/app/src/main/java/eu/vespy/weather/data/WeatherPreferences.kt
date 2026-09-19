@@ -51,6 +51,7 @@ class WeatherPreferences(context: Context) {
         showDates = preferences.getBoolean(KEY_SHOW_DATES, false),
         showMushrooms = preferences.getBoolean(KEY_SHOW_MUSHROOMS, false),
         showWidgetLocation = preferences.getBoolean(KEY_SHOW_WIDGET_LOCATION, true),
+        temperatureTextScale = preferences.getFloat(KEY_TEMPERATURE_TEXT_SCALE, .92f).takeIf { it in TEMPERATURE_TEXT_SCALES } ?: .92f,
     )
 
     fun saveLocations(locations: List<WeatherLocation>) {
@@ -107,6 +108,7 @@ class WeatherPreferences(context: Context) {
             .putBoolean(KEY_SHOW_DATES, settings.showDates)
             .putBoolean(KEY_SHOW_MUSHROOMS, settings.showMushrooms)
             .putBoolean(KEY_SHOW_WIDGET_LOCATION, settings.showWidgetLocation)
+            .putFloat(KEY_TEMPERATURE_TEXT_SCALE, settings.temperatureTextScale)
             .apply()
     }
 
@@ -148,6 +150,8 @@ class WeatherPreferences(context: Context) {
         showWindArrows = preferences.getBoolean("${KEY_WIDGET_PREFIX}wind_arrows_$widgetId", defaults.showWindArrows),
         showMushrooms = preferences.getBoolean("${KEY_WIDGET_PREFIX}mushrooms_$widgetId", defaults.showMushrooms),
         demo = preferences.getBoolean("${KEY_WIDGET_PREFIX}demo_$widgetId", false),
+        temperatureTextScale = preferences.getFloat("${KEY_WIDGET_PREFIX}temperature_text_scale_$widgetId", 1f)
+            .takeIf { it in TEMPERATURE_TEXT_SCALES } ?: 1f,
     )
 
     fun saveWidgetDisplaySettings(widgetId: Int, settings: WidgetDisplaySettings) {
@@ -160,6 +164,7 @@ class WeatherPreferences(context: Context) {
             .putBoolean("${KEY_WIDGET_PREFIX}wind_arrows_$widgetId", settings.showWindArrows)
             .putBoolean("${KEY_WIDGET_PREFIX}mushrooms_$widgetId", settings.showMushrooms)
             .putBoolean("${KEY_WIDGET_PREFIX}demo_$widgetId", settings.demo)
+            .putFloat("${KEY_WIDGET_PREFIX}temperature_text_scale_$widgetId", settings.temperatureTextScale)
             .apply()
     }
 
@@ -175,6 +180,7 @@ class WeatherPreferences(context: Context) {
             .remove("${KEY_WIDGET_PREFIX}wind_arrows_$widgetId")
             .remove("${KEY_WIDGET_PREFIX}mushrooms_$widgetId")
             .remove("${KEY_WIDGET_PREFIX}demo_$widgetId")
+            .remove("${KEY_WIDGET_PREFIX}temperature_text_scale_$widgetId")
             .apply()
     }
 
@@ -234,6 +240,7 @@ class WeatherPreferences(context: Context) {
         const val KEY_SHOW_DATES = "show_dates"
         const val KEY_SHOW_MUSHROOMS = "show_mushrooms"
         const val KEY_SHOW_WIDGET_LOCATION = "show_widget_location"
+        const val KEY_TEMPERATURE_TEXT_SCALE = "temperature_text_scale"
         const val KEY_WIDGET_LOCATION_PREFIX = "widget_location_"
         const val KEY_WIDGET_FORECAST_HOURS_PREFIX = "widget_forecast_hours_"
         const val KEY_WIDGET_PREFIX = "widget_setting_"
@@ -242,5 +249,6 @@ class WeatherPreferences(context: Context) {
         val ZOOM_LEVELS = setOf(.25f, .3f, .5f, .75f, 1f, 2f)
         val THEMES = setOf("system", "dark", "light")
         val LANGUAGES = setOf("system", "en-US", "pl-PL")
+        val TEMPERATURE_TEXT_SCALES = setOf(.8f, .9f, .92f, 1f, 1.1f)
     }
 }

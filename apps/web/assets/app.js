@@ -1694,6 +1694,15 @@ let timelineTouchActive = false;
 let timelineTouchStartPosition = null;
 let timelineTouchBoundaryLocked = false;
 let timelineTouchSettleTimer = 0;
+let timelineLegendFrame = 0;
+
+function scheduleTimelineLegendPosition() {
+  if (timelineLegendFrame) return;
+  timelineLegendFrame = requestAnimationFrame(() => {
+    timelineLegendFrame = 0;
+    updateTimelineLegendPosition();
+  });
+}
 
 function snapTimelineToNowIfClose() {
   if (!settings.showHistoricalData || !withinTimelineMagnet(forecastTimelineScroll.scrollLeft, timelineNowScrollLeft, timelineMagneticDistance())) return;
@@ -1763,7 +1772,7 @@ function settleTimelineTouch() {
 }
 
 forecastTimelineScroll.addEventListener('scroll', () => {
-  updateTimelineLegendPosition();
+  scheduleTimelineLegendPosition();
   if (!settings.showHistoricalData || timelineTouchStartPosition === null) return;
   const bounded = stopTimelineAtNow(timelineTouchStartPosition, forecastTimelineScroll.scrollLeft, timelineNowScrollLeft);
   if (bounded !== forecastTimelineScroll.scrollLeft) {
@@ -1839,9 +1848,13 @@ if (IS_EMBEDDED) {
 }
 
 let resizeTimer = 0;
+let lastViewportWidth = window.innerWidth;
 window.addEventListener('resize', () => {
+  const viewportWidth = window.innerWidth;
+  if (Math.abs(viewportWidth - lastViewportWidth) < 1) return;
+  lastViewportWidth = viewportWidth;
   clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => applyZoom(zoomIndex), 80);
+  resizeTimer = setTimeout(() => applyZoom(zoomIndex), 180);
 });
 
 document.body.classList.toggle('embedded', IS_EMBEDDED);

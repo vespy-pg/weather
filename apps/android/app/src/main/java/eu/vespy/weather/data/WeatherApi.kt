@@ -119,6 +119,12 @@ class WeatherApi(private val baseUrl: String = BuildConfig.API_BASE_URL) {
         PromotionFeed(parsedCampaigns, feed.optInt("rotationSeconds", 8).coerceIn(3, 300))
     }
 
+    suspend fun submitIssueReport(report: JSONObject): String = withContext(Dispatchers.IO) {
+        request(endpoint("issue-reports"), method = "POST", body = report)
+            .optString("reportId")
+            .ifBlank { error("Server did not return a report ID") }
+    }
+
     private fun safeHttpsUrl(value: String?): String? = value?.let {
         runCatching { URL(it) }.getOrNull()?.takeIf { url -> url.protocol == "https" }?.toString()
     }
@@ -131,13 +137,19 @@ class WeatherApi(private val baseUrl: String = BuildConfig.API_BASE_URL) {
 
     private fun endpoint(path: String): Uri = Uri.parse(baseUrl.trimEnd('/') + "/" + path)
 
-    private fun request(uri: Uri): JSONObject {
+    private fun request(uri: Uri, method: String = "GET", body: JSONObject? = null): JSONObject {
         val connection = URL(uri.toString()).openConnection() as HttpURLConnection
         return try {
             connection.connectTimeout = 8_000
-            connection.readTimeout = 12_000
+            connection.readTimeout = 30_000
+            connection.requestMethod = method
             connection.setRequestProperty("Accept", "application/json")
             connection.setRequestProperty("User-Agent", "VespyWeather-Android/${BuildConfig.VERSION_NAME}")
+            if (body != null) {
+                connection.doOutput = true
+                connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                connection.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(body.toString()) }
+            }
             if (connection.responseCode !in 200..299) error("Server returned ${connection.responseCode}")
             JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
         } finally {

@@ -107,6 +107,10 @@ Optional environment variables:
 
 - `PORT` changes the HTTP port from `8080`.
 - `WEATHER_CACHE_TTL_MS` changes the upstream cache duration.
+- `WEATHER_REPORT_DIRECTORY` selects the durable directory used for optional Android issue reports. Production mounts `/var/lib/weather/issues` into the read-only application container.
+- `WEATHER_REPORT_ADMIN_USER` and `WEATHER_REPORT_ADMIN_PASSWORD` protect the server-rendered report browser at `/admin/issues` with HTTP Basic authentication.
+- `WEATHER_REPORT_ADMIN_ORIGIN` sets the public origin used in notification links.
+- `WEATHER_REPORT_NTFY_URL` optionally sends a metadata-only push notification to a private ntfy topic when a report is stored. Notifications contain only the opaque report ID and application version.
 - `WEATHER_ALLOWED_ORIGIN` restricts cross-origin API access. It defaults to `*`.
 - `GOOGLE_ANALYTICS_ID` enables consent-gated Google Analytics 4 when set to a valid `G-...` measurement ID.
 

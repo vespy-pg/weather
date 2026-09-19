@@ -185,6 +185,7 @@ data class ForecastDisplaySettings(
     val showDates: Boolean = false,
     val showMushrooms: Boolean = false,
     val showWidgetLocation: Boolean = true,
+    val temperatureTextScale: Float = .92f,
 )
 
 data class TemperatureThresholds(
@@ -203,6 +204,7 @@ data class WidgetDisplaySettings(
     val showWindArrows: Boolean = false,
     val showMushrooms: Boolean = false,
     val demo: Boolean = false,
+    val temperatureTextScale: Float = 1f,
 )
 
 fun List<HourlyWeather>.atExactInterval(hours: Int): List<HourlyWeather> {

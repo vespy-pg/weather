@@ -60,10 +60,12 @@ import eu.vespy.weather.data.WidgetDisplaySettings
 import eu.vespy.weather.ui.DEFAULT_LOCATIONS
 import eu.vespy.weather.ui.LEGACY_DEFAULT_LOCATIONS
 import eu.vespy.weather.ui.LocationControls
+import eu.vespy.weather.ui.IssueReportDialog
 import eu.vespy.weather.ui.WeatherFieldShape
 import eu.vespy.weather.ui.WeatherPanelShape
 import eu.vespy.weather.ui.WeatherSettingsSection
 import eu.vespy.weather.ui.WeatherSupportingText
+import eu.vespy.weather.ui.TemperatureTextSizeDropdown
 import eu.vespy.weather.ui.hideNavigationControls
 
 class WeatherWidgetConfigureActivity : ComponentActivity() {
@@ -91,6 +93,7 @@ class WeatherWidgetConfigureActivity : ComponentActivity() {
             WeatherStripWidgetProvider::class.java.name
         setContent {
             WidgetLocationPicker(
+                widgetId = widgetId,
                 locations = locations,
                 initialLocation = initialLocation,
                 initialForecastHours = preferences.widgetForecastHours(widgetId),
@@ -144,6 +147,7 @@ private val widgetLightColors = lightColorScheme(
 
 @Composable
 private fun WidgetLocationPicker(
+    widgetId: Int,
     locations: List<WeatherLocation>,
     initialLocation: WeatherLocation,
     initialForecastHours: Int,
@@ -159,6 +163,7 @@ private fun WidgetLocationPicker(
     var forecastMenuExpanded by remember { mutableStateOf(false) }
     var selectedLocation by remember { mutableStateOf(initialLocation) }
     var widgetSettings by remember { mutableStateOf(initialWidgetSettings) }
+    var showIssueReport by remember { mutableStateOf(false) }
     val systemDark = isSystemInDarkTheme()
     val dark = when (initialAppTheme) {
         "light" -> false
@@ -264,12 +269,26 @@ private fun WidgetLocationPicker(
                     }
                     WeatherSettingsSection(stringResource(R.string.widget_display_section)) {
                         WidgetSwitch(stringResource(R.string.show_hourly_temperatures), widgetSettings.showHourlyTemperatures) { widgetSettings = widgetSettings.copy(showHourlyTemperatures = it) }
+                        if (widgetSettings.showHourlyTemperatures) {
+                            WeatherSupportingText(stringResource(R.string.temperature_text_size))
+                            TemperatureTextSizeDropdown(widgetSettings.temperatureTextScale) {
+                                widgetSettings = widgetSettings.copy(temperatureTextScale = it)
+                            }
+                        }
                         if (!compactStrip) WidgetSwitch(stringResource(R.string.show_apparent_temperature), widgetSettings.showApparentTemperature) { widgetSettings = widgetSettings.copy(showApparentTemperature = it) }
                         WidgetSwitch(stringResource(R.string.show_precipitation), widgetSettings.showPrecipitation) { widgetSettings = widgetSettings.copy(showPrecipitation = it) }
                         WidgetSwitch(stringResource(R.string.show_wind_arrows), widgetSettings.showWindArrows) { widgetSettings = widgetSettings.copy(showWindArrows = it) }
                         if (!compactStrip) WidgetSwitch(stringResource(R.string.show_mushrooms), widgetSettings.showMushrooms) { widgetSettings = widgetSettings.copy(showMushrooms = it) }
                         WidgetDefaultOrOn(stringResource(R.string.show_widget_location), widgetSettings.forceLocationName) { widgetSettings = widgetSettings.copy(forceLocationName = it) }
                         WidgetSwitch(stringResource(R.string.demo_weather), widgetSettings.demo) { widgetSettings = widgetSettings.copy(demo = it) }
+                    }
+                    WeatherSettingsSection(stringResource(R.string.report_issue)) {
+                        WeatherSupportingText(stringResource(R.string.report_issue_description))
+                        Button(
+                            onClick = { showIssueReport = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = WeatherFieldShape,
+                        ) { Text(stringResource(R.string.report_issue)) }
                     }
                 }
                 Button(
@@ -279,6 +298,16 @@ private fun WidgetLocationPicker(
                 ) {
                     Text(stringResource(R.string.save_widget_settings))
                 }
+            }
+            if (showIssueReport) {
+                IssueReportDialog(
+                    appScreenshot = null,
+                    sourceWidgetId = widgetId,
+                    sourceWidgetSettings = widgetSettings,
+                    sourceForecastHours = forecastHours,
+                    sourceLocation = selectedLocation,
+                    onDismiss = { showIssueReport = false },
+                )
             }
         }
     }

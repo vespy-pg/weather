@@ -1,6 +1,84 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {createServer, forecastUrl, isForecastRoutePath, locationMatchesQualifiers, locationSearchUrl, locationSearchVariants, mushroomCondition, mushroomObservationsUrl, normalizeForecast, normalizeGoogleAnalyticsId, normalizeLocale, normalizeMushroomObservations, normalizePostalLocations, normalizeReverseLocation, normalizedSearchText, postalCodeSearchUrl, preferredLanguageForCountry, promotionFeed, rankLocationCandidates, renderIndexHtml, selectCapitalResult, seoPageMetadata, staticCacheControl} from './server.js';
+import {mkdtemp, readFile, rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
+import {createServer, forecastUrl, isForecastRoutePath, locationMatchesQualifiers, locationSearchUrl, locationSearchVariants, mushroomCondition, mushroomObservationsUrl, normalizeForecast, normalizeGoogleAnalyticsId, normalizeIssueReport, normalizeLocale, normalizeMushroomObservations, normalizePostalLocations, normalizeReverseLocation, normalizedSearchText, postalCodeSearchUrl, preferredLanguageForCountry, promotionFeed, rankLocationCandidates, renderIndexHtml, selectCapitalResult, seoPageMetadata, staticCacheControl} from './server.js';
+
+test('normalizes issue reports without retaining encoded attachment data in metadata', () => {
+  const report = normalizeIssueReport({
+    description: 'Temperatures overlap on my device.',
+    app: {versionName: '0.1.6'},
+    device: {model: 'Test device'},
+    attachments: [{name: '../forecast.png', contentType: 'image/png', base64: Buffer.from('image').toString('base64')}]
+  });
+  assert.equal(report.metadata.description, 'Temperatures overlap on my device.');
+  assert.equal(report.metadata.attachments[0].name, 'forecast.png');
+  assert.equal(report.metadata.attachments[0].bytes, 5);
+  assert.equal(report.attachments[0].bytes.toString(), 'image');
+  assert.equal('base64' in report.metadata.attachments[0], false);
+});
+
+test('rejects incomplete issue reports and unsupported attachments', () => {
+  assert.throws(() => normalizeIssueReport({description: 'Too short'}), /between 10 and 4000/);
+  assert.throws(() => normalizeIssueReport({
+    description: 'A sufficiently detailed report.',
+    attachments: [{name: 'data.txt', contentType: 'text/plain', base64: Buffer.from('data').toString('base64')}]
+  }), /Attachment 1 is invalid/);
+});
+
+test('accepts an issue report and stores metadata outside the application image', async () => {
+  const reportRoot = await mkdtemp(path.join(tmpdir(), 'weather-issue-reports-'));
+  const previousRoot = process.env.WEATHER_REPORT_DIRECTORY;
+  const previousAdminUser = process.env.WEATHER_REPORT_ADMIN_USER;
+  const previousAdminPassword = process.env.WEATHER_REPORT_ADMIN_PASSWORD;
+  process.env.WEATHER_REPORT_DIRECTORY = reportRoot;
+  process.env.WEATHER_REPORT_ADMIN_USER = 'weather-test';
+  process.env.WEATHER_REPORT_ADMIN_PASSWORD = 'strong-test-password';
+  const server = createServer();
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  try {
+    const {port} = server.address();
+    const response = await fetch(`http://127.0.0.1:${port}/issue-reports`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({description: 'The hourly temperatures overlap on my device.'})
+    });
+    assert.equal(response.status, 201);
+    const {reportId} = await response.json();
+    const stored = JSON.parse(await readFile(path.join(reportRoot, reportId, 'report.json'), 'utf8'));
+    assert.equal(stored.reportId, reportId);
+    assert.equal(stored.description, 'The hourly temperatures overlap on my device.');
+    assert.equal(stored.status, 'new');
+
+    const unauthorized = await fetch(`http://127.0.0.1:${port}/admin/issues`);
+    assert.equal(unauthorized.status, 401);
+    assert.match(unauthorized.headers.get('www-authenticate'), /Basic/);
+
+    const authorization = `Basic ${Buffer.from('weather-test:strong-test-password').toString('base64')}`;
+    const list = await fetch(`http://127.0.0.1:${port}/admin/issues`, {headers: {Authorization: authorization}});
+    assert.equal(list.status, 200);
+    assert.match(await list.text(), /1 new - 1 stored/);
+
+    const detail = await fetch(`http://127.0.0.1:${port}/admin/issues/${reportId}`, {headers: {Authorization: authorization}});
+    assert.equal(detail.status, 200);
+    assert.match(await detail.text(), /The hourly temperatures overlap on my device/);
+    const viewed = JSON.parse(await readFile(path.join(reportRoot, reportId, 'report.json'), 'utf8'));
+    assert.equal(viewed.status, 'seen');
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+    if (previousRoot === undefined) delete process.env.WEATHER_REPORT_DIRECTORY;
+    else process.env.WEATHER_REPORT_DIRECTORY = previousRoot;
+    if (previousAdminUser === undefined) delete process.env.WEATHER_REPORT_ADMIN_USER;
+    else process.env.WEATHER_REPORT_ADMIN_USER = previousAdminUser;
+    if (previousAdminPassword === undefined) delete process.env.WEATHER_REPORT_ADMIN_PASSWORD;
+    else process.env.WEATHER_REPORT_ADMIN_PASSWORD = previousAdminPassword;
+    await rm(reportRoot, {recursive: true, force: true});
+  }
+});
 
 test('serves static resources to HEAD requests without a response body', async () => {
   const server = createServer();

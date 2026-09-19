@@ -40,10 +40,19 @@
     <string name="search">Search</string>
     <string name="close">Close</string>
     <string name="temperature_unit">Temperature unit</string>
+    <string name="temperature_text_size">Hourly temperature text size</string>
+    <string name="temperature_text_size_extra_small">Extra small - 80%</string>
+    <string name="temperature_text_size_small">Small - 90%</string>
+    <string name="temperature_text_size_default">Medium - 92%</string>
+    <string name="temperature_text_size_large">Large - 100%</string>
+    <string name="temperature_text_size_extra_large">Extra large - 110%</string>
     <string name="no_locations">No locations found</string>
     <string name="more_locations_available">More results are available. Refine your search.</string>
     <string name="saved_locations">Saved locations</string>
     <string name="remove">Remove</string>
+    <string name="remove_location">Remove location</string>
+    <string name="share_location">Share location</string>
+    <string name="share_location_message">See the weather forecast for %1$s:\n%2$s</string>
     <string name="forecast_display">Forecast display</string>
     <string name="default_zoom">Default timeline zoom</string>
     <string name="show_hourly_temperatures">Hourly temperature values</string>
@@ -63,7 +72,7 @@
     <string name="widget_display_section">Displayed information</string>
     <string name="app_appearance_section">Appearance</string>
     <string name="app_temperature_section">Temperature</string>
-    <string name="app_privacy_section">Widget and privacy</string>
+    <string name="app_privacy_section">Support, widgets and privacy</string>
     <string name="choose_widget_location_description">Search or choose a saved location. You can edit it later from the widget menu.</string>
     <string name="widget_forecast_length">Forecast length</string>
     <string name="widget_forecast_option">%1$d hours (%2$s days)</string>
@@ -98,4 +107,12 @@
     <string name="analytics_allow">Allow analytics</string>
     <string name="analytics_consent">Share anonymous usage analytics</string>
     <string name="privacy_policy">Privacy policy</string>
+    <string name="report_issue">Report an issue</string>
+    <string name="report_issue_description">Describe what happened, what you expected, and whether the problem can be repeated.</string>
+    <string name="report_issue_message">Issue description</string>
+    <string name="report_issue_include_diagnostics">Include device details, app and widget settings, location names, and diagnostic images</string>
+    <string name="report_issue_privacy">The report is sent securely to Vespy. Coordinates and forecast data are not included. Turn off diagnostics to send only the description and basic app version.</string>
+    <string name="report_issue_send">Send report</string>
+    <string name="report_issue_failed">The report could not be sent. Check your connection and try again.</string>
+    <string name="report_issue_sent">Thank you. Report ID: %1$s</string>
 </resources>

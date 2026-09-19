@@ -35,7 +35,7 @@ function isLightTheme() {
 
 function canvasPixelRatio(rect) {
   const deviceRatio = window.devicePixelRatio || 1;
-  return Math.max(.25, Math.min(deviceRatio, 16384 / rect.width, 4096 / rect.height));
+  return Math.max(.25, Math.min(deviceRatio, 2, 16384 / rect.width, 4096 / rect.height));
 }
 
 function colorWithAlpha(color, alpha) {
@@ -988,7 +988,7 @@ export function drawWeatherChart(canvas, points, days = [], options = {}) {
 export function drawAirQualityChart(canvas, points) {
   const rect = canvas.getBoundingClientRect();
   if (!points.length || rect.width < 1) return;
-  const ratio = window.devicePixelRatio || 1;
+  const ratio = canvasPixelRatio(rect);
   canvas.width = Math.max(1, Math.round(rect.width * ratio));
   canvas.height = Math.max(1, Math.round(rect.height * ratio));
   const context = canvas.getContext('2d');
@@ -1065,7 +1065,7 @@ export function drawAirQualityChart(canvas, points) {
 
 export function drawTemperatureChart(canvas, history, selection) {
   const rect = canvas.getBoundingClientRect();
-  const ratio = window.devicePixelRatio || 1;
+  const ratio = canvasPixelRatio(rect);
   canvas.width = Math.max(1, Math.round(rect.width * ratio));
   canvas.height = Math.max(1, Math.round(rect.height * ratio));
   const context = canvas.getContext('2d');

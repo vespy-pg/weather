@@ -2,6 +2,7 @@ package eu.vespy.weather.ui
 
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
+import android.content.Intent
 import android.graphics.Color.parseColor
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -10,6 +11,7 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.location.LocationManager
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -67,7 +69,6 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableFloatStateOf
@@ -182,16 +183,23 @@ fun VespyWeatherApp(viewModel: WeatherViewModel) {
         else -> systemDarkTheme
     }
     val context = LocalContext.current
+    var showSettings by rememberSaveable { mutableStateOf(false) }
+    var recreateAfterSettingsClose by rememberSaveable { mutableStateOf(false) }
     val updateDisplaySettings: (ForecastDisplaySettings) -> Unit = { settings ->
         val languageChanged = settings.language != viewModel.state.displaySettings.language
-        val themeChanged = settings.theme != viewModel.state.displaySettings.theme
         val historyChanged = settings.showHistoricalData != viewModel.state.displaySettings.showHistoricalData
         val mushroomsChanged = settings.showMushrooms != viewModel.state.displaySettings.showMushrooms
         viewModel.setDisplaySettings(settings)
-        if (languageChanged) (context as? Activity)?.recreate()
-        else if (themeChanged || historyChanged || mushroomsChanged) viewModel.refresh()
+        if (languageChanged) recreateAfterSettingsClose = true
+        else if (historyChanged || mushroomsChanged) viewModel.refresh()
     }
-    var showSettings by rememberSaveable { mutableStateOf(false) }
+    val dismissSettings: () -> Unit = {
+        showSettings = false
+        if (recreateAfterSettingsClose) {
+            recreateAfterSettingsClose = false
+            (context as? Activity)?.recreate()
+        }
+    }
     MaterialTheme(colorScheme = if (darkTheme) DarkColors else LightColors) {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -244,7 +252,7 @@ fun VespyWeatherApp(viewModel: WeatherViewModel) {
                 }
                 if (showSettings) SettingsDialog(
                     state = state,
-                    onDismiss = { showSettings = false },
+                    onDismiss = dismissSettings,
                     onSelectLocation = viewModel::selectLocation,
                     onAddLocation = viewModel::addLocation,
                     onCurrentLocation = viewModel::addCurrentLocation,
@@ -503,8 +511,8 @@ private fun ForecastTimeline(
     val trackWidth = slotWidth * max(1, points.size)
     val mushroomHeight = if (settings.showMushrooms) (if (landscape) 34.dp else 44.dp) else 0.dp
     val timelineHeight = (if (landscape) 290.dp else 368.dp) + mushroomHeight
-    val labelHeight = 62.dp
-    val skyHeight = if (landscape) 68.dp else 103.dp
+    val labelHeight = 72.dp
+    val skyHeight = if (landscape) 62.dp else 93.dp
     val windHeight = if (!settings.showWind) 0.dp else if (settings.showWindArrows) {
         if (landscape) 48.dp else 60.dp
     } else if (landscape) 34.dp else 45.dp
@@ -597,7 +605,7 @@ private fun ForecastTimeline(
                 fullWeekdayNames = true,
                 dayLabelTextSize = 16f * density,
                 hourTextSize = 13f * density,
-                temperatureTextSize = 24f * density,
+                temperatureTextSize = 24f * density * settings.temperatureTextScale,
                 windScale = 1.22f,
                 showTemperatureValues = settings.showHourlyTemperatures,
                 showApparentTemperature = settings.showApparentTemperature,
@@ -1017,6 +1025,8 @@ private fun SettingsDialog(
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
+    var showIssueReport by remember { mutableStateOf(false) }
+    var reportScreenshot by remember { mutableStateOf<Bitmap?>(null) }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) useLastKnownLocation(context, onCurrentLocation)
         else Toast.makeText(context, R.string.location_permission_denied, Toast.LENGTH_LONG).show()
@@ -1053,6 +1063,7 @@ private fun SettingsDialog(
                         selectedLocation = state.location,
                         onSelectLocation = onSelectLocation,
                         onSearchResult = onAddLocation,
+                        onShareLocation = { shareLocation(context, it, state.displaySettings.language) },
                         onRemoveLocation = onRemoveLocation,
                     )
                     Button(
@@ -1095,6 +1106,10 @@ private fun SettingsDialog(
                             ) { Text("°$unit") }
                         }
                     }
+                    WeatherSupportingText(stringResource(R.string.temperature_text_size))
+                    TemperatureTextSizeDropdown(state.displaySettings.temperatureTextScale) {
+                        onDisplaySettings(state.displaySettings.copy(temperatureTextScale = it))
+                    }
                     WeatherSupportingText(stringResource(R.string.temperature_color_thresholds))
                     ThresholdSlider(stringResource(R.string.deep_frost), state.displaySettings.temperatureThresholds.deepFrost, -30f..-1f, state.temperatureUnit) { value -> updateThresholds(state, onDisplaySettings, state.displaySettings.temperatureThresholds.copy(deepFrost = value)) }
                     ThresholdSlider(stringResource(R.string.mild), state.displaySettings.temperatureThresholds.mild, 1f..(state.displaySettings.temperatureThresholds.warm - 1f), state.temperatureUnit) { value -> updateThresholds(state, onDisplaySettings, state.displaySettings.temperatureThresholds.copy(mild = value)) }
@@ -1124,6 +1139,14 @@ private fun SettingsDialog(
                         shape = WeatherFieldShape,
                     ) { Text(stringResource(R.string.add_widget)) }
                     SettingSwitch(stringResource(R.string.analytics_consent), state.analyticsConsent == true, onAnalyticsConsent)
+                    Button(
+                        onClick = {
+                            reportScreenshot = eu.vespy.weather.diagnostics.IssueDiagnostics.captureAppWindow(context)
+                            showIssueReport = true
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = WeatherFieldShape,
+                    ) { Text(stringResource(R.string.report_issue)) }
                     TextButton(onClick = onResetDefaults, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.reset_defaults)) }
                     TextButton(onClick = { uriHandler.openUri("https://weather.vespy.eu/privacy.html") }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.privacy_policy)) }
                 }
@@ -1133,6 +1156,51 @@ private fun SettingsDialog(
                     onClick = onDismiss,
                     modifier = Modifier.align(Alignment.End).padding(horizontal = 20.dp, vertical = 8.dp),
                 ) { Text(stringResource(R.string.close), fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+            }
+        }
+    }
+    if (showIssueReport) {
+        IssueReportDialog(
+            appScreenshot = reportScreenshot,
+            onDismiss = { showIssueReport = false; reportScreenshot = null },
+        )
+    }
+}
+
+@Composable
+fun TemperatureTextSizeDropdown(selected: Float, onSelect: (Float) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    val options = listOf(
+        .8f to stringResource(R.string.temperature_text_size_extra_small),
+        .9f to stringResource(R.string.temperature_text_size_small),
+        .92f to stringResource(R.string.temperature_text_size_default),
+        1f to stringResource(R.string.temperature_text_size_large),
+        1.1f to stringResource(R.string.temperature_text_size_extra_large),
+    )
+    val selectedLabel = options.minByOrNull { kotlin.math.abs(it.first - selected) }?.second.orEmpty()
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        Button(
+            onClick = { expanded = true },
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+            shape = WeatherFieldShape,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+            ),
+        ) {
+            Text(selectedLabel, Modifier.weight(1f), fontWeight = FontWeight.Bold)
+            Text("▾")
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.width(maxWidth),
+        ) {
+            options.forEach { (scale, label) ->
+                DropdownMenuItem(
+                    text = { Text(label, fontWeight = if (scale == selected) FontWeight.Bold else FontWeight.Normal) },
+                    onClick = { onSelect(scale); expanded = false },
+                )
             }
         }
     }
@@ -1163,9 +1231,34 @@ private fun AnalyticsConsentDialog(onConsent: (Boolean) -> Unit) {
 @Composable
 private fun HideDialogNavigation() {
     val view = LocalView.current
-    SideEffect {
-        (view.parent as? DialogWindowProvider)?.window?.let(::hideNavigationControls)
+    val window = (view.parent as? DialogWindowProvider)?.window
+    LaunchedEffect(window) {
+        window?.let(::hideNavigationControls)
     }
+}
+
+private fun shareLocation(context: Context, location: eu.vespy.weather.data.WeatherLocation, language: String) {
+    val locale = (language.takeUnless { it == "system" } ?: Locale.getDefault().toLanguageTag())
+        .let { if (it.startsWith("pl", ignoreCase = true)) "pl-PL" else "en-US" }
+    val slug = location.name.trim()
+        .replace(Regex("[^\\p{L}\\p{N}]+"), "-")
+        .trim('-')
+        .ifEmpty { "location" }
+    val coordinates = String.format(Locale.US, "%.5f,%.5f", location.latitude, location.longitude)
+    val url = Uri.Builder()
+        .scheme("https")
+        .authority("weather.vespy.eu")
+        .appendPath(locale)
+        .appendPath(slug)
+        .appendQueryParameter("ll", coordinates)
+        .appendQueryParameter("share", "1")
+        .build()
+        .toString()
+    val intent = Intent(Intent.ACTION_SEND)
+        .setType("text/plain")
+        .putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.share_location))
+        .putExtra(Intent.EXTRA_TEXT, context.getString(R.string.share_location_message, location.name, url))
+    context.startActivity(Intent.createChooser(intent, context.getString(R.string.share_location)))
 }
 
 private fun useLastKnownLocation(context: Context, onLocation: (Double, Double) -> Unit) {
@@ -1206,13 +1299,19 @@ private fun updateThresholds(state: WeatherUiState, onChange: (ForecastDisplaySe
 
 @Composable
 private fun ThresholdSlider(label: String, value: Float, range: ClosedFloatingPointRange<Float>, unit: String, onChange: (Float) -> Unit) {
-    val displayed = if (unit == "F") value * 9f / 5f + 32f else value
+    var sliderValue by remember(value) { mutableFloatStateOf(value) }
+    val displayed = if (unit == "F") sliderValue * 9f / 5f + 32f else sliderValue
     Column {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(label, fontSize = 14.sp)
             Text("${displayed.toInt()}°$unit", color = Muted, fontSize = 14.sp)
         }
-        Slider(value = value, onValueChange = onChange, valueRange = range)
+        Slider(
+            value = sliderValue.coerceIn(range),
+            onValueChange = { sliderValue = it },
+            onValueChangeFinished = { onChange(sliderValue) },
+            valueRange = range,
+        )
     }
 }
 

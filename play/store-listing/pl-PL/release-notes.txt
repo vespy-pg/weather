@@ -1,1 +1,1 @@
-Wprowadzono pełnoekranowe ustawienia aplikacji i widgetów, dodano kompaktowy widget nieba i wiatru oraz ulepszono podglądy i skalowanie widgetów.
+Ulepszono zapisane lokalizacje, stabilność ustawień oraz skalowanie i obsługę widgetów. Dodano regulację rozmiaru temperatur, czytelniejszy układ prognozy i raporty z opcjonalną diagnostyką.

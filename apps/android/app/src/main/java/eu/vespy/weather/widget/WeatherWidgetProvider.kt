@@ -23,6 +23,7 @@ import eu.vespy.weather.withSavedAppLocale
 import eu.vespy.weather.data.WeatherApi
 import eu.vespy.weather.data.WeatherPreferences
 import eu.vespy.weather.data.forWidgetForecast
+import eu.vespy.weather.diagnostics.WidgetFrameCache
 import eu.vespy.weather.ui.DEFAULT_LOCATIONS
 import eu.vespy.weather.ui.ForecastGraphics
 import eu.vespy.weather.ui.forecastSummaryText
@@ -30,6 +31,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -59,7 +61,7 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
                     val forecast = if (widgetSettings.demo) widgetDemoForecast() else forecasts[locationKey]
                         ?: WeatherApi().forecast(location, language = language).also { forecasts[locationKey] = it }
                     val options = manager.getAppWidgetOptions(widgetId)
-                    val density = context.resources.displayMetrics.density.coerceAtMost(2.5f)
+                    val density = context.resources.displayMetrics.density.coerceAtMost(2f)
                     val forecastHours = preferences.widgetForecastHours(widgetId)
                     val dark = when (widgetSettings.theme) {
                         "dark" -> true
@@ -70,7 +72,7 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
                         val widthDp = size.width.roundToInt().coerceAtLeast(40)
                         val heightDp = size.height.roundToInt().coerceAtLeast(40)
                         val columns = (widthDp / 80).coerceIn(1, 8)
-                        val rows = if (compactStrip) 1 else ((heightDp + 13) / 136).coerceIn(1, 8)
+                        val rows = if (compactStrip) 1 else widgetRowCount(heightDp)
                         val rawWidth = (widthDp * density).roundToInt()
                         val rawHeight = (heightDp * density).roundToInt()
                         val bitmapScale = min(1f, min(MAX_BITMAP_SIZE.toFloat() / rawWidth, MAX_BITMAP_SIZE.toFloat() / rawHeight))
@@ -95,14 +97,10 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
                             advisoryIsAlert = advisoryFooter && forecast.alerts.isNotEmpty(),
                             compactStrip = compactStrip,
                         )
+                        WidgetFrameCache.store(context, widgetId, bitmap)
                         views(context, bitmap, widgetId, location, widgetSettings.demo)
                     }
-                    val responsiveViews = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && viewsBySize.size > 1) {
-                        RemoteViews(viewsBySize)
-                    } else {
-                        viewsBySize.values.first()
-                    }
-                    manager.updateAppWidget(widgetId, responsiveViews)
+                    manager.updateAppWidget(widgetId, viewsBySize.values.first())
                 }
             } catch (_: Exception) {
                 // Keep the last successful widget frame when the network or provider is unavailable.
@@ -118,10 +116,22 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
 
     override fun onDeleted(context: Context, appWidgetIds: IntArray) {
         val preferences = WeatherPreferences(context)
-        appWidgetIds.forEach(preferences::removeWidgetLocation)
+        appWidgetIds.forEach { widgetId ->
+            preferences.removeWidgetLocation(widgetId)
+            WidgetFrameCache.remove(context, widgetId)
+        }
     }
 
     private fun widgetSizes(context: Context, options: Bundle): List<SizeF> {
+        val minWidth = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 80).coerceAtLeast(40)
+        val minHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 110).coerceAtLeast(40)
+        val maxWidth = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, minWidth).coerceAtLeast(minWidth)
+        val maxHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, minHeight).coerceAtLeast(minHeight)
+        val landscape = context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        val currentSize = SizeF(
+            if (landscape) maxWidth.toFloat() else minWidth.toFloat(),
+            if (landscape) minHeight.toFloat() else maxHeight.toFloat(),
+        )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val advertisedSizes = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 options.getParcelableArrayList(AppWidgetManager.OPTION_APPWIDGET_SIZES, SizeF::class.java)
@@ -132,19 +142,10 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
             advertisedSizes
                 ?.filter { it.width >= 40f && it.height >= 40f }
                 ?.distinct()
-                ?.takeIf { it.isNotEmpty() }
-                ?.let { return it }
+                ?.minByOrNull { abs(it.width - currentSize.width) + abs(it.height - currentSize.height) }
+                ?.let { return listOf(it) }
         }
-
-        val minWidth = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 80).coerceAtLeast(40)
-        val minHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 110).coerceAtLeast(40)
-        val maxWidth = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, minWidth).coerceAtLeast(minWidth)
-        val maxHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, minHeight).coerceAtLeast(minHeight)
-        val landscape = context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        return listOf(SizeF(
-            if (landscape) maxWidth.toFloat() else minWidth.toFloat(),
-            if (landscape) minHeight.toFloat() else maxHeight.toFloat(),
-        ))
+        return listOf(currentSize)
     }
 
     private fun views(
@@ -175,6 +176,7 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
                 putExtra("widget_demo", demo)
             }
             val pendingIntent = PendingIntent.getActivity(context, widgetId, intent, PendingIntent.FLAG_CANCEL_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            setOnClickPendingIntent(R.id.widget_root, pendingIntent)
             setOnClickPendingIntent(R.id.widget_image, pendingIntent)
         }
 
@@ -206,8 +208,8 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
         canvas.save()
         canvas.clipPath(android.graphics.Path().apply { addRoundRect(bounds, radius, radius, android.graphics.Path.Direction.CW) })
         val footerHeight = if (advisoryText != null) {
-            val maximumFooterHeight = if (rows >= 3) 124f else 108f
-            min(maximumFooterHeight * density, height * .82f)
+            val maximumFooterHeight = if (rows >= 3) 92f else 54f
+            min(maximumFooterHeight * density, height * if (rows >= 3) .42f else .48f)
         } else 0f
         val chartHeight = height - footerHeight
         val expanded = rows >= 3
@@ -246,9 +248,9 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
             precipitationScale = if (expanded) 1.8f else 1.55f,
             showWeekdayNames = true,
             temperatureUnit = temperatureUnit,
-            dayLabelTextSize = 16f * density,
+            dayLabelTextSize = (if (compactStrip) 11f else 16f) * density,
             hourTextSize = 13f * density,
-            temperatureTextSize = 24f * density,
+            temperatureTextSize = (if (compactStrip) 18f else 24f) * density * widgetSettings.temperatureTextScale,
             windScale = if (expanded) 1.22f else 1f,
             temperatureThresholds = temperatureThresholds,
             showTemperatureValues = widgetSettings.showHourlyTemperatures,
@@ -260,6 +262,7 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
             showTemperatureChart = !compactStrip,
             demoLabel = "DEMO".takeIf { widgetSettings.demo },
             lightningScale = .68f,
+            inlineCompactHeader = compactStrip,
         )
         if (locationLabel != null) {
             val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -312,7 +315,7 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
             textSize = 28f * density
             typeface = android.graphics.Typeface.DEFAULT_BOLD
         })
-        val descriptionTextSize = if (rows >= 3) 30f else 24f
+        val descriptionTextSize = if (rows >= 3) 18f else 14f
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = if (dark) Color.rgb(231, 237, 247) else Color.rgb(23, 34, 52)
             textSize = descriptionTextSize * density
@@ -333,7 +336,7 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
         val baseline = top + if (secondLine.isBlank()) footerHeight * .74f else footerHeight * .52f
         canvas.drawText(firstLine, x, baseline, paint)
         if (secondLine.isNotBlank()) {
-            val lineSpacing = if (rows >= 3) 37f else 30f
+            val lineSpacing = if (rows >= 3) 23f else 18f
             canvas.drawText(secondLine, x, baseline + lineSpacing * density, paint)
         }
     }
@@ -367,3 +370,5 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
         }
     }
 }
+
+internal fun widgetRowCount(heightDp: Int): Int = ((heightDp + 20) / 65).coerceIn(1, 8)

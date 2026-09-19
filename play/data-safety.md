@@ -6,8 +6,8 @@ Verify every answer against the production build and the current Play Console wo
 
 - The app collects or transmits user data: Yes.
 - Data is encrypted in transit: Yes, production endpoints use HTTPS.
-- Users can request deletion: No account or server-side profile is created. Local data can be deleted by clearing app storage or uninstalling the app. Operational logs follow server log rotation.
-- The app allows users to request that data is deleted without deleting an account: Review this answer in Play Console. The app has no account and no durable user profile.
+- Users can request deletion: Yes. Issue reports return a report ID that can be sent to `webmaster@vespy.eu` with a deletion request. Local data can be deleted by clearing app storage or uninstalling the app. Operational logs follow server log rotation.
+- The app allows users to request that data is deleted without deleting an account: Yes, for optional issue reports. The app has no account.
 
 ## Data types
 
@@ -30,6 +30,15 @@ Verify every answer against the production build and the current Play Console wo
 - Collected: Treat the Firebase app instance identifier as collected only after analytics consent. Advertising ID permissions are explicitly removed from the merged manifest.
 - Purpose: Analytics.
 - Optional: Yes.
+
+### User-generated content and diagnostics
+
+- Collected: Only when the user explicitly submits an issue report.
+- Data: The entered problem description and app version. If the diagnostic option remains enabled, the report also contains the device manufacturer and model, Android/API version, screen dimensions, display density, font scale, app and widget display settings, location names, and diagnostic images of the app and widgets.
+- Excluded: Precise coordinates and raw forecast data are not included in issue reports.
+- Purpose: App functionality and developer communications, specifically troubleshooting and resolving the reported problem.
+- Optional: Yes. Sending a report is optional, and diagnostic details and images can be disabled before submission.
+- Sharing: No sale or advertising use. Hosting providers may process the report as service providers. A notification provider may receive only the opaque report ID and app version, never the description, device details, location names, or images.
 
 ### Search input and saved preferences
 
