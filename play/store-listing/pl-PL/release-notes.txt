@@ -1,1 +1,1 @@
-Ulepszono zapisane lokalizacje, stabilność ustawień oraz skalowanie i obsługę widgetów. Dodano regulację rozmiaru temperatur, czytelniejszy układ prognozy i raporty z opcjonalną diagnostyką.
+Ulepszono zapisane lokalizacje, stabilność ustawień oraz skalowanie i obsługę widgetów. Dodano regulację temperatur, czytelniejszy układ prognozy i raporty z diagnostyką renderowania każdego widgetu.

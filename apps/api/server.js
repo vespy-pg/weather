@@ -22,9 +22,9 @@ const MUSHROOM_OBSERVATION_DAYS = 30;
 const MUSHROOM_OBSERVATION_RADIUS_KM = 30;
 const cache = new Map();
 const issueReportRateLimits = new Map();
-const MAX_ISSUE_REPORT_BYTES = 12 * 1024 * 1024;
+const MAX_ISSUE_REPORT_BYTES = 24 * 1024 * 1024;
 const MAX_ISSUE_ATTACHMENT_BYTES = 3 * 1024 * 1024;
-const MAX_ISSUE_ATTACHMENTS = 8;
+const MAX_ISSUE_ATTACHMENTS = 64;
 
 export function normalizeGoogleAnalyticsId(value) {
   const id = String(value || '').trim().toUpperCase();
@@ -121,7 +121,7 @@ export function normalizeIssueReport(source) {
       throw error;
     }
     totalAttachmentBytes += bytes.length;
-    if (totalAttachmentBytes > 8 * 1024 * 1024) {
+    if (totalAttachmentBytes > 16 * 1024 * 1024) {
       const error = new Error('Attachments are too large.');
       error.statusCode = 400;
       throw error;
@@ -143,7 +143,7 @@ export function normalizeIssueReport(source) {
       app: source?.app && typeof source.app === 'object' ? source.app : {},
       device: source?.device && typeof source.device === 'object' ? source.device : {},
       activeLocation: source?.activeLocation && typeof source.activeLocation === 'object' ? source.activeLocation : null,
-      widgets: Array.isArray(source?.widgets) ? source.widgets.slice(0, 50) : [],
+      widgets: Array.isArray(source?.widgets) ? source.widgets.slice(0, 64) : [],
       attachments: attachments.map(({name, contentType, bytes}) => ({name, contentType, bytes: bytes.length}))
     },
     attachments

@@ -111,7 +111,7 @@
     <string name="report_issue_description">Opisz, co się stało, jaki był oczekiwany rezultat i czy problem da się powtórzyć.</string>
     <string name="report_issue_message">Opis problemu</string>
     <string name="report_issue_include_diagnostics">Dołącz dane urządzenia, ustawienia aplikacji i widgetów, nazwy lokalizacji oraz obrazy diagnostyczne</string>
-    <string name="report_issue_privacy">Raport jest bezpiecznie wysyłany do Vespy. Współrzędne i dane prognozy nie są dołączane. Wyłącz diagnostykę, aby wysłać tylko opis i podstawową wersję aplikacji.</string>
+    <string name="report_issue_privacy">Raport jest bezpiecznie wysyłany do Vespy. Diagnostyka zawiera obrazy widgetów i ograniczone wartości prognozy potrzebne do odtworzenia renderowania, ale nigdy współrzędne. Wyłącz diagnostykę, aby wysłać tylko opis i podstawową wersję aplikacji.</string>
     <string name="report_issue_send">Wyślij raport</string>
     <string name="report_issue_failed">Nie udało się wysłać raportu. Sprawdź połączenie i spróbuj ponownie.</string>
     <string name="report_issue_sent">Dziękujemy. Identyfikator raportu: %1$s</string>

@@ -17,6 +17,9 @@ import android.os.Build
 import android.os.Bundle
 import android.util.SizeF
 import android.widget.RemoteViews
+import org.json.JSONArray
+import org.json.JSONObject
+import java.time.Instant
 import eu.vespy.weather.MainActivity
 import eu.vespy.weather.R
 import eu.vespy.weather.withSavedAppLocale
@@ -76,10 +79,13 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
                         val rawWidth = (widthDp * density).roundToInt()
                         val rawHeight = (heightDp * density).roundToInt()
                         val bitmapScale = min(1f, min(MAX_BITMAP_SIZE.toFloat() / rawWidth, MAX_BITMAP_SIZE.toFloat() / rawHeight))
+                        val bitmapWidth = (rawWidth * bitmapScale).roundToInt()
+                        val bitmapHeight = (rawHeight * bitmapScale).roundToInt()
+                        val renderedPoints = forecast.hourly.forWidgetForecast(forecastHours, columns)
                         val bitmap = renderWidget(
-                            width = (rawWidth * bitmapScale).roundToInt(),
-                            height = (rawHeight * bitmapScale).roundToInt(),
-                            points = forecast.hourly.forWidgetForecast(forecastHours, columns),
+                            width = bitmapWidth,
+                            height = bitmapHeight,
+                            points = renderedPoints,
                             days = forecast.daily,
                             dark = dark,
                             todayLabel = context.getString(R.string.today),
@@ -97,7 +103,33 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
                             advisoryIsAlert = advisoryFooter && forecast.alerts.isNotEmpty(),
                             compactStrip = compactStrip,
                         )
-                        WidgetFrameCache.store(context, widgetId, bitmap)
+                        val manifest = JSONObject()
+                            .put("renderedAt", Instant.now().toString())
+                            .put("widgetType", when {
+                                compactStrip -> "strip"
+                                advisoryFooter -> "advisory"
+                                else -> "timeline"
+                            })
+                            .put("launcherSize", JSONObject().put("widthDp", widthDp).put("heightDp", heightDp))
+                            .put("bitmap", JSONObject()
+                                .put("widthPx", bitmapWidth)
+                                .put("heightPx", bitmapHeight)
+                                .put("deviceDensity", context.resources.displayMetrics.density)
+                                .put("renderDensity", density * bitmapScale)
+                                .put("bitmapScale", bitmapScale))
+                            .put("layout", JSONObject()
+                                .put("rows", rows)
+                                .put("columns", columns)
+                                .put("forecastHours", forecastHours)
+                                .put("pointCount", renderedPoints.size)
+                                .put("temperatureUnit", temperatureUnit)
+                                .put("resolvedTheme", if (dark) "dark" else "light"))
+                            .put("settings", widgetSettings.toDiagnosticJson())
+                            .put("forecast", JSONObject()
+                                .put("currentTimestamp", forecast.current.timestamp)
+                                .put("hourly", renderedPoints.hourlyDiagnosticJson())
+                                .put("daily", forecast.daily.dailyDiagnosticJson()))
+                        WidgetFrameCache.store(context, widgetId, bitmap, manifest)
                         views(context, bitmap, widgetId, location, widgetSettings.demo)
                     }
                     manager.updateAppWidget(widgetId, viewsBySize.values.first())
@@ -368,6 +400,52 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
                 putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, intArrayOf(widgetId))
             })
         }
+    }
+}
+
+private fun eu.vespy.weather.data.WidgetDisplaySettings.toDiagnosticJson() = JSONObject()
+    .put("theme", theme)
+    .put("forceLocationName", forceLocationName)
+    .put("temperatureTextScale", temperatureTextScale)
+    .put("showHourlyTemperatures", showHourlyTemperatures)
+    .put("showApparentTemperature", showApparentTemperature)
+    .put("showPrecipitation", showPrecipitation)
+    .put("showWindArrows", showWindArrows)
+    .put("showMushrooms", showMushrooms)
+    .put("demo", demo)
+
+private fun List<eu.vespy.weather.data.HourlyWeather>.hourlyDiagnosticJson() = JSONArray().apply {
+    this@hourlyDiagnosticJson.forEach { point ->
+        put(JSONObject()
+            .put("timestamp", point.timestamp)
+            .put("temperature", point.temperature)
+            .put("apparentTemperature", point.apparentTemperature)
+            .put("precipitationProbability", point.precipitationProbability)
+            .put("precipitation", point.precipitation)
+            .put("rain", point.rain)
+            .put("snowfall", point.snowfall)
+            .put("weatherCode", point.weatherCode)
+            .put("cloudCover", point.cloudCover)
+            .put("windSpeed", point.windSpeed)
+            .put("windDirection", point.windDirection)
+            .put("windGusts", point.windGusts)
+            .put("tornado", point.tornado))
+    }
+}
+
+private fun List<eu.vespy.weather.data.DailyWeather>.dailyDiagnosticJson() = JSONArray().apply {
+    this@dailyDiagnosticJson.forEach { day ->
+        put(JSONObject()
+            .put("date", day.date)
+            .put("sunrise", day.sunrise)
+            .put("sunset", day.sunset)
+            .put("mushroom", day.mushroom?.let { mushroom -> JSONObject()
+                .put("score", mushroom.score)
+                .put("level", mushroom.level)
+                .put("recentRainfall", mushroom.recentRainfall)
+                .put("relativeHumidity", mushroom.relativeHumidity)
+                .put("soilMoisture", mushroom.soilMoisture)
+            } ?: JSONObject.NULL))
     }
 }
 

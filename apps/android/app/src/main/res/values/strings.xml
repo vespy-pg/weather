@@ -111,7 +111,7 @@
     <string name="report_issue_description">Describe what happened, what you expected, and whether the problem can be repeated.</string>
     <string name="report_issue_message">Issue description</string>
     <string name="report_issue_include_diagnostics">Include device details, app and widget settings, location names, and diagnostic images</string>
-    <string name="report_issue_privacy">The report is sent securely to Vespy. Coordinates and forecast data are not included. Turn off diagnostics to send only the description and basic app version.</string>
+    <string name="report_issue_privacy">The report is sent securely to Vespy. Diagnostics include widget images and sanitized forecast values needed to reproduce their rendering, but never coordinates. Turn off diagnostics to send only the description and basic app version.</string>
     <string name="report_issue_send">Send report</string>
     <string name="report_issue_failed">The report could not be sent. Check your connection and try again.</string>
     <string name="report_issue_sent">Thank you. Report ID: %1$s</string>

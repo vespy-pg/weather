@@ -28,8 +28,8 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 object IssueDiagnostics {
-    private const val MAX_IMAGE_DIMENSION = 1600
-    private const val MAX_WIDGET_ATTACHMENTS = 6
+    private const val MAX_APP_IMAGE_DIMENSION = 1600
+    private const val MAX_WIDGET_IMAGE_DIMENSION = 1200
 
     fun captureAppWindow(context: Context): Bitmap? {
         var current = context
@@ -67,7 +67,6 @@ object IssueDiagnostics {
             "strip" to WeatherStripWidgetProvider::class.java,
         )
         val fallbackLocation = preferences.locations(DEFAULT_LOCATIONS).first()
-        var attachmentCount = 0
 
         providers.forEach { (type, providerClass) ->
             manager.getAppWidgetIds(ComponentName(context, providerClass)).forEach { widgetId ->
@@ -86,26 +85,27 @@ object IssueDiagnostics {
                         .put("maximumWidthDp", options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH))
                         .put("maximumHeightDp", options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT)))
                     .put("settings", widgetSettings.toJson())
+                WidgetFrameCache.manifest(context, widgetId)?.let { widget.put("lastRender", it) }
                 if (includeVisualsAndLocations) {
                     val location = sourceLocation.takeIf { widgetId == sourceWidgetId }
                         ?: preferences.widgetLocation(widgetId, fallbackLocation)
                     widget.put("location", JSONObject().put("name", location.name).put("country", location.country).put("timezone", location.timezone))
-                    if (attachmentCount < MAX_WIDGET_ATTACHMENTS) {
-                        WidgetFrameCache.frameFile(context, widgetId).takeIf(File::isFile)?.let { file ->
-                            BitmapFactory.decodeFile(file.path)?.let { bitmap ->
-                                attachments.put(bitmap.toAttachment("widget-$widgetId.jpg"))
-                                bitmap.recycle()
-                                attachmentCount++
-                            }
+                    val attachmentName = "widget-$widgetId.jpg"
+                    val frameAttached = WidgetFrameCache.frameFile(context, widgetId).takeIf(File::isFile)?.let { file ->
+                        BitmapFactory.decodeFile(file.path)?.let { bitmap ->
+                            attachments.put(bitmap.toAttachment(attachmentName, MAX_WIDGET_IMAGE_DIMENSION, 80))
+                            bitmap.recycle()
+                            true
                         }
-                    }
+                    } ?: false
+                    widget.put("frameAttachment", attachmentName.takeIf { frameAttached } ?: JSONObject.NULL)
                 }
                 widgets.put(widget)
             }
         }
 
         if (includeVisualsAndLocations && appScreenshot != null) {
-            attachments.put(appScreenshot.toAttachment("app-forecast.jpg"))
+            attachments.put(appScreenshot.toAttachment("app-forecast.jpg", MAX_APP_IMAGE_DIMENSION, 86))
         }
 
         val activeLocation = preferences.activeLocation(fallbackLocation)
@@ -175,14 +175,14 @@ object IssueDiagnostics {
         .put("showMushrooms", showMushrooms)
         .put("demo", demo)
 
-    private fun Bitmap.toAttachment(name: String): JSONObject {
+    private fun Bitmap.toAttachment(name: String, maximumDimension: Int, quality: Int): JSONObject {
         val longestSide = max(width, height)
-        val outputBitmap = if (longestSide > MAX_IMAGE_DIMENSION) {
-            val scale = MAX_IMAGE_DIMENSION.toFloat() / longestSide
+        val outputBitmap = if (longestSide > maximumDimension) {
+            val scale = maximumDimension.toFloat() / longestSide
             Bitmap.createScaledBitmap(this, (width * scale).roundToInt(), (height * scale).roundToInt(), true)
         } else this
         val bytes = ByteArrayOutputStream().use { stream ->
-            outputBitmap.compress(Bitmap.CompressFormat.JPEG, 86, stream)
+            outputBitmap.compress(Bitmap.CompressFormat.JPEG, quality, stream)
             stream.toByteArray()
         }
         if (outputBitmap !== this) outputBitmap.recycle()
@@ -198,18 +198,26 @@ object IssueDiagnostics {
 object WidgetFrameCache {
     private fun directory(context: Context) = File(context.cacheDir, "issue-report-widgets")
 
-    fun store(context: Context, widgetId: Int, bitmap: Bitmap) {
+    fun store(context: Context, widgetId: Int, bitmap: Bitmap, manifest: JSONObject) {
         runCatching {
             val directory = directory(context).apply { mkdirs() }
             File(directory, "widget-$widgetId.png").outputStream().use { stream ->
                 bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
             }
+            File(directory, "widget-$widgetId.json").writeText(manifest.toString())
         }
     }
 
     fun remove(context: Context, widgetId: Int) {
-        runCatching { frameFile(context, widgetId).delete() }
+        runCatching {
+            frameFile(context, widgetId).delete()
+            manifestFile(context, widgetId).delete()
+        }
     }
 
     fun frameFile(context: Context, widgetId: Int) = File(directory(context), "widget-$widgetId.png")
+    private fun manifestFile(context: Context, widgetId: Int) = File(directory(context), "widget-$widgetId.json")
+    fun manifest(context: Context, widgetId: Int): JSONObject? = runCatching {
+        manifestFile(context, widgetId).takeIf(File::isFile)?.readText()?.let(::JSONObject)
+    }.getOrNull()
 }

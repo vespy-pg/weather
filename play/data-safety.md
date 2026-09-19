@@ -34,8 +34,8 @@ Verify every answer against the production build and the current Play Console wo
 ### User-generated content and diagnostics
 
 - Collected: Only when the user explicitly submits an issue report.
-- Data: The entered problem description and app version. If the diagnostic option remains enabled, the report also contains the device manufacturer and model, Android/API version, screen dimensions, display density, font scale, app and widget display settings, location names, and diagnostic images of the app and widgets.
-- Excluded: Precise coordinates and raw forecast data are not included in issue reports.
+- Data: The entered problem description and app version. If the diagnostic option remains enabled, the report also contains the device manufacturer and model, Android/API version, screen dimensions, display density, font scale, app and widget display settings, location names, diagnostic images of the app and every widget, exact rendering dimensions, and sanitized forecast values needed to reproduce widget rendering.
+- Excluded: Precise coordinates are not included in issue reports.
 - Purpose: App functionality and developer communications, specifically troubleshooting and resolving the reported problem.
 - Optional: Yes. Sending a report is optional, and diagnostic details and images can be disabled before submission.
 - Sharing: No sale or advertising use. Hosting providers may process the report as service providers. A notification provider may receive only the opaque report ID and app version, never the description, device details, location names, or images.
