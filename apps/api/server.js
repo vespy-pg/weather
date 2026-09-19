@@ -1,5 +1,5 @@
 import http from 'node:http';
-import {mkdir, readFile, readdir, stat, writeFile} from 'node:fs/promises';
+import {mkdir, readFile, readdir, rm, stat, writeFile} from 'node:fs/promises';
 import {randomUUID, timingSafeEqual} from 'node:crypto';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -25,6 +25,8 @@ const issueReportRateLimits = new Map();
 const MAX_ISSUE_REPORT_BYTES = 24 * 1024 * 1024;
 const MAX_ISSUE_ATTACHMENT_BYTES = 3 * 1024 * 1024;
 const MAX_ISSUE_ATTACHMENTS = 64;
+const DEFAULT_ISSUE_REPORT_RETENTION_DAYS = 30;
+const ISSUE_REPORT_CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 export function normalizeGoogleAnalyticsId(value) {
   const id = String(value || '').trim().toUpperCase();
@@ -182,6 +184,48 @@ async function issueReport(request, response) {
 
 function issueReportRoot() {
   return path.resolve(process.env.WEATHER_REPORT_DIRECTORY || '/tmp/weather-issue-reports');
+}
+
+function issueReportRetentionDays() {
+  const configured = Number(process.env.WEATHER_REPORT_RETENTION_DAYS || DEFAULT_ISSUE_REPORT_RETENTION_DAYS);
+  return Number.isInteger(configured) && configured >= 1 && configured <= 365
+    ? configured
+    : DEFAULT_ISSUE_REPORT_RETENTION_DAYS;
+}
+
+export async function purgeExpiredIssueReports({
+  root = issueReportRoot(),
+  retentionDays = issueReportRetentionDays(),
+  now = Date.now()
+} = {}) {
+  await mkdir(root, {recursive: true, mode: 0o700});
+  const cutoff = now - retentionDays * 24 * 60 * 60 * 1000;
+  const entries = await readdir(root, {withFileTypes: true});
+  let deleted = 0;
+  await Promise.all(entries.map(async entry => {
+    if (!entry.isDirectory() || !issueReportId(entry.name)) return;
+    const reportDirectory = path.join(root, entry.name);
+    const report = await readFile(path.join(reportDirectory, 'report.json'), 'utf8')
+      .then(JSON.parse)
+      .catch(() => null);
+    const submittedAt = Date.parse(report?.submittedAt || `${entry.name.slice(0, 10)}T00:00:00.000Z`);
+    if (!Number.isFinite(submittedAt) || submittedAt > cutoff) return;
+    await rm(reportDirectory, {recursive: true, force: true});
+    deleted += 1;
+  }));
+  return deleted;
+}
+
+function startIssueReportCleanup() {
+  const options = {root: issueReportRoot(), retentionDays: issueReportRetentionDays()};
+  const cleanup = () => void purgeExpiredIssueReports(options)
+    .then(deleted => {
+      if (deleted) console.log(`Deleted ${deleted} expired issue report(s).`);
+    })
+    .catch(error => console.error('Issue report cleanup failed:', error));
+  cleanup();
+  const timer = setInterval(cleanup, ISSUE_REPORT_CLEANUP_INTERVAL_MS);
+  timer.unref();
 }
 
 async function notifyIssueReport(reportId, metadata) {
@@ -1054,5 +1098,6 @@ export function createServer() {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  startIssueReportCleanup();
   createServer().listen(PORT, () => console.log(`Weather is available at http://127.0.0.1:${PORT}`));
 }

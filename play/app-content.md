@@ -6,7 +6,7 @@
 - Default language: English (United States)
 - App or game: App
 - Category: Weather
-- Contact email: webmaster@vespy.eu
+- Contact email: vespy.weather@gmail.com
 - Privacy policy URL: https://weather.vespy.eu/privacy.html
 
 ## Declarations

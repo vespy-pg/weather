@@ -20,6 +20,11 @@ Shared rules in `~/.ai/rules/` are the source of truth for machine-wide AI behav
 - Deploy the committed GitHub revision so local, remote and deployed files remain consistent.
 - Preserve and reconcile uncommitted deployed changes through Git before deploying.
 
+## Public contact
+
+- The public contact email address for this project is `vespy.weather@gmail.com`.
+- Use this address in public-facing project content, store listings, privacy information and support instructions.
+
 ## Android releases
 
 - Every new Android version must include release notes for every supported Google Play locale.

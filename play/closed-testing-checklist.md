@@ -13,7 +13,7 @@
 - [ ] Open Test and release > Testing > Closed testing in Play Console.
 - [ ] Create a track named `closed` or manage the default closed track.
 - [ ] Select the existing tester email list or a Google Group.
-- [ ] Set the feedback address to `webmaster@vespy.eu`.
+- [ ] Set the feedback address to `vespy.weather@gmail.com`.
 - [ ] Select the intended countries and regions.
 - [ ] Review the release, resolve all errors, and start the rollout.
 - [ ] Share the closed-test opt-in link with eligible testers.

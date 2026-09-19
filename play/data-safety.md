@@ -1,12 +1,43 @@
-# Google Play Data Safety draft
+# Google Play Data Safety declaration
 
 Verify every answer against the production build and the current Play Console wording before submission.
+
+The response matrix below was verified against the Play Console CSV export on 2026-09-19. Treat it as the canonical declaration until the application's data handling changes.
+
+## Play Console response matrix
+
+### General responses
+
+- Collects or shares required user data types: Yes.
+- All collected user data is encrypted in transit: Yes.
+- Account creation methods: The app does not allow users to create an account.
+- Users can sign in with accounts created outside the app: No.
+- Users can request data deletion: Yes.
+- Data deletion information URL: `https://weather.vespy.eu/privacy.html`.
+- Families policy badge: Not selected.
+- Independent security review badge: Not selected.
+- UPI badge: Not selected.
+
+### Selected data types and handling
+
+All selected types are marked as collected, not shared, not processed ephemerally, and optional.
+
+| Data type | Collection purposes |
+| --- | --- |
+| Approximate location | App functionality |
+| Diagnostics | App functionality, Analytics |
+| App interactions | Analytics |
+| In-app search history | App functionality |
+| Other user-generated content | App functionality |
+| Device or other IDs | Analytics |
+
+No other data types are selected. In particular, precise location, crash logs, photos, videos, files, personal information, financial information and installed apps are not selected.
 
 ## Data collection and sharing
 
 - The app collects or transmits user data: Yes.
 - Data is encrypted in transit: Yes, production endpoints use HTTPS.
-- Users can request deletion: Yes. Issue reports return a report ID that can be sent to `webmaster@vespy.eu` with a deletion request. Local data can be deleted by clearing app storage or uninstalling the app. Operational logs follow server log rotation.
+- Users can request deletion: Yes. Issue reports return a report ID that can be sent to `vespy.weather@gmail.com` with a deletion request. Reports are also deleted automatically no later than 30 days after submission. Local data can be deleted by clearing app storage or uninstalling the app. Operational logs follow server log rotation.
 - The app allows users to request that data is deleted without deleting an account: Yes, for optional issue reports. The app has no account.
 
 ## Data types
@@ -14,20 +45,23 @@ Verify every answer against the production build and the current Play Console wo
 ### Approximate location
 
 - Collected: Yes. A searched or device-derived location is sent to the Weather API to obtain forecasts.
-- Shared: Service-provider processing may apply for Open-Meteo and OpenStreetMap Nominatim. Official warnings are retrieved from MeteoAlarm country feeds without sending the selected coordinates to MeteoAlarm. Use Play Console's service-provider exception where applicable.
+- Shared: No. Open-Meteo and OpenStreetMap Nominatim process it as service providers. Official warnings are retrieved from MeteoAlarm country feeds without sending the selected coordinates to MeteoAlarm.
 - Purpose: App functionality.
-- Processing: Required for a selected forecast. Device permission itself is optional because users can search manually.
+- Processing: Not ephemeral. The API uses short-lived in-memory caches and operational request logs may contain request parameters.
+- Optional: Yes. Device location permission is optional because users can search manually.
 
 ### App activity
 
-- Collected: Only after explicit analytics consent.
-- Data: App interactions such as forecast loads, display-setting changes, and promotion impressions or clicks.
-- Purpose: Analytics.
-- Optional: Yes. Collection is disabled by default and can be withdrawn in Settings.
+- App interactions are collected only after explicit analytics consent. Examples include forecast loads, display-setting changes, and promotion impressions or clicks.
+- App interactions are not shared, not processed ephemerally, optional, and used for analytics.
+- In-app search history is collected to return place search results. It is not shared, not processed ephemerally, optional, and used for app functionality.
+- Other user-generated content is collected only when the user submits an issue description. It is not shared, not processed ephemerally, optional, and used for app functionality.
 
 ### Device or other identifiers
 
 - Collected: Treat the Firebase app instance identifier as collected only after analytics consent. Advertising ID permissions are explicitly removed from the merged manifest.
+- Shared: No.
+- Processing: Not ephemeral.
 - Purpose: Analytics.
 - Optional: Yes.
 
@@ -36,8 +70,9 @@ Verify every answer against the production build and the current Play Console wo
 - Collected: Only when the user explicitly submits an issue report.
 - Data: The entered problem description and app version. If the diagnostic option remains enabled, the report also contains the device manufacturer and model, Android/API version, screen dimensions, display density, font scale, app and widget display settings, location names, diagnostic images of the app and every widget, exact rendering dimensions, and sanitized forecast values needed to reproduce widget rendering.
 - Excluded: Precise coordinates are not included in issue reports.
-- Purpose: App functionality and developer communications, specifically troubleshooting and resolving the reported problem.
+- Purpose: The issue description is used for app functionality. Diagnostic data is used for app functionality and analytics, specifically troubleshooting and resolving the reported problem.
 - Optional: Yes. Sending a report is optional, and diagnostic details and images can be disabled before submission.
+- Retention: Reports and their diagnostic attachments are automatically deleted no later than 30 days after submission.
 - Sharing: No sale or advertising use. Hosting providers may process the report as service providers. A notification provider may receive only the opaque report ID and app version, never the description, device details, location names, or images.
 
 ### Play Console checklist for optional issue reports

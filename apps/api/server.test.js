@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {mkdtemp, readFile, rm} from 'node:fs/promises';
+import {mkdir, mkdtemp, readFile, readdir, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
-import {createServer, forecastUrl, isForecastRoutePath, locationMatchesQualifiers, locationSearchUrl, locationSearchVariants, mushroomCondition, mushroomObservationsUrl, normalizeForecast, normalizeGoogleAnalyticsId, normalizeIssueReport, normalizeLocale, normalizeMushroomObservations, normalizePostalLocations, normalizeReverseLocation, normalizedSearchText, postalCodeSearchUrl, preferredLanguageForCountry, promotionFeed, rankLocationCandidates, renderIndexHtml, selectCapitalResult, seoPageMetadata, staticCacheControl} from './server.js';
+import {createServer, forecastUrl, isForecastRoutePath, locationMatchesQualifiers, locationSearchUrl, locationSearchVariants, mushroomCondition, mushroomObservationsUrl, normalizeForecast, normalizeGoogleAnalyticsId, normalizeIssueReport, normalizeLocale, normalizeMushroomObservations, normalizePostalLocations, normalizeReverseLocation, normalizedSearchText, postalCodeSearchUrl, preferredLanguageForCountry, promotionFeed, purgeExpiredIssueReports, rankLocationCandidates, renderIndexHtml, selectCapitalResult, seoPageMetadata, staticCacheControl} from './server.js';
 
 test('normalizes issue reports without retaining encoded attachment data in metadata', () => {
   const report = normalizeIssueReport({
@@ -25,6 +25,31 @@ test('rejects incomplete issue reports and unsupported attachments', () => {
     description: 'A sufficiently detailed report.',
     attachments: [{name: 'data.txt', contentType: 'text/plain', base64: Buffer.from('data').toString('base64')}]
   }), /Attachment 1 is invalid/);
+});
+
+test('deletes issue reports after the configured retention period', async () => {
+  const reportRoot = await mkdtemp(path.join(tmpdir(), 'weather-issue-retention-'));
+  const oldId = '2026-08-01-00000000-0000-4000-8000-000000000001';
+  const recentId = '2026-09-10-00000000-0000-4000-8000-000000000002';
+  try {
+    await Promise.all([oldId, recentId].map(async reportId => {
+      const directory = path.join(reportRoot, reportId);
+      await mkdir(directory);
+      const submittedAt = reportId === oldId ? '2026-08-01T12:00:00.000Z' : '2026-09-10T12:00:00.000Z';
+      await writeFile(path.join(directory, 'report.json'), JSON.stringify({reportId, submittedAt}));
+    }));
+
+    const deleted = await purgeExpiredIssueReports({
+      root: reportRoot,
+      retentionDays: 30,
+      now: Date.parse('2026-09-19T12:00:00.000Z')
+    });
+
+    assert.equal(deleted, 1);
+    assert.deepEqual(await readdir(reportRoot), [recentId]);
+  } finally {
+    await rm(reportRoot, {recursive: true, force: true});
+  }
 });
 
 test('accepts an issue report and stores metadata outside the application image', async () => {

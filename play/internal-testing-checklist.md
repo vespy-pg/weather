@@ -14,7 +14,7 @@
 ## Play Console setup
 
 - [ ] Upload the title, descriptions, icon, feature graphic and screenshots from `play/store-listing/en-US`.
-- [ ] Set category to Weather and contact email to `webmaster@vespy.eu`.
+- [ ] Set category to Weather and contact email to `vespy.weather@gmail.com`.
 - [ ] Publish `https://weather.vespy.eu/privacy.html` before entering it as the privacy-policy URL.
 - [ ] Complete App access, Ads, Target audience, Content rating and Data Safety using the drafts in `play/`.
 - [ ] Add tester email addresses or a Google Group to the internal track.
