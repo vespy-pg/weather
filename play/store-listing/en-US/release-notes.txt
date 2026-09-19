@@ -1,1 +1,1 @@
-Improves saved locations, settings stability, and widget scaling and touch handling. Adds adjustable temperature text, clearer forecast spacing, and issue reports with optional per-widget rendering diagnostics.
+Updates Android compatibility and resolves an outdated Fragment SDK warning while retaining the latest widget and issue-report diagnostics improvements.

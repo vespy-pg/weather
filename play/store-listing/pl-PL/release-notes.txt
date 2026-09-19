@@ -1,1 +1,1 @@
-Ulepszono zapisane lokalizacje, stabilność ustawień oraz skalowanie i obsługę widgetów. Dodano regulację temperatur, czytelniejszy układ prognozy i raporty z diagnostyką renderowania każdego widgetu.
+Zaktualizowano zgodność z Androidem i usunięto ostrzeżenie o nieaktualnym pakiecie Fragment, zachowując najnowsze ulepszenia widgetów i raportów diagnostycznych.
