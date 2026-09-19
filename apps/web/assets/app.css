@@ -91,6 +91,15 @@ h2 { margin-bottom: 2px; font-size: 18px; }
 .stale-weather-warning strong { display: block; color: var(--orange); font-size: 16px; }
 .stale-weather-warning p { margin: 4px 0 0; color: var(--text); font-size: 12px; line-height: 1.45; }
 .weather-stale .forecast-panel { border-color: color-mix(in srgb, var(--orange) 70%, var(--line)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--orange) 18%, transparent); }
+.android-app-promotion { display: flex; min-height: 62px; align-items: center; justify-content: center; gap: 18px; margin-bottom: 10px; padding: 5px 16px; border: 1px solid var(--line); border-radius: 10px; background: radial-gradient(circle at 58% 0, color-mix(in srgb, var(--blue) 14%, transparent), transparent 34%), var(--panel); }
+.android-app-promotion strong { font-size: 14px; letter-spacing: -.01em; }
+.google-play-link { display: block; border-radius: 8px; transition: filter .15s ease, transform .15s ease; }
+.google-play-link:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.google-play-link:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.google-play-badge { display: block; width: 168px; height: auto; }
+.google-play-badge-pl { display: none; }
+html[lang="pl-PL"] .google-play-badge-en { display: none; }
+html[lang="pl-PL"] .google-play-badge-pl { display: block; }
 .topbar-actions { display: flex; min-width: 0; flex: 0 0 auto; align-items: center; gap: 7px; }
 .location-heading { position: relative; min-width: 0; }
 .location-title-row { position: relative; display: flex; min-width: 0; align-items: center; gap: 8px; }
@@ -345,22 +354,29 @@ html[data-share-prompt="collapsed"] .share-forecast { display: none; }
 .settings-content { padding: 18px; }
 .settings-content fieldset { margin: 16px 0 0; border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
 .settings-content legend { padding: 0 6px; color: var(--muted); font-size: 11px; font-weight: 800; }
-.selected-location-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
-.selected-location { min-width: 0; margin: 0; font-weight: 800; }
-.saved-locations { display: grid; gap: 5px; margin-bottom: 10px; }
+.settings-google-play-link { display: block; width: 168px; margin: 0 auto 14px; border-radius: 8px; transition: filter .15s ease, transform .15s ease; }
+.settings-google-play-link:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.settings-google-play-link:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.settings-google-play-link .google-play-badge { width: 100%; }
+.settings-location-picker { position: relative; z-index: 2; margin-bottom: 10px; }
+.settings-location-toggle { display: flex; width: 100%; min-height: 42px; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--text); font-weight: 800; text-align: left; cursor: pointer; }
+.settings-location-toggle:hover, .settings-location-toggle[aria-expanded="true"] { border-color: var(--blue); background: var(--control-hover); }
+.settings-location-toggle svg { width: 17px; height: 17px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s ease; }
+.settings-location-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+.settings-location-options { position: absolute; z-index: 4; top: calc(100% + 5px); right: 0; left: 0; display: grid; max-height: 230px; gap: 5px; overflow: auto; padding: 6px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); box-shadow: 0 14px 38px rgba(0, 0, 0, .42); }
 .saved-location { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 5px; }
-.saved-location-select, .saved-location-share, .saved-location-remove, .location-share-button { border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--text); cursor: pointer; }
+.saved-location-select, .saved-location-share, .saved-location-remove { border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--text); cursor: pointer; }
 .saved-location-select { padding: 8px 10px; text-align: left; }
 .saved-location-select[aria-pressed="true"] { border-color: var(--blue); background: var(--control-hover); }
 .saved-location-share, .saved-location-remove { display: grid; width: 38px; place-items: center; }
-.saved-location-share, .location-share-button { color: var(--blue); }
-.saved-location-share svg, .location-share-button svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.location-share-button { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 7px; padding: 8px 10px; font-size: 11px; font-weight: 800; }
+.saved-location-share { color: var(--blue); }
+.saved-location-share svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .saved-location-remove { color: var(--muted); font-size: 19px; }
-.saved-location-share:hover, .location-share-button:hover { border-color: var(--blue); background: var(--control-hover); }
+.saved-location-share:hover { border-color: var(--blue); background: var(--control-hover); }
 .saved-location-remove:hover { border-color: var(--red); color: var(--red); }
 .saved-location-remove:disabled { opacity: .35; cursor: not-allowed; }
-.location-search-row { display: grid; grid-template-columns: 1fr auto auto; gap: 7px; }
+.location-search-row { display: grid; grid-template-columns: 1fr; gap: 7px; }
+.location-search-row button { width: 100%; min-height: 40px; }
 .location-search-row input, .setting-row select, .embed-code-row textarea { min-width: 0; border: 1px solid var(--line); border-radius: 7px; padding: 9px 11px; background: var(--surface); color: var(--text); }
 .location-results { display: grid; gap: 5px; margin-top: 8px; }
 .location-status { min-height: 16px; margin: 7px 0 0; color: var(--green); font-size: 11px; }
@@ -388,6 +404,7 @@ html[data-share-prompt="collapsed"] .share-forecast { display: none; }
 .temperature-scale-slider input[data-temperature-threshold="hot"] { --thumb-color: #ff263f; }
 .temperature-scale-values { position: relative; height: 25px; margin: 0 9px; color: var(--muted); font: 700 9px/1 ui-monospace, monospace; }
 .temperature-scale-values span { position: absolute; left: var(--position); transform: translateX(-50%); white-space: nowrap; }
+.temperature-threshold-list { display: none; }
 .settings-help { margin: 0 0 9px; color: var(--muted); font-size: 11px; line-height: 1.5; }
 .embed-code-row { display: grid; grid-template-columns: 1fr auto; align-items: start; gap: 7px; }
 .embed-code-row textarea { width: 100%; resize: vertical; font: 700 10px/1.45 ui-monospace, monospace; }
@@ -409,7 +426,7 @@ html[data-share-prompt="collapsed"] .share-forecast { display: none; }
 
 body.embedded { overflow-y: hidden; background: transparent; }
 body.embedded .shell { width: 100%; margin: 0; }
-body.embedded .topbar, body.embedded .share-forecast, body.embedded .current-grid, body.embedded .daily-panel, body.embedded .web-promotion { display: none; }
+body.embedded .android-app-promotion, body.embedded .topbar, body.embedded .share-forecast, body.embedded .current-grid, body.embedded .daily-panel, body.embedded .web-promotion { display: none; }
 body.embedded .forecast-panel { margin: 0; border-radius: 0; }
 body.embedded .forecast-guide { margin: 0; border-top: 0; border-radius: 0; }
 body.embedded .forecast-heading-tools .muted { display: none; }
@@ -453,6 +470,20 @@ body.embedded .data-attribution { display: none; }
 
 @media (max-width: 640px) {
   .topbar-actions .language-control, .topbar-actions .theme-button { display: none; }
+  .settings-dialog { inset: 0; width: 100vw; max-width: none; height: 100dvh; max-height: none; margin: 0; border: 0; border-radius: 0; }
+  .settings-content { min-height: 100dvh; padding: 16px max(14px, env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
+  .settings-google-play-link { margin-bottom: 12px; }
+  .temperature-scale-heading { margin-bottom: 8px; }
+  .temperature-scale-heading small { display: none; }
+  .temperature-scale-slider, .temperature-scale-values { display: none; }
+  .temperature-threshold-list { display: grid; gap: 12px; }
+  .temperature-threshold-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 5px 12px; color: var(--text); font-size: 13px; }
+  .temperature-threshold-row output { color: var(--muted); font: 700 12px/1 ui-monospace, monospace; }
+  .temperature-threshold-row input { width: 100%; height: 30px; grid-column: 1 / -1; margin: 0; accent-color: var(--blue); cursor: pointer; }
+  .temperature-threshold-row input[data-temperature-threshold="deepFrost"] { accent-color: #aab3bf; }
+  .temperature-threshold-row input[data-temperature-threshold="mild"] { accent-color: #45cf88; }
+  .temperature-threshold-row input[data-temperature-threshold="warm"] { accent-color: #f28e3e; }
+  .temperature-threshold-row input[data-temperature-threshold="hot"] { accent-color: #ff263f; }
 }
 
 @media (orientation: landscape) and (max-height: 620px) {
@@ -464,6 +495,8 @@ body.embedded .data-attribution { display: none; }
   .location-edit-button { width: 27px; height: 27px; }
   .location-heading .muted { font-size: 9px; line-height: 1.15; }
   .topbar-actions { gap: 4px; }
+  .android-app-promotion { min-height: 52px; margin-bottom: 5px; padding: 2px 10px; }
+  .google-play-badge { width: 150px; }
   .topbar-actions .theme-button, .topbar-actions .settings-button { display: grid; width: 30px; height: 30px; place-items: center; padding: 0; }
   .topbar-actions .theme-button #themeLabel, .topbar-actions .settings-button span { display: none; }
   .language-control { height: 30px; padding: 2px 5px; }
@@ -500,8 +533,7 @@ body.embedded .data-attribution { display: none; }
   .analytics-consent-actions { justify-content: flex-end; }
   .panel { padding: 10px; }
   .section-heading { align-items: flex-start; }
-  .location-search-row { grid-template-columns: 1fr 1fr; }
-  .location-search-row input { grid-column: 1 / -1; }
+  .location-search-row { grid-template-columns: 1fr; }
   .legend-grid { grid-template-columns: 1fr; }
   .embed-code-row { grid-template-columns: 1fr; }
   .web-promotion-link { grid-template-columns: 106px minmax(0, 1fr); gap: 8px 10px; padding: 9px 10px; }

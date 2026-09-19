@@ -1236,6 +1236,8 @@ function fillSettingsForm() {
   pendingLocations = [...settings.locations];
   document.getElementById('locationQuery').value = '';
   renderPendingLocations();
+  document.getElementById('settingsLocationOptions').hidden = true;
+  document.getElementById('settingsLocationToggle').setAttribute('aria-expanded', 'false');
   document.getElementById('defaultZoom').value = String(settings.zoom);
   document.getElementById('colorTheme').value = settings.theme;
   document.getElementById('languageSetting').value = settings.language;
@@ -1273,11 +1275,24 @@ function renderTemperatureScale() {
     warm: celsiusToDisplay(thresholds.warm),
     hot: celsiusToDisplay(thresholds.hot)
   };
+  const step = temperatureUnit() === 'F' ? 1 : .5;
+  const mobileBounds = {
+    deepFrost: [celsiusToDisplay(-30), celsiusToDisplay(-1)],
+    mild: [celsiusToDisplay(1), values.warm - step],
+    warm: [values.mild + step, values.hot - step],
+    hot: [values.warm + step, celsiusToDisplay(45)]
+  };
   document.querySelectorAll('[data-temperature-threshold]').forEach(input => {
-    input.min = String(bounds.minimum);
-    input.max = String(bounds.maximum);
-    input.step = temperatureUnit() === 'F' ? '1' : '.5';
-    input.value = String(values[input.dataset.temperatureThreshold]);
+    const name = input.dataset.temperatureThreshold;
+    const limits = input.closest('.temperature-threshold-list') && mobileBounds[name];
+    input.min = String(limits?.[0] ?? bounds.minimum);
+    input.max = String(limits?.[1] ?? bounds.maximum);
+    input.step = String(step);
+    input.value = String(values[name]);
+  });
+  document.querySelectorAll('[data-threshold-value]').forEach(output => {
+    const value = Number(values[output.dataset.thresholdValue]);
+    output.textContent = `${value.toFixed(Number.isInteger(value) ? 0 : 1)}°${temperatureUnit()}`;
   });
   const range = bounds.maximum - bounds.minimum;
   const position = value => (value - bounds.minimum) / range * 100;
@@ -1384,8 +1399,8 @@ function saveFormChanges({reloadWeather = false} = {}) {
 }
 
 function renderPendingLocations() {
-  document.getElementById('selectedLocation').textContent = `${t('settings.activeLocation')}: ${locationLabel(pendingLocation)}`;
-  const container = document.getElementById('savedLocations');
+  document.getElementById('settingsLocationValue').textContent = locationLabel(pendingLocation);
+  const container = document.getElementById('settingsLocationOptions');
   container.innerHTML = pendingLocations.map((item, index) => `<div class="saved-location">
     <button type="button" class="saved-location-select" data-saved-location="${index}" aria-pressed="${sameLocation(item, pendingLocation)}">${escapeHtml(locationLabel(item))}</button>
     <button type="button" class="saved-location-share" data-share-location="${index}" aria-label="${escapeHtml(t('action.shareLocation'))}" title="${escapeHtml(t('action.shareLocation'))}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="2.5"></circle><circle cx="6" cy="12" r="2.5"></circle><circle cx="18" cy="19" r="2.5"></circle><path d="m8.2 10.8 7.6-4.5M8.2 13.2l7.6 4.5"></path></svg></button>
@@ -1394,6 +1409,8 @@ function renderPendingLocations() {
   container.querySelectorAll('[data-saved-location]').forEach(button => button.addEventListener('click', () => {
     pendingLocation = pendingLocations[Number(button.dataset.savedLocation)];
     renderPendingLocations();
+    container.hidden = true;
+    document.getElementById('settingsLocationToggle').setAttribute('aria-expanded', 'false');
     saveFormChanges({reloadWeather: true});
   }));
   container.querySelectorAll('[data-remove-location]').forEach(button => button.addEventListener('click', () => {
@@ -1449,7 +1466,7 @@ async function searchLocations() {
   clearTimeout(locationSearchTimer);
   const query = document.getElementById('locationQuery').value.trim();
   const resultsElement = document.getElementById('locationResults');
-  if (query.length < 2) return;
+  if (query.length < 3) return;
   const requestId = ++locationSearchRequest;
   resultsElement.textContent = t('status.searching');
   resultsElement.hidden = false;
@@ -1493,8 +1510,18 @@ function toggleLocationMenu() {
 }
 document.getElementById('editLocation').addEventListener('click', toggleLocationMenu);
 document.getElementById('locationTitle').addEventListener('click', toggleLocationMenu);
+document.getElementById('settingsLocationToggle').addEventListener('click', event => {
+  const options = document.getElementById('settingsLocationOptions');
+  const opening = options.hidden;
+  options.hidden = !opening;
+  event.currentTarget.setAttribute('aria-expanded', String(opening));
+});
 document.addEventListener('click', event => {
   if (!event.target.closest('.location-title-row')) closeLocationMenu();
+  if (!event.target.closest('.settings-location-picker')) {
+    document.getElementById('settingsLocationOptions').hidden = true;
+    document.getElementById('settingsLocationToggle').setAttribute('aria-expanded', 'false');
+  }
 });
 document.getElementById('themeToggle').addEventListener('click', () => {
   applyTheme(settings.theme === 'dark' ? 'light' : 'dark', true);
@@ -1549,7 +1576,6 @@ document.getElementById('copyEmbedCode').addEventListener('click', async () => {
   }
 });
 document.querySelectorAll('[data-share-forecast]').forEach(button => button.addEventListener('click', () => openShareDialog()));
-document.getElementById('shareActiveLocation').addEventListener('click', () => openShareDialog(pendingLocation));
 document.getElementById('shareNative').addEventListener('click', async () => {
   if (!navigator.share) return;
   try {
@@ -1576,12 +1602,12 @@ document.getElementById('closeShareDialog').addEventListener('click', () => docu
 document.getElementById('shareDialog').addEventListener('click', event => {
   if (event.target === event.currentTarget) event.currentTarget.close();
 });
-document.getElementById('searchLocation').addEventListener('click', searchLocations);
 document.getElementById('locationQuery').addEventListener('input', event => {
   clearTimeout(locationSearchTimer);
   const query = event.currentTarget.value.trim();
-  if (query.length < 2) {
+  if (query.length < 3) {
     locationSearchRequest += 1;
+    document.getElementById('locationResults').innerHTML = '';
     document.getElementById('locationResults').hidden = true;
     document.getElementById('settingsError').textContent = '';
     return;

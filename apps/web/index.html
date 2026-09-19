@@ -33,10 +33,17 @@
       if (query.get('share') !== '1' && localStorage.getItem('weather.share-prompt.v1') === 'collapsed') document.documentElement.dataset.sharePrompt = 'collapsed';
     } catch { document.documentElement.dataset.theme = 'dark'; }
   </script>
-  <link rel="stylesheet" href="/assets/app.css?v=54">
+  <link rel="stylesheet" href="/assets/app.css?v=57">
 </head>
 <body>
   <main class="shell">
+    <aside class="android-app-promotion">
+      <strong data-i18n="app.androidPromotion">Vespy Weather on your phone</strong>
+      <a class="google-play-link" href="https://play.google.com/store/apps/details?id=eu.vespy.weather" target="_blank" rel="noopener noreferrer">
+        <img class="google-play-badge google-play-badge-en" src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" alt="Get it on Google Play">
+        <img class="google-play-badge google-play-badge-pl" src="https://play.google.com/intl/en_us/badges/static/images/badges/pl_badge_web_generic.png" alt="Pobierz z Google Play">
+      </a>
+    </aside>
     <header class="topbar">
       <div class="location-heading">
         <p class="eyebrow" data-i18n="app.weather">WEATHER</p>
@@ -348,24 +355,26 @@
 
   <dialog class="settings-dialog" id="settingsDialog">
     <form method="dialog" class="settings-content" id="settingsForm">
+      <a class="settings-google-play-link" href="https://play.google.com/store/apps/details?id=eu.vespy.weather" target="_blank" rel="noopener noreferrer">
+        <img class="google-play-badge google-play-badge-en" src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" alt="Get it on Google Play">
+        <img class="google-play-badge google-play-badge-pl" src="https://play.google.com/intl/en_us/badges/static/images/badges/pl_badge_web_generic.png" alt="Pobierz z Google Play">
+      </a>
       <div class="dialog-heading">
         <div><p class="eyebrow" data-i18n="settings.eyebrow">PERSONALIZATION</p><h2 data-i18n="settings.title">Weather settings</h2></div>
-        <button class="icon-button" value="cancel" aria-label="Close settings">×</button>
+        <button class="icon-button" value="cancel" aria-label="Close settings" autofocus>×</button>
       </div>
 
       <fieldset>
         <legend data-i18n="settings.location">Location</legend>
-        <div class="selected-location-row">
-          <p class="selected-location" id="selectedLocation"></p>
-          <button class="location-share-button" type="button" id="shareActiveLocation">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="2.5"></circle><circle cx="6" cy="12" r="2.5"></circle><circle cx="18" cy="19" r="2.5"></circle><path d="m8.2 10.8 7.6-4.5M8.2 13.2l7.6 4.5"></path></svg>
-            <span data-i18n="action.shareLocation">Share location</span>
+        <div class="settings-location-picker">
+          <button class="settings-location-toggle" type="button" id="settingsLocationToggle" aria-expanded="false" aria-controls="settingsLocationOptions">
+            <span id="settingsLocationValue"></span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"></path></svg>
           </button>
+          <div class="settings-location-options" id="settingsLocationOptions" hidden></div>
         </div>
-        <div class="saved-locations" id="savedLocations"></div>
         <div class="location-search-row">
-          <input id="locationQuery" type="search" minlength="2" autocomplete="off" placeholder="Search city, place or postal code" data-i18n-placeholder="settings.searchPlaceholder">
-          <button type="button" id="searchLocation" data-i18n="action.search">Search</button>
+          <input id="locationQuery" type="search" minlength="3" autocomplete="off" placeholder="Search city, place or postal code" data-i18n-placeholder="settings.searchPlaceholder">
           <button type="button" id="useDeviceLocation" data-i18n="action.useDevice">Use device</button>
         </div>
         <div class="location-results" id="locationResults" aria-live="polite"></div>
@@ -394,6 +403,24 @@
             <input type="range" data-temperature-threshold="hot" aria-label="Hot threshold">
           </div>
           <div class="temperature-scale-values" id="temperatureScaleValues"></div>
+          <div class="temperature-threshold-list">
+            <label class="temperature-threshold-row">
+              <span data-i18n="settings.thresholdDeepFrost">Deep frost</span><output data-threshold-value="deepFrost"></output>
+              <input type="range" data-temperature-threshold="deepFrost" aria-label="Deep frost threshold">
+            </label>
+            <label class="temperature-threshold-row">
+              <span data-i18n="settings.thresholdMild">Mild</span><output data-threshold-value="mild"></output>
+              <input type="range" data-temperature-threshold="mild" aria-label="Mild threshold">
+            </label>
+            <label class="temperature-threshold-row">
+              <span data-i18n="settings.thresholdWarm">Warm</span><output data-threshold-value="warm"></output>
+              <input type="range" data-temperature-threshold="warm" aria-label="Warm threshold">
+            </label>
+            <label class="temperature-threshold-row">
+              <span data-i18n="settings.thresholdHot">Hot</span><output data-threshold-value="hot"></output>
+              <input type="range" data-temperature-threshold="hot" aria-label="Hot threshold">
+            </label>
+          </div>
         </div>
         <label class="setting-row"><span data-i18n="settings.zoom">Default timeline zoom</span>
           <select id="defaultZoom"><option value="0.25">25% (2/day)</option><option value="0.3">30% (4/day)</option><option value="0.5">50% (6/day)</option><option value="0.75">75% (8/day)</option><option value="1">100% (12/day)</option><option value="2">200% (24/day)</option></select>
@@ -431,6 +458,6 @@
     </form>
   </dialog>
 
-  <script src="/assets/app.js?v=54" type="module"></script>
+  <script src="/assets/app.js?v=55" type="module"></script>
 </body>
 </html>
