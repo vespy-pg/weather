@@ -1085,7 +1085,7 @@ private fun SunlightComparison(sunrise: String?, sunset: String?, dayLength: Dou
         }
         DayBriefRow(
             stringResource(R.string.above_shortest_day), "+${durationText(aboveShortest)}",
-            stringResource(R.string.below_longest_day), "-${durationText(belowLongest)}",
+            stringResource(R.string.below_longest_day), durationText(belowLongest),
             Color(0xFFFFC83D), Color(0xFFFFC83D),
         )
     }
