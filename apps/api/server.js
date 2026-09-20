@@ -478,7 +478,22 @@ export function mushroomCondition(source, dailyIndex) {
   };
 }
 
-export function normalizeForecast(source, location, {pastDays = 0} = {}) {
+const POLLEN_FIELDS = ['alder_pollen', 'birch_pollen', 'grass_pollen', 'mugwort_pollen', 'olive_pollen', 'ragweed_pollen'];
+
+export function dailyPollen(source, date) {
+  const timestamps = source?.hourly?.time || [];
+  const values = POLLEN_FIELDS.reduce((result, field) => {
+    const readings = timestamps.flatMap((timestamp, index) => String(timestamp).startsWith(date) ? [at(source.hourly, field, index)] : [])
+      .filter(value => value !== null && value !== undefined && value !== '')
+      .map(Number)
+      .filter(Number.isFinite);
+    result[field.replace('_pollen', '')] = readings.length ? Number(Math.max(...readings).toFixed(1)) : null;
+    return result;
+  }, {});
+  return Object.values(values).some(value => value !== null) ? values : null;
+}
+
+export function normalizeForecast(source, location, {pastDays = 0, pollenSource = null} = {}) {
   const allHourlyTimes = source.hourly?.time || [];
   const currentHour = String(source.current?.time || '').slice(0, 13);
   const matchingHourIndex = allHourlyTimes.findIndex(timestamp => String(timestamp).slice(0, 13) === currentHour);
@@ -548,6 +563,7 @@ export function normalizeForecast(source, location, {pastDays = 0} = {}) {
       windGustsMaximum: at(source.daily, 'wind_gusts_10m_max', sourceIndex),
       windDirection: at(source.daily, 'wind_direction_10m_dominant', sourceIndex),
       uvIndexMaximum: at(source.daily, 'uv_index_max', sourceIndex),
+      pollen: dailyPollen(pollenSource, date),
       mushroom: mushroomCondition(source, sourceIndex)
     };
     }),
@@ -574,6 +590,17 @@ export function forecastUrl({latitude, longitude, timezone, includeMushrooms = f
   const requestedPastDays = Math.max(includeMushrooms ? 7 : 0, Math.max(0, Math.min(7, Math.trunc(Number(pastDays) || 0))));
   if (requestedPastDays) parameters.set('past_days', String(requestedPastDays));
   return `https://api.open-meteo.com/v1/forecast?${parameters}`;
+}
+
+export function pollenForecastUrl({latitude, longitude, timezone}) {
+  const parameters = new URLSearchParams({
+    latitude: String(latitude),
+    longitude: String(longitude),
+    timezone: timezone || 'auto',
+    forecast_days: '4',
+    hourly: POLLEN_FIELDS.join(',')
+  });
+  return `https://air-quality-api.open-meteo.com/v1/air-quality?${parameters}`;
 }
 
 export function mushroomObservationsUrl({latitude, longitude, language = DEFAULT_LOCALE}, now = new Date()) {
@@ -996,16 +1023,17 @@ async function weather(requestUrl, response) {
     admin2: requestUrl.searchParams.get('admin2') || null,
     admin3: requestUrl.searchParams.get('admin3') || null
   };
-  const [source, resolvedLocation] = await Promise.all([
+  const [source, resolvedLocation, pollenSource] = await Promise.all([
     cachedFetch(forecastUrl({
     ...location,
     includeMushrooms: ['1', 'true'].includes(requestUrl.searchParams.get('mushrooms')),
     pastDays
     })),
-    resolvedWeatherLocation(location, language).catch(() => location)
+    resolvedWeatherLocation(location, language).catch(() => location),
+    cachedFetch(pollenForecastUrl(location)).catch(() => null)
   ]);
   const alerts = await meteoAlarmWarnings(resolvedLocation, language, cachedFetchText).catch(() => []);
-  return json(response, 200, {...normalizeForecast(source, resolvedLocation, {pastDays}), alerts});
+  return json(response, 200, {...normalizeForecast(source, resolvedLocation, {pastDays, pollenSource}), alerts});
 }
 
 async function mushroomObservations(requestUrl, response) {

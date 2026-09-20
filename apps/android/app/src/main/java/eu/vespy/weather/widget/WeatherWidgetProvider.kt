@@ -240,7 +240,9 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
         canvas.save()
         canvas.clipPath(android.graphics.Path().apply { addRoundRect(bounds, radius, radius, android.graphics.Path.Direction.CW) })
         val footerHeight = if (advisoryText != null) {
-            val maximumFooterHeight = if (rows >= 3) 92f else 54f
+            // Taller widgets reserve a dedicated 64dp timeline header for weekday, hour and
+            // temperature. Keep the advisory compact so the chart still has room for its layers.
+            val maximumFooterHeight = if (rows >= 3) 62f else 54f
             min(maximumFooterHeight * density, height * if (rows >= 3) .42f else .48f)
         } else 0f
         val chartHeight = height - footerHeight
@@ -249,20 +251,20 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
             compactStrip -> chartHeight * .42f
             rows == 1 -> chartHeight * .38f
             rows == 2 -> min(50f * density, chartHeight * .36f)
-            else -> chartHeight * .24f
+            else -> min(64f * density, chartHeight * .38f)
         }
         val contentHeight = chartHeight - labelHeight
         val skyHeight = if (compactStrip) {
             chartHeight * .30f
         } else if (expanded) {
-            min(68f * density, contentHeight * .36f)
+            min(50f * density, contentHeight * .38f)
         } else {
             min(56f * density, contentHeight * .3f)
         }
         val windHeight = if (compactStrip) {
             chartHeight - labelHeight - skyHeight
         } else if (expanded) {
-            min(42f * density, contentHeight * .22f)
+            min(38f * density, contentHeight * .30f)
         } else {
             min(34f * density, contentHeight * .18f)
         }
@@ -295,6 +297,7 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
             demoLabel = "DEMO".takeIf { widgetSettings.demo },
             lightningScale = .68f,
             inlineCompactHeader = compactStrip,
+            separateHeaderRows = expanded,
         )
         if (locationLabel != null) {
             val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -397,6 +400,14 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
                 ?: ComponentName(context, WeatherWidgetProvider::class.java)
             context.sendBroadcast(Intent().setComponent(component).apply {
                 action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+                // A unique data URI prevents Android from coalescing a save with an earlier
+                // update broadcast. Saving widget settings must always render a fresh bitmap.
+                data = Uri.Builder()
+                    .scheme("vespy-weather")
+                    .authority("widget-refresh")
+                    .appendPath(widgetId.toString())
+                    .appendQueryParameter("request", System.currentTimeMillis().toString())
+                    .build()
                 putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, intArrayOf(widgetId))
             })
         }

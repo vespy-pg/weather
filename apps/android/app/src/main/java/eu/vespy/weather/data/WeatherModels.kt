@@ -40,6 +40,10 @@ data class HourlyWeather(
     val windDirection: Double? = null,
     val windGusts: Double?,
     val tornado: Boolean = false,
+    val relativeHumidity: Double? = null,
+    val visibility: Double? = null,
+    val surfacePressure: Double? = null,
+    val uvIndex: Double? = null,
 )
 
 data class DailyWeather(
@@ -47,6 +51,29 @@ data class DailyWeather(
     val sunrise: String?,
     val sunset: String?,
     val mushroom: MushroomCondition? = null,
+    val weatherCode: Int? = null,
+    val temperatureMaximum: Double? = null,
+    val temperatureMinimum: Double? = null,
+    val apparentTemperatureMaximum: Double? = null,
+    val apparentTemperatureMinimum: Double? = null,
+    val daylightDuration: Double? = null,
+    val sunshineDuration: Double? = null,
+    val precipitation: Double? = null,
+    val precipitationProbability: Double? = null,
+    val windSpeedMaximum: Double? = null,
+    val windGustsMaximum: Double? = null,
+    val windDirection: Double? = null,
+    val uvIndexMaximum: Double? = null,
+    val pollen: PollenForecast? = null,
+)
+
+data class PollenForecast(
+    val alder: Double?,
+    val birch: Double?,
+    val grass: Double?,
+    val mugwort: Double?,
+    val olive: Double?,
+    val ragweed: Double?,
 )
 
 data class MushroomCondition(

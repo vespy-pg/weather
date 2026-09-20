@@ -3,7 +3,7 @@ import test from 'node:test';
 import {mkdir, mkdtemp, readFile, readdir, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
-import {createServer, forecastUrl, isForecastRoutePath, locationMatchesQualifiers, locationSearchUrl, locationSearchVariants, mushroomCondition, mushroomObservationsUrl, normalizeForecast, normalizeGoogleAnalyticsId, normalizeIssueReport, normalizeLocale, normalizeMushroomObservations, normalizePostalLocations, normalizeReverseLocation, normalizedSearchText, postalCodeSearchUrl, preferredLanguageForCountry, promotionFeed, purgeExpiredIssueReports, rankLocationCandidates, renderIndexHtml, selectCapitalResult, seoPageMetadata, staticCacheControl} from './server.js';
+import {createServer, dailyPollen, forecastUrl, isForecastRoutePath, locationMatchesQualifiers, locationSearchUrl, locationSearchVariants, mushroomCondition, mushroomObservationsUrl, normalizeForecast, normalizeGoogleAnalyticsId, normalizeIssueReport, normalizeLocale, normalizeMushroomObservations, normalizePostalLocations, normalizeReverseLocation, normalizedSearchText, pollenForecastUrl, postalCodeSearchUrl, preferredLanguageForCountry, promotionFeed, purgeExpiredIssueReports, rankLocationCandidates, renderIndexHtml, selectCapitalResult, seoPageMetadata, staticCacheControl} from './server.js';
 
 test('normalizes issue reports without retaining encoded attachment data in metadata', () => {
   const report = normalizeIssueReport({
@@ -177,6 +177,17 @@ test('forecastUrl requests the fields shared by web and Android clients', () => 
   assert.match(mushroomUrl.searchParams.get('hourly'), /soil_moisture_0_to_1cm/);
   const historyUrl = new URL(forecastUrl({latitude: 50.67, longitude: 19.12, timezone: 'Europe/Warsaw', pastDays: 3}));
   assert.equal(historyUrl.searchParams.get('past_days'), '3');
+});
+
+test('pollen forecast uses the European air-quality endpoint and aggregates a day by peak concentration', () => {
+  const url = new URL(pollenForecastUrl({latitude: 50.67, longitude: 19.12, timezone: 'Europe/Warsaw'}));
+  assert.equal(url.hostname, 'air-quality-api.open-meteo.com');
+  assert.equal(url.searchParams.get('forecast_days'), '4');
+  assert.match(url.searchParams.get('hourly'), /grass_pollen/);
+  assert.deepEqual(dailyPollen({hourly: {
+    time: ['2026-09-20T00:00', '2026-09-20T12:00', '2026-09-21T00:00'],
+    alder_pollen: [1, 3, 2], birch_pollen: [null, 4, 1], grass_pollen: [8, 6, 2], mugwort_pollen: [0, 1, 0], olive_pollen: [null, null, null], ragweed_pollen: [2, 5, 1]
+  }}, '2026-09-20'), {alder: 3, birch: 4, grass: 8, mugwort: 1, olive: null, ragweed: 5});
 });
 
 test('scores mushroom conditions from recent rain, moisture, humidity, and temperature', () => {

@@ -197,6 +197,10 @@ class WeatherApi(private val baseUrl: String = BuildConfig.API_BASE_URL) {
                     windDirection = item.optNullableDouble("windDirection"),
                     windGusts = item.optNullableDouble("windGusts"),
                     tornado = item.optBoolean("tornado", false),
+                    relativeHumidity = item.optNullableDouble("relativeHumidity"),
+                    visibility = item.optNullableDouble("visibility"),
+                    surfacePressure = item.optNullableDouble("surfacePressure"),
+                    uvIndex = item.optNullableDouble("uvIndex"),
                 ))
             }
         }
@@ -205,6 +209,7 @@ class WeatherApi(private val baseUrl: String = BuildConfig.API_BASE_URL) {
             for (index in 0 until dailySource.length()) {
                 val item = dailySource.getJSONObject(index)
                 val mushroom = item.optJSONObject("mushroom")
+                val pollen = item.optJSONObject("pollen")
                 add(DailyWeather(
                     date = item.optString("date"),
                     sunrise = item.optNullableString("sunrise"),
@@ -216,6 +221,29 @@ class WeatherApi(private val baseUrl: String = BuildConfig.API_BASE_URL) {
                             recentRainfall = it.optNullableDouble("recentRainfall"),
                             relativeHumidity = it.optNullableDouble("relativeHumidity"),
                             soilMoisture = it.optNullableDouble("soilMoisture"),
+                        )
+                    },
+                    weatherCode = item.optNullableInt("weatherCode"),
+                    temperatureMaximum = item.optNullableDouble("temperatureMaximum"),
+                    temperatureMinimum = item.optNullableDouble("temperatureMinimum"),
+                    apparentTemperatureMaximum = item.optNullableDouble("apparentTemperatureMaximum"),
+                    apparentTemperatureMinimum = item.optNullableDouble("apparentTemperatureMinimum"),
+                    daylightDuration = item.optNullableDouble("daylightDuration"),
+                    sunshineDuration = item.optNullableDouble("sunshineDuration"),
+                    precipitation = item.optNullableDouble("precipitation"),
+                    precipitationProbability = item.optNullableDouble("precipitationProbability"),
+                    windSpeedMaximum = item.optNullableDouble("windSpeedMaximum"),
+                    windGustsMaximum = item.optNullableDouble("windGustsMaximum"),
+                    windDirection = item.optNullableDouble("windDirection"),
+                    uvIndexMaximum = item.optNullableDouble("uvIndexMaximum"),
+                    pollen = pollen?.let {
+                        PollenForecast(
+                            alder = it.optNullableDouble("alder"),
+                            birch = it.optNullableDouble("birch"),
+                            grass = it.optNullableDouble("grass"),
+                            mugwort = it.optNullableDouble("mugwort"),
+                            olive = it.optNullableDouble("olive"),
+                            ragweed = it.optNullableDouble("ragweed"),
                         )
                     },
                 ))

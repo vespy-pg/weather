@@ -238,6 +238,7 @@ object ForecastGraphics {
         pointOffset: Int = 0,
         lightningScale: Float = 1f,
         inlineCompactHeader: Boolean = false,
+        separateHeaderRows: Boolean = false,
     ) {
         if (points.isEmpty() || bounds.width() <= 0f || bounds.height() <= 0f) return
         val palette = palette(dark)
@@ -256,7 +257,7 @@ object ForecastGraphics {
             pixelScale, textScale, showHours, temperatureStep.coerceAtLeast(1), precipitationScale,
             showWeekdayNames, fullWeekdayNames, dayLabelTextSize, hourTextSize, temperatureTextSize,
             showTemperatureValues, showPrecipitation, temperatureThresholds, currentTimestamp, showDates,
-            inlineCompactHeader,
+            inlineCompactHeader, separateHeaderRows,
         )
         if (showTemperatureChart) {
             drawTemperature(canvas, temperature, points, palette, pixelScale, showApparentTemperature, temperatureThresholds, temperatureMinimum, temperatureMaximum, lightningScale)
@@ -337,6 +338,7 @@ object ForecastGraphics {
         currentTimestamp: String?,
         showDates: Boolean,
         inlineCompactHeader: Boolean,
+        separateHeaderRows: Boolean,
     ) {
         val cell = bounds.width() / points.size
         val daylightByDate = days.associateBy({ it.date }, { day ->
@@ -361,7 +363,7 @@ object ForecastGraphics {
             canvas, bounds, points, palette, todayLabel, labelHeight, cell, temperatureUnit,
             textScale, showHours, temperatureStep, pixelScale, showWeekdayNames, fullWeekdayNames,
             dayLabelTextSize, hourTextSize, temperatureTextSize, showTemperatureValues, temperatureThresholds,
-            currentTimestamp, showDates, inlineCompactHeader,
+            currentTimestamp, showDates, inlineCompactHeader, separateHeaderRows,
         )
         val weatherLine = bounds.top + labelHeight
         val weatherDepth = (bounds.height() - labelHeight) * .58f
@@ -430,6 +432,7 @@ object ForecastGraphics {
         currentTimestamp: String?,
         showDates: Boolean,
         inlineCompactHeader: Boolean,
+        separateHeaderRows: Boolean,
     ) {
         val mono = Typeface.create("monospace", Typeface.BOLD)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = mono; textAlign = Paint.Align.CENTER }
@@ -451,6 +454,8 @@ object ForecastGraphics {
                 val label = dayName + dateLabel
                 val labelBaseline = if (inlineCompactHeader) {
                     bounds.top + height - max(2f * pixelScale, height * .08f)
+                } else if (separateHeaderRows) {
+                    bounds.top + max(-paint.fontMetrics.top + 2f * pixelScale, height * .34f)
                 } else {
                     bounds.top + max(2f * pixelScale, height * .01f) - paint.fontMetrics.top
                 }
@@ -464,7 +469,8 @@ object ForecastGraphics {
             if (showHours) {
                 paint.color = palette.muted
                 paint.textSize = hourTextSize ?: height * .2f * textScale
-                canvas.drawText(dateTime?.let { "%02d".format(it.hour) } ?: "--", bounds.left + (index + .5f) * cell, bounds.top + height * .55f, paint)
+                val hourBaseline = if (separateHeaderRows) bounds.top + height * .58f else bounds.top + height * .55f
+                canvas.drawText(dateTime?.let { "%02d".format(it.hour) } ?: "--", bounds.left + (index + .5f) * cell, hourBaseline, paint)
             }
             if (showTemperatureValues && index % temperatureStep == 0 && !(inlineCompactHeader && newDay)) {
                 paint.color = temperatureColor(point.temperature, temperatureThresholds)
@@ -476,6 +482,8 @@ object ForecastGraphics {
                 val textX = center.coerceIn(bounds.left + halfWidth + 3f * pixelScale, bounds.right - halfWidth - 3f * pixelScale)
                 val temperatureBaseline = if (inlineCompactHeader) {
                     bounds.top + height - max(2f * pixelScale, height * .08f)
+                } else if (separateHeaderRows) {
+                    bounds.top + height * .96f
                 } else if (showHours) {
                     bounds.top + height * .91f
                 } else {

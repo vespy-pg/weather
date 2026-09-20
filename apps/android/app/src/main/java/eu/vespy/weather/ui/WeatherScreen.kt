@@ -23,9 +23,9 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.rememberScrollableState
 import androidx.compose.foundation.gestures.scrollable
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -77,7 +77,6 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -118,6 +117,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import eu.vespy.weather.R
 import eu.vespy.weather.data.HourlyWeather
+import eu.vespy.weather.data.DailyWeather
 import eu.vespy.weather.data.Promotion
 import eu.vespy.weather.data.ForecastDisplaySettings
 import eu.vespy.weather.data.TemperatureThresholds
@@ -138,6 +138,8 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
 import kotlin.math.PI
+import kotlin.math.acos
+import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -304,8 +306,13 @@ private fun ForecastPane(
             state.loading && state.forecast == null -> LoadingState(Modifier.weight(1f))
             state.error != null && state.forecast == null -> ErrorState(onRetry, Modifier.weight(1f))
             state.forecast != null -> {
-                state.forecast.alerts.firstOrNull()?.let { WeatherAlertBanner(it, landscape) }
-                ForecastCard(state.forecast, landscape, state.temperatureUnit, state.displaySettings, onDisplaySettings, darkTheme, state.demo)
+                Column(
+                    modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(7.dp),
+                ) {
+                    state.forecast.alerts.firstOrNull()?.let { WeatherAlertBanner(it, landscape) }
+                    ForecastCard(state.forecast, landscape, state.temperatureUnit, state.displaySettings, onDisplaySettings, darkTheme, state.demo)
+                }
             }
         }
     }
@@ -440,8 +447,7 @@ private fun ForecastCard(
                 ForecastSummaryHeader(forecast, landscape, Modifier.weight(1f).padding(end = 8.dp))
                 ZoomControls(displaySettings, onDisplaySettings, large = false)
             }
-            ForecastTimeline(forecast, landscape, temperatureUnit, displaySettings, darkTheme, demo)
-            if (!landscape) Metrics(forecast, temperatureUnit)
+            ForecastTimeline(forecast, landscape, temperatureUnit, displaySettings, onDisplaySettings, darkTheme, demo)
         }
     }
 }
@@ -494,6 +500,7 @@ private fun ForecastTimeline(
     landscape: Boolean,
     temperatureUnit: String,
     settings: ForecastDisplaySettings,
+    onDisplaySettings: (ForecastDisplaySettings) -> Unit,
     dark: Boolean,
     demo: Boolean,
 ) {
@@ -524,60 +531,89 @@ private fun ForecastTimeline(
     val nowIndex = remember(points, forecast.current.timestamp) { points.currentIndex(forecast.current.timestamp).coerceAtLeast(0) }
     val nowPosition = if (settings.showHistoricalData) nowIndex * slotWidthPx else 0f
     var position by remember(points, settings.zoom, settings.showHistoricalData) { mutableFloatStateOf(nowPosition) }
-    var gestureStart by remember { mutableStateOf<Float?>(null) }
-    var historyPull by remember { mutableFloatStateOf(0f) }
+    var focusedDate by remember(points, nowIndex) { mutableStateOf(points.getOrNull(nowIndex)?.timestamp?.take(10)) }
+    var zoomAnchorTimestamp by remember { mutableStateOf<String?>(null) }
+    Column {
     BoxWithConstraints(modifier = Modifier.fillMaxWidth().height(timelineHeight).clipToBounds()) {
         val viewportPx = with(densityContext) { maxWidth.toPx() }
         val contentPx = with(densityContext) { (legendWidth + trackWidth).toPx() }
         val maxPosition = (contentPx - viewportPx).coerceAtLeast(0f)
-        val resistance = with(densityContext) { 10.dp.toPx() }
-        val magneticDistance = slotWidthPx * 6f / groupHours
+        val legendWidthPx = with(densityContext) { legendWidth.toPx() }
+        fun pointIndexAtViewportCenter(): Int = ((position + viewportPx / 2f - legendWidthPx) / slotWidthPx)
+            .toInt().coerceIn(0, points.lastIndex)
+        fun firstVisiblePointIndex(): Int = ((position - legendWidthPx) / slotWidthPx)
+            .toInt().coerceIn(0, points.lastIndex)
+        fun detailsPointIndex(): Int = (firstVisiblePointIndex() + 1).coerceAtMost(points.lastIndex)
+        LaunchedEffect(position, viewportPx, slotWidthPx, legendWidthPx, points) {
+            focusedDate = points.getOrNull(detailsPointIndex())?.timestamp?.take(10)
+        }
+        LaunchedEffect(settings.zoom, zoomAnchorTimestamp, viewportPx, points) {
+            val anchor = zoomAnchorTimestamp ?: return@LaunchedEffect
+            val anchorIndex = points.indexOfLast { it.timestamp <= anchor }.coerceAtLeast(0)
+            position = (legendWidthPx + (anchorIndex + .5f) * slotWidthPx - viewportPx / 2f).coerceIn(0f, maxPosition)
+            zoomAnchorTimestamp = null
+        }
+        val pinchModifier = Modifier.pointerInput(points, settings.zoom) {
+            awaitEachGesture {
+                var previousDistance: Float? = null
+                var accumulatedZoom = 1f
+                do {
+                    val event = awaitPointerEvent()
+                    val fingers = event.changes.filter { it.pressed }
+                    if (fingers.size >= 2) {
+                        val distance = (fingers[0].position - fingers[1].position).getDistance()
+                        previousDistance?.takeIf { it > 0f }?.let { previous ->
+                            accumulatedZoom *= distance / previous
+                            val levels = listOf(.25f, .3f, .5f, .75f, 1f, 2f)
+                            val index = levels.indexOf(settings.zoom).coerceAtLeast(0)
+                            val nextIndex = when {
+                                accumulatedZoom >= 1.12f -> (index + 1).coerceAtMost(levels.lastIndex)
+                                accumulatedZoom <= .88f -> (index - 1).coerceAtLeast(0)
+                                else -> index
+                            }
+                            if (nextIndex != index) {
+                                zoomAnchorTimestamp = points[pointIndexAtViewportCenter()].timestamp
+                                onDisplaySettings(settings.copy(zoom = levels[nextIndex]))
+                                accumulatedZoom = 1f
+                            }
+                        }
+                        previousDistance = distance
+                    } else {
+                        previousDistance = null
+                        accumulatedZoom = 1f
+                    }
+                } while (event.changes.any { it.pressed })
+            }
+        }
+        val dayHeaderModifier = Modifier.pointerInput(points, position, slotWidthPx, legendWidthPx, viewportPx) {
+            detectTapGestures { tap ->
+                if (tap.y > labelHeight.toPx()) return@detectTapGestures
+                val pointIndex = ((position + tap.x - legendWidthPx) / slotWidthPx).toInt().coerceIn(0, points.lastIndex)
+                val date = points[pointIndex].timestamp.take(10)
+                val dayStart = points.indexOfFirst { it.timestamp.take(10) == date }
+                val nextDayStart = ((dayStart + 1) until points.size).firstOrNull { points[it].timestamp.take(10) != date }
+                    ?: points.size
+                if (pointIndex in dayStart until min(dayStart + 3, nextDayStart)) {
+                    focusedDate = date
+                    position = (legendWidthPx + dayStart * slotWidthPx).coerceIn(0f, maxPosition)
+                }
+            }
+        }
         val scrollableState = rememberScrollableState { delta ->
             val oldPosition = position
-            val attempted = (oldPosition - delta).coerceIn(0f, maxPosition)
-            val start = gestureStart ?: oldPosition.also { gestureStart = it }
-            val target = when {
-                !settings.showHistoricalData -> attempted
-                start > nowPosition + 1f && attempted < nowPosition -> nowPosition
-                start < nowPosition - 1f && attempted > nowPosition -> nowPosition
-                kotlin.math.abs(start - nowPosition) <= 1f && attempted < nowPosition -> {
-                    historyPull += delta.coerceAtLeast(0f)
-                    if (historyPull <= resistance) nowPosition else (nowPosition - historyPull + resistance).coerceAtLeast(0f)
-                }
-                else -> attempted
-            }
-            position = target
-            oldPosition - target
-        }
-        LaunchedEffect(scrollableState, nowPosition, magneticDistance) {
-            snapshotFlow { scrollableState.isScrollInProgress }.collect { moving ->
-                if (!moving) {
-                    delay(150)
-                    if (!scrollableState.isScrollInProgress) {
-                        if (settings.showHistoricalData && kotlin.math.abs(position - nowPosition) <= magneticDistance) position = nowPosition
-                        gestureStart = null
-                        historyPull = 0f
-                    }
-                }
-            }
+            position = (oldPosition - delta).coerceIn(0f, maxPosition)
+            oldPosition - position
         }
         Box(
             modifier = Modifier.fillMaxSize()
                 .scrollable(scrollableState, Orientation.Horizontal, flingBehavior = ScrollableDefaults.flingBehavior())
-                .pointerInput(points, settings.showHistoricalData, nowPosition) {
-                    awaitEachGesture {
-                        awaitFirstDown(requireUnconsumed = false)
-                        gestureStart = position
-                        historyPull = 0f
-                        waitForUpOrCancellation()
-                    }
-                },
+                .then(pinchModifier)
+                .then(dayHeaderModifier),
         ) {
             Canvas(
                 modifier = Modifier.fillMaxSize(),
             ) {
             val nativeCanvas = drawContext.canvas.nativeCanvas
-            val legendWidthPx = legendWidth.toPx()
             val firstVisible = ((position - legendWidthPx) / slotWidthPx).toInt().coerceAtLeast(0)
             val bufferedStart = (firstVisible - 2).coerceAtLeast(0)
             val visibleCount = (size.width / slotWidthPx).toInt() + 5
@@ -659,6 +695,17 @@ private fun ForecastTimeline(
                     pixelScale = density,
                 )
             }
+        }
+    }
+        focusedDate?.let { date ->
+            ForecastDayBrief(
+                date = date,
+                points = hourly.filter { it.timestamp.take(10) == date },
+                daily = forecast.daily.firstOrNull { it.date == date },
+                latitude = forecast.location.latitude,
+                temperatureUnit = temperatureUnit,
+                compact = landscape,
+            )
         }
     }
 }
@@ -864,6 +911,139 @@ private fun Metrics(forecast: WeatherForecast, temperatureUnit: String) {
         Metric(stringResource(R.string.wind), "${forecast.current.windSpeed?.toInt() ?: 0} km/h", Modifier.weight(1f))
     }
 }
+
+@Composable
+private fun ForecastDayBrief(
+    date: String,
+    points: List<HourlyWeather>,
+    daily: DailyWeather?,
+    latitude: Double,
+    temperatureUnit: String,
+    compact: Boolean,
+) {
+    if (points.isEmpty()) return
+    val context = LocalContext.current
+    val locale = context.resources.configuration.locales[0]
+    val title = runCatching {
+        LocalDate.parse(date).format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL).withLocale(locale))
+    }.getOrDefault(date)
+    val temperatures = points.mapNotNull(HourlyWeather::temperature)
+    val apparent = points.mapNotNull(HourlyWeather::apparentTemperature)
+    val precipitation = daily?.precipitation ?: points.sumOf { it.precipitation ?: 0.0 }
+    val rainProbability = daily?.precipitationProbability ?: points.mapNotNull(HourlyWeather::precipitationProbability).maxOrNull()
+    val wetHours = points.count { (it.precipitation ?: 0.0) > 0.05 }
+    val cloudCover = points.mapNotNull(HourlyWeather::cloudCover).averageOrNull()
+    val humidity = points.mapNotNull(HourlyWeather::relativeHumidity).averageOrNull()
+    val pressure = points.mapNotNull(HourlyWeather::surfacePressure).averageOrNull()
+    val visibility = points.mapNotNull(HourlyWeather::visibility).minOrNull()
+    val peakWind = daily?.windSpeedMaximum ?: points.maxOfOrNull { it.windSpeed ?: 0.0 }
+    val peakGust = daily?.windGustsMaximum ?: points.maxOfOrNull { it.windGusts ?: 0.0 }
+    val sunrise = daily?.sunrise?.let(::clockTime) ?: "-"
+    val sunset = daily?.sunset?.let(::clockTime) ?: "-"
+    val dayLength = daily?.daylightDuration ?: estimatedDaylightSeconds(date, latitude)
+    val shortestDay = estimatedDaylightSeconds("${LocalDate.parse(date).year}-12-21", latitude)
+    val longestDay = estimatedDaylightSeconds("${LocalDate.parse(date).year}-06-21", latitude)
+    val shortest = min(shortestDay, longestDay)
+    val longest = max(shortestDay, longestDay)
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = if (compact) 6.dp else 8.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(9.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .32f)),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+            Text(
+                stringResource(R.string.day_brief),
+                color = MaterialTheme.colorScheme.primary,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = .7.sp,
+            )
+            Text(title, fontSize = if (compact) 16.sp else 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(stringResource(R.string.day_brief_context), color = Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp))
+            DayBriefSection(stringResource(R.string.day_brief_temperature)) {
+                DayBriefRow(
+                    stringResource(R.string.low_high), "${temperatureText(daily?.temperatureMinimum ?: temperatures.minOrNull(), temperatureUnit)} / ${temperatureText(daily?.temperatureMaximum ?: temperatures.maxOrNull(), temperatureUnit)}",
+                    stringResource(R.string.apparent_range), "${temperatureText(daily?.apparentTemperatureMinimum ?: apparent.minOrNull(), temperatureUnit)} / ${temperatureText(daily?.apparentTemperatureMaximum ?: apparent.maxOrNull(), temperatureUnit)}",
+                )
+            }
+            DayBriefSection(stringResource(R.string.day_brief_rain)) {
+                DayBriefRow(stringResource(R.string.rain_total), String.format(locale, "%.1f mm", precipitation), stringResource(R.string.rain_chance), rainProbability?.let { "${it.toInt()}%" } ?: "-")
+                DayBriefRow(stringResource(R.string.wet_hours), "$wetHours h", stringResource(R.string.cloud_cover), cloudCover?.let { "${it.toInt()}%" } ?: "-")
+            }
+            DayBriefSection(stringResource(R.string.day_brief_air)) {
+                DayBriefRow(stringResource(R.string.peak_wind), peakWind?.let { "${it.toInt()} km/h" } ?: "-", stringResource(R.string.wind_gusts), peakGust?.let { "${it.toInt()} km/h" } ?: "-")
+                DayBriefRow(stringResource(R.string.humidity), humidity?.let { "${it.toInt()}%" } ?: "-", stringResource(R.string.pressure), pressure?.let { "${it.toInt()} hPa" } ?: "-")
+                DayBriefRow(stringResource(R.string.visibility), visibility?.let { String.format(locale, "%.1f km", it / 1000) } ?: "-", stringResource(R.string.wind_direction), daily?.windDirection?.let(::windDirectionText) ?: "-")
+            }
+            DayBriefSection(stringResource(R.string.day_brief_sun)) {
+                DayBriefRow(stringResource(R.string.sun_window), "$sunrise - $sunset", stringResource(R.string.daylight), durationText(dayLength))
+                DayBriefRow(stringResource(R.string.sunshine), durationText(daily?.sunshineDuration), stringResource(R.string.uv_max), daily?.uvIndexMaximum?.let { String.format(locale, "%.1f", it) } ?: "-")
+                DayBriefRow(stringResource(R.string.above_shortest_day), "+${durationText(dayLength - shortest)}", stringResource(R.string.below_longest_day), "-${durationText(longest - dayLength)}")
+            }
+            DayBriefSection(stringResource(R.string.day_brief_pollen)) {
+                val pollen = daily?.pollen
+                if (pollen == null) Text(stringResource(R.string.pollen_unavailable), color = Muted, fontSize = 12.sp)
+                else {
+                    DayBriefRow(stringResource(R.string.pollen_alder), pollenValue(pollen.alder), stringResource(R.string.pollen_birch), pollenValue(pollen.birch))
+                    DayBriefRow(stringResource(R.string.pollen_grass), pollenValue(pollen.grass), stringResource(R.string.pollen_mugwort), pollenValue(pollen.mugwort))
+                    DayBriefRow(stringResource(R.string.pollen_olive), pollenValue(pollen.olive), stringResource(R.string.pollen_ragweed), pollenValue(pollen.ragweed))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DayBriefSection(title: String, content: @Composable () -> Unit) {
+    Column(modifier = Modifier.padding(top = 14.dp)) {
+        Text(title, color = MaterialTheme.colorScheme.primary, fontFamily = FontFamily.Monospace, fontSize = 11.sp, fontWeight = FontWeight.Black, letterSpacing = .6.sp)
+        Column(modifier = Modifier.padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) { content() }
+    }
+}
+
+@Composable
+private fun DayBriefRow(leftLabel: String, leftValue: String, rightLabel: String, rightValue: String) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        DayBriefMetric(leftLabel, leftValue, Modifier.weight(1f))
+        DayBriefMetric(rightLabel, rightValue, Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun DayBriefMetric(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 8.dp)) {
+        Text(label, color = Muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(value, fontSize = 17.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+private fun List<Double>.averageOrNull(): Double? = takeIf { it.isNotEmpty() }?.average()
+
+@Composable
+private fun durationText(seconds: Double?): String {
+    val minutes = ((seconds ?: 0.0) / 60).toInt().coerceAtLeast(0)
+    return stringResource(R.string.duration_hours_minutes, minutes / 60, minutes % 60)
+}
+
+@Composable
+private fun pollenValue(value: Double?): String = value?.let { "${String.format(Locale.getDefault(), "%.1f", it)} ${stringResource(R.string.pollen_unit)}" } ?: "-"
+
+private fun windDirectionText(degrees: Double): String = listOf("N", "NE", "E", "SE", "S", "SW", "W", "NW")[((degrees + 22.5) / 45).toInt() % 8]
+
+private fun estimatedDaylightSeconds(date: String, latitude: Double): Double {
+    val day = runCatching { LocalDate.parse(date).dayOfYear }.getOrDefault(172)
+    val latitudeRadians = Math.toRadians(latitude.coerceIn(-89.8, 89.8))
+    val declination = Math.toRadians(-23.44 * cos(2 * PI * (day + 10) / 365.25))
+    val horizon = Math.toRadians(-.833)
+    val hourAngle = ((sin(horizon) - sin(latitudeRadians) * sin(declination)) / (cos(latitudeRadians) * cos(declination))).coerceIn(-1.0, 1.0)
+    return 24 * acos(hourAngle) / PI * 3600
+}
+
+private fun clockTime(timestamp: String): String = runCatching {
+    LocalDateTime.parse(timestamp).format(DateTimeFormatter.ofPattern("HH:mm"))
+}.getOrDefault("-")
 
 @Composable
 private fun Metric(label: String, value: String, modifier: Modifier = Modifier) {
