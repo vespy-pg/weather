@@ -114,6 +114,9 @@
     <string name="show_precipitation">Symbole opadów</string>
     <string name="show_wind">Oś wiatru</string>
     <string name="show_wind_arrows">Kierunek i prędkość wiatru</string>
+    <string name="show_uv_index">Wykres indeksu UV</string>
+    <string name="show_humidity">Wykres wilgotności</string>
+    <string name="show_pressure">Wykres ciśnienia atmosferycznego</string>
     <string name="show_historical_data">Pokazuj dane historyczne</string>
     <string name="show_dates">Pokazuj daty obok nazw dni</string>
     <string name="show_mushrooms">Warunki dla grzybów</string>

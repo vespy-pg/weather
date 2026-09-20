@@ -80,13 +80,15 @@ object ForecastGraphics {
         labelHeight: Float,
         skyHeight: Float,
         windHeight: Float,
+        environmentHeight: Float = 0f,
         mushroomHeight: Float = 0f,
         pixelScale: Float,
     ) {
         val palette = palette(dark)
         val skyBottom = bounds.top + labelHeight + skyHeight
-        val temperatureBottom = bounds.bottom - windHeight - mushroomHeight
-        val windBottom = bounds.bottom - mushroomHeight
+        val temperatureBottom = bounds.bottom - windHeight - environmentHeight - mushroomHeight
+        val windBottom = temperatureBottom + windHeight
+        val environmentBottom = bounds.bottom - mushroomHeight
         val centerX = bounds.centerX()
         canvas.drawRect(bounds, Paint().apply { color = palette.background })
 
@@ -97,7 +99,8 @@ object ForecastGraphics {
         canvas.drawLine(bounds.right - pixelScale, bounds.top, bounds.right - pixelScale, bounds.bottom, separator)
         canvas.drawLine(bounds.left, skyBottom, bounds.right, skyBottom, separator)
         canvas.drawLine(bounds.left, temperatureBottom, bounds.right, temperatureBottom, separator)
-        if (mushroomHeight > 0f) canvas.drawLine(bounds.left, windBottom, bounds.right, windBottom, separator)
+        if (environmentHeight > 0f) canvas.drawLine(bounds.left, windBottom, bounds.right, windBottom, separator)
+        if (mushroomHeight > 0f) canvas.drawLine(bounds.left, environmentBottom, bounds.right, environmentBottom, separator)
 
         val skySectionHeight = skyBottom - bounds.top
         val iconStroke = 1.6f * pixelScale
@@ -206,6 +209,7 @@ object ForecastGraphics {
         labelHeight: Float,
         skyHeight: Float,
         windHeight: Float,
+        environmentHeight: Float = 0f,
         mushroomHeight: Float = 0f,
         temperatureUnit: String = "C",
         pixelScale: Float = 1f,
@@ -247,10 +251,10 @@ object ForecastGraphics {
             sky.left,
             sky.bottom,
             sky.right,
-            if (showTemperatureChart) bounds.bottom - windHeight - mushroomHeight else sky.bottom,
+            if (showTemperatureChart) bounds.bottom - windHeight - environmentHeight - mushroomHeight else sky.bottom,
         )
-        val wind = RectF(bounds.left, temperature.bottom, bounds.right, bounds.bottom - mushroomHeight)
-        val mushrooms = RectF(bounds.left, wind.bottom, bounds.right, bounds.bottom)
+        val wind = RectF(bounds.left, temperature.bottom, bounds.right, temperature.bottom + windHeight)
+        val mushrooms = RectF(bounds.left, bounds.bottom - mushroomHeight, bounds.right, bounds.bottom)
         canvas.drawRect(bounds, Paint().apply { color = palette.background })
         drawSky(
             canvas, sky, points, days, palette, todayLabel, labelHeight, temperatureUnit,
@@ -275,7 +279,8 @@ object ForecastGraphics {
         val border = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = palette.grid; strokeWidth = pixelScale; style = Paint.Style.STROKE }
         canvas.drawLine(bounds.left, sky.bottom, bounds.right, sky.bottom, border)
         if (showTemperatureChart) canvas.drawLine(bounds.left, temperature.bottom, bounds.right, temperature.bottom, border)
-        if (showMushrooms && mushroomHeight > 0f) canvas.drawLine(bounds.left, wind.bottom, bounds.right, wind.bottom, border)
+        if (environmentHeight > 0f) canvas.drawLine(bounds.left, wind.bottom, bounds.right, wind.bottom, border)
+        if (showMushrooms && mushroomHeight > 0f) canvas.drawLine(bounds.left, mushrooms.top, bounds.right, mushrooms.top, border)
         canvas.drawLine(bounds.left, bounds.bottom - 1f, bounds.right, bounds.bottom - 1f, border)
     }
 
@@ -661,6 +666,73 @@ object ForecastGraphics {
             strokeWidth = 1.25f * pixelScale
         })
         drawDaySeparators(canvas, bounds, points, palette, pixelScale)
+    }
+
+    fun drawMetricLayer(
+        canvas: Canvas,
+        bounds: RectF,
+        points: List<HourlyWeather>,
+        values: List<Double?>,
+        dark: Boolean,
+        color: Int,
+        pixelScale: Float,
+        fixedMinimum: Double? = null,
+        fixedMaximum: Double? = null,
+    ) {
+        if (points.isEmpty() || bounds.height() <= 0f) return
+        val palette = palette(dark)
+        canvas.drawRect(bounds, Paint().apply { this.color = palette.background })
+        val available = values.filterNotNull()
+        val minimum = fixedMinimum ?: available.minOrNull() ?: 0.0
+        val maximum = fixedMaximum ?: available.maxOrNull() ?: minimum + 1.0
+        val range = (maximum - minimum).coerceAtLeast(1.0)
+        val verticalPadding = 6f * pixelScale
+        val yValues = values.map { value ->
+            value?.let { bounds.bottom - verticalPadding - ((it - minimum) / range).toFloat().coerceIn(0f, 1f) * (bounds.height() - verticalPadding * 2) }
+        }
+        val cell = bounds.width() / points.size
+        canvas.drawLine(bounds.left, bounds.centerY(), bounds.right, bounds.centerY(), Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = palette.grid
+            strokeWidth = pixelScale
+        })
+        yValues.forEachIndexed { index, y ->
+            if (y == null) return@forEachIndexed
+            canvas.drawRect(bounds.left + index * cell, y, bounds.left + (index + 1) * cell, bounds.bottom, Paint().apply {
+                this.color = withAlpha(color, 24)
+            })
+        }
+        canvas.drawPath(smoothLinePath(bounds.left, cell, yValues), Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = color
+            style = Paint.Style.STROKE
+            strokeWidth = 2.3f * pixelScale
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+        })
+        canvas.drawLine(bounds.left, bounds.top, bounds.right, bounds.top, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = palette.separator
+            strokeWidth = 1.25f * pixelScale
+        })
+        drawDaySeparators(canvas, bounds, points, palette, pixelScale)
+    }
+
+    fun drawMetricLegend(canvas: Canvas, bounds: RectF, dark: Boolean, label: String, color: Int, pixelScale: Float) {
+        val palette = palette(dark)
+        canvas.drawRect(bounds, Paint().apply { this.color = palette.background })
+        canvas.drawLine(bounds.left, bounds.top, bounds.right, bounds.top, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = palette.separator
+            strokeWidth = 1.25f * pixelScale
+        })
+        canvas.drawLine(bounds.right - pixelScale, bounds.top, bounds.right - pixelScale, bounds.bottom, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = palette.separator
+            strokeWidth = 1.25f * pixelScale
+        })
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = color
+            textAlign = Paint.Align.CENTER
+            textSize = 9f * pixelScale
+            typeface = Typeface.create("monospace", Typeface.BOLD)
+        }
+        canvas.drawText(label, bounds.centerX(), bounds.centerY() - (textPaint.ascent() + textPaint.descent()) / 2f, textPaint)
     }
 
     private fun drawDemoWatermarks(canvas: Canvas, bounds: RectF, points: List<HourlyWeather>, label: String, everyDay: Boolean, pixelScale: Float, palette: ForecastPalette) {

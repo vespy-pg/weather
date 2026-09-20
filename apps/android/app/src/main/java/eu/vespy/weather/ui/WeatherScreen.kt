@@ -516,8 +516,24 @@ private fun ForecastTimeline(
     }
     val slotWidth = 22.dp * settings.zoom * groupHours
     val trackWidth = slotWidth * max(1, points.size)
+    val metricRows = remember(points, settings.showUvIndex, settings.showHumidity, settings.showPressure) {
+        buildList {
+            if (settings.showUvIndex) {
+                val values = points.map(HourlyWeather::uvIndex)
+                add(TimelineMetric("UV", android.graphics.Color.rgb(255, 200, 61), values, 0.0, max(11.0, values.filterNotNull().maxOrNull() ?: 0.0)))
+            }
+            if (settings.showHumidity) add(TimelineMetric("%", android.graphics.Color.rgb(74, 163, 255), points.map(HourlyWeather::relativeHumidity), 0.0, 100.0))
+            if (settings.showPressure) {
+                val values = points.map(HourlyWeather::surfacePressure)
+                val available = values.filterNotNull()
+                add(TimelineMetric("hPa", android.graphics.Color.rgb(177, 145, 255), values, available.minOrNull()?.minus(3), available.maxOrNull()?.plus(3)))
+            }
+        }
+    }
+    val metricRowHeight = if (landscape) 30.dp else 40.dp
+    val environmentHeight = metricRowHeight * metricRows.size
     val mushroomHeight = if (settings.showMushrooms) (if (landscape) 34.dp else 44.dp) else 0.dp
-    val timelineHeight = (if (landscape) 290.dp else 368.dp) + mushroomHeight
+    val timelineHeight = (if (landscape) 290.dp else 368.dp) + environmentHeight + mushroomHeight
     val labelHeight = 72.dp
     val skyHeight = if (landscape) 62.dp else 93.dp
     val windHeight = if (!settings.showWind) 0.dp else if (settings.showWindArrows) {
@@ -632,6 +648,7 @@ private fun ForecastTimeline(
                 labelHeight = labelHeight.toPx(),
                 skyHeight = skyHeight.toPx(),
                 windHeight = windHeight.toPx(),
+                environmentHeight = environmentHeight.toPx(),
                 mushroomHeight = mushroomHeight.toPx(),
                 temperatureUnit = temperatureUnit,
                 pixelScale = density,
@@ -665,15 +682,34 @@ private fun ForecastTimeline(
                     canvas = nativeCanvas,
                     bounds = android.graphics.RectF(
                         legendWidthPx,
-                        size.height - windHeight.toPx() - mushroomHeight.toPx(),
+                        size.height - windHeight.toPx() - environmentHeight.toPx() - mushroomHeight.toPx(),
                         legendWidthPx + trackWidth.toPx(),
-                        size.height - mushroomHeight.toPx(),
+                        size.height - environmentHeight.toPx() - mushroomHeight.toPx(),
                     ),
                     points = points,
                     dark = dark,
                     pixelScale = density,
                     windScale = 1.22f,
                     showAnnotations = settings.showWindArrows,
+                )
+            }
+            val environmentTop = size.height - environmentHeight.toPx() - mushroomHeight.toPx()
+            metricRows.forEachIndexed { index, metric ->
+                ForecastGraphics.drawMetricLayer(
+                    canvas = nativeCanvas,
+                    bounds = android.graphics.RectF(
+                        legendWidthPx,
+                        environmentTop + index * metricRowHeight.toPx(),
+                        legendWidthPx + trackWidth.toPx(),
+                        environmentTop + (index + 1) * metricRowHeight.toPx(),
+                    ),
+                    points = points,
+                    values = metric.values,
+                    dark = dark,
+                    color = metric.color,
+                    pixelScale = density,
+                    fixedMinimum = metric.minimum,
+                    fixedMaximum = metric.maximum,
                 )
             }
             nativeCanvas.restore()
@@ -691,9 +727,21 @@ private fun ForecastTimeline(
                     labelHeight = labelHeight.toPx(),
                     skyHeight = skyHeight.toPx(),
                     windHeight = windHeight.toPx(),
+                    environmentHeight = environmentHeight.toPx(),
                     mushroomHeight = mushroomHeight.toPx(),
                     pixelScale = density,
                 )
+                val environmentTop = size.height - environmentHeight.toPx() - mushroomHeight.toPx()
+                metricRows.forEachIndexed { index, metric ->
+                    ForecastGraphics.drawMetricLegend(
+                        canvas = drawContext.canvas.nativeCanvas,
+                        bounds = android.graphics.RectF(0f, environmentTop + index * metricRowHeight.toPx(), size.width, environmentTop + (index + 1) * metricRowHeight.toPx()),
+                        dark = dark,
+                        label = metric.label,
+                        color = metric.color,
+                        pixelScale = density,
+                    )
+                }
             }
         }
     }
@@ -709,6 +757,14 @@ private fun ForecastTimeline(
         }
     }
 }
+
+private data class TimelineMetric(
+    val label: String,
+    val color: Int,
+    val values: List<Double?>,
+    val minimum: Double?,
+    val maximum: Double?,
+)
 
 @Composable
 private fun HourlyLabels(points: List<HourlyWeather>, slotWidth: Dp, height: Dp) {
@@ -1579,6 +1635,9 @@ private fun SettingsDialog(
                     SettingSwitch(stringResource(R.string.show_precipitation), state.displaySettings.showPrecipitation) { onDisplaySettings(state.displaySettings.copy(showPrecipitation = it)) }
                     SettingSwitch(stringResource(R.string.show_wind), state.displaySettings.showWind) { onDisplaySettings(state.displaySettings.copy(showWind = it)) }
                     SettingSwitch(stringResource(R.string.show_wind_arrows), state.displaySettings.showWindArrows) { onDisplaySettings(state.displaySettings.copy(showWindArrows = it, showWind = if (it) true else state.displaySettings.showWind)) }
+                    SettingSwitch(stringResource(R.string.show_uv_index), state.displaySettings.showUvIndex) { onDisplaySettings(state.displaySettings.copy(showUvIndex = it)) }
+                    SettingSwitch(stringResource(R.string.show_humidity), state.displaySettings.showHumidity) { onDisplaySettings(state.displaySettings.copy(showHumidity = it)) }
+                    SettingSwitch(stringResource(R.string.show_pressure), state.displaySettings.showPressure) { onDisplaySettings(state.displaySettings.copy(showPressure = it)) }
                     SettingSwitch(stringResource(R.string.show_historical_data), state.displaySettings.showHistoricalData) { onDisplaySettings(state.displaySettings.copy(showHistoricalData = it)) }
                     SettingSwitch(stringResource(R.string.show_dates), state.displaySettings.showDates) { onDisplaySettings(state.displaySettings.copy(showDates = it)) }
                     SettingSwitch(stringResource(R.string.show_mushrooms), state.displaySettings.showMushrooms) { onDisplaySettings(state.displaySettings.copy(showMushrooms = it)) }

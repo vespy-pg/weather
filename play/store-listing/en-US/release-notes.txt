@@ -1,1 +1,1 @@
-Adds detailed daily weather summaries, air-quality and pollen forecasts, sunlight comparisons and pinch-to-zoom. Improves widget layouts, location management and issue reporting.
+Adds daily weather details, air quality, pollen, sunlight paths and hourly UV, humidity and pressure charts. Improves zooming, widgets, locations and issue reporting.

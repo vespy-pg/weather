@@ -114,6 +114,9 @@
     <string name="show_precipitation">Precipitation symbols</string>
     <string name="show_wind">Wind timeline</string>
     <string name="show_wind_arrows">Wind direction arrows and speed</string>
+    <string name="show_uv_index">UV index chart</string>
+    <string name="show_humidity">Humidity chart</string>
+    <string name="show_pressure">Atmospheric pressure chart</string>
     <string name="show_historical_data">Show historical data</string>
     <string name="show_dates">Show dates beside day names</string>
     <string name="show_mushrooms">Mushroom conditions</string>
