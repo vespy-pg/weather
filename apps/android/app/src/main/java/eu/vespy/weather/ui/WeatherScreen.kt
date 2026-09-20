@@ -1057,10 +1057,11 @@ private fun SunlightComparison(sunrise: String?, sunset: String?, dayLength: Dou
     val shortestDifference = (aboveShortest / 120).toInt()
     val longestDifference = (belowLongest / 120).toInt()
     val rows = listOf(
-        Triple(stringResource(R.string.shortest_day), sunriseMinutes + shortestDifference, sunsetMinutes - shortestDifference),
-        Triple(stringResource(R.string.selected_day), sunriseMinutes, sunsetMinutes),
-        Triple(stringResource(R.string.longest_day), sunriseMinutes - longestDifference, sunsetMinutes + longestDifference),
+        Triple(stringResource(R.string.shortest_day), (sunriseMinutes + shortestDifference).coerceIn(0, 1440), (sunsetMinutes - shortestDifference).coerceIn(0, 1440)),
+        Triple(stringResource(R.string.selected_day), sunriseMinutes.coerceIn(0, 1440), sunsetMinutes.coerceIn(0, 1440)),
+        Triple(stringResource(R.string.longest_day), (sunriseMinutes - longestDifference).coerceIn(0, 1440), (sunsetMinutes + longestDifference).coerceIn(0, 1440)),
     )
+    val domain = sunlightDomain(rows)
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Column(
             modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)).padding(10.dp),
@@ -1074,9 +1075,9 @@ private fun SunlightComparison(sunrise: String?, sunset: String?, dayLength: Dou
                     Text("${formatClockMinutes(rise)} - ${formatClockMinutes(set)}", color = color, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
             }
-            SunPathChart(rows)
+            SunPathChart(rows, domain.first, domain.last)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                listOf("00", "06", "12", "18", "24").forEach { Text(it, color = Muted, fontSize = 8.sp) }
+                listOf(domain.first, (domain.first + domain.last) / 2, domain.last).forEach { Text(formatClockMinutes(it), color = Muted, fontSize = 8.sp) }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 SunEventSummary(
@@ -1104,13 +1105,18 @@ private fun SunlightComparison(sunrise: String?, sunset: String?, dayLength: Dou
 }
 
 @Composable
-private fun SunPathChart(rows: List<Triple<String, Int, Int>>) {
+private fun SunPathChart(rows: List<Triple<String, Int, Int>>, domainStart: Int, domainEnd: Int) {
     Canvas(Modifier.fillMaxWidth().height(132.dp)) {
         val horizonY = size.height - 14.dp.toPx()
-        val xForTime: (Int) -> Float = { minutes -> size.width * minutes.coerceIn(0, 1440) / 1440f }
+        val edgePadding = 6.dp.toPx()
+        val drawableWidth = (size.width - edgePadding * 2).coerceAtLeast(1f)
+        val domainSpan = (domainEnd - domainStart).coerceAtLeast(1)
+        val xForTime: (Int) -> Float = { minutes ->
+            edgePadding + drawableWidth * (minutes.coerceIn(domainStart, domainEnd) - domainStart) / domainSpan.toFloat()
+        }
         drawRect(Color(0xFF16212D).copy(alpha = .72f), Offset(0f, horizonY), Size(size.width, size.height - horizonY))
         drawLine(Muted.copy(alpha = .45f), Offset(0f, horizonY), Offset(size.width, horizonY), strokeWidth = 2.dp.toPx())
-        listOf(0, 1, 2).forEach { index ->
+        listOf(2, 0, 1).forEach { index ->
             val (_, rise, set) = rows[index]
             val startX = xForTime(rise)
             val endX = xForTime(set)
@@ -1135,8 +1141,6 @@ private fun SunPathChart(rows: List<Triple<String, Int, Int>>) {
                 drawPath(glow, color.copy(alpha = .08f))
             }
             drawPath(path, color.copy(alpha = if (index == 1) 1f else .72f), style = Stroke(width = if (index == 1) 4.dp.toPx() else 2.dp.toPx(), cap = StrokeCap.Round))
-            drawCircle(color, radius = if (index == 1) 6.dp.toPx() else 4.dp.toPx(), center = Offset(startX, horizonY))
-            drawCircle(color, radius = if (index == 1) 6.dp.toPx() else 4.dp.toPx(), center = Offset(endX, horizonY))
             if (index == 1) {
                 val sunY = (horizonY + apexY) / 2f
                 val sunX = midpoint
@@ -1145,6 +1149,15 @@ private fun SunPathChart(rows: List<Triple<String, Int, Int>>) {
             }
         }
     }
+}
+
+internal fun sunlightDomain(rows: List<Triple<String, Int, Int>>): IntRange {
+    val rawStart = rows.minOfOrNull { min(it.second, it.third) }?.coerceIn(0, 1440) ?: 0
+    val rawEnd = rows.maxOfOrNull { max(it.second, it.third) }?.coerceIn(0, 1440) ?: 1440
+    if (rawEnd - rawStart >= 60) return rawStart..rawEnd
+    val center = (rawStart + rawEnd) / 2
+    val start = (center - 30).coerceIn(0, 1380)
+    return start..(start + 60)
 }
 
 @Composable
@@ -1304,6 +1317,7 @@ private fun clockMinutes(timestamp: String?): Int? = timestamp?.let {
 }
 
 private fun formatClockMinutes(minutes: Int): String {
+    if (minutes >= 1440) return "24:00"
     val normalized = minutes.coerceIn(0, 1439)
     return "%02d:%02d".format(Locale.US, normalized / 60, normalized % 60)
 }
