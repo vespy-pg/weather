@@ -56,6 +56,11 @@
     <string name="shortest_day">Shortest</string>
     <string name="selected_day">Selected</string>
     <string name="longest_day">Longest</string>
+    <string name="sunrise">Sunrise</string>
+    <string name="sunset">Sunset</string>
+    <string name="earliest">Earliest</string>
+    <string name="current">Selected</string>
+    <string name="latest">Latest</string>
     <string name="sunrise_difference">Sunrise: shortest +%1$s, longest -%2$s</string>
     <string name="sunset_difference">Sunset: shortest -%1$s, longest +%2$s</string>
     <string name="european_aqi">European Air Quality Index</string>

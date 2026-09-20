@@ -30,7 +30,6 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.BoxWithConstraintsScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -1075,12 +1074,25 @@ private fun SunlightComparison(sunrise: String?, sunset: String?, dayLength: Dou
                     Text("${formatClockMinutes(rise)} - ${formatClockMinutes(set)}", color = color, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
             }
-            BoxWithConstraints(modifier = Modifier.fillMaxWidth().height(54.dp)) {
-                Box(Modifier.fillMaxWidth().height(2.dp).align(Alignment.Center).background(Muted.copy(alpha = .18f), RoundedCornerShape(2.dp)))
-                rows.forEachIndexed { index, (_, rise, set) -> SunlightBand(rise, set, sunlightColor(index), index * 16) }
-            }
+            SunPathChart(rows)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 listOf("00", "06", "12", "18", "24").forEach { Text(it, color = Muted, fontSize = 8.sp) }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                SunEventSummary(
+                    stringResource(R.string.sunrise),
+                    earliest = rows[2].second,
+                    current = rows[1].second,
+                    latest = rows[0].second,
+                    modifier = Modifier.weight(1f),
+                )
+                SunEventSummary(
+                    stringResource(R.string.sunset),
+                    earliest = rows[0].third,
+                    current = rows[1].third,
+                    latest = rows[2].third,
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
         DayBriefRow(
@@ -1092,13 +1104,65 @@ private fun SunlightComparison(sunrise: String?, sunset: String?, dayLength: Dou
 }
 
 @Composable
-private fun BoxWithConstraintsScope.SunlightBand(sunriseMinutes: Int, sunsetMinutes: Int, color: Color, y: Int) {
-    val start = sunriseMinutes.coerceIn(0, 1440) / 1440f
-    val end = sunsetMinutes.coerceIn(0, 1440) / 1440f
-    val thickness = if (y == 16) 7.dp else 4.dp
-    Box(Modifier.fillMaxWidth((end - start).coerceAtLeast(0f)).height(thickness).offset(x = maxWidth * start, y = (y + 8).dp).background(color, RoundedCornerShape(4.dp)))
-    Box(Modifier.size(if (y == 16) 11.dp else 8.dp).offset(x = maxWidth * start - if (y == 16) 5.5.dp else 4.dp, y = (y + 6).dp).background(color, RoundedCornerShape(50)))
-    Box(Modifier.size(if (y == 16) 11.dp else 8.dp).offset(x = maxWidth * end - if (y == 16) 5.5.dp else 4.dp, y = (y + 6).dp).background(color, RoundedCornerShape(50)))
+private fun SunPathChart(rows: List<Triple<String, Int, Int>>) {
+    Canvas(Modifier.fillMaxWidth().height(132.dp)) {
+        val horizonY = size.height - 14.dp.toPx()
+        val xForTime: (Int) -> Float = { minutes -> size.width * minutes.coerceIn(0, 1440) / 1440f }
+        drawRect(Color(0xFF16212D).copy(alpha = .72f), Offset(0f, horizonY), Size(size.width, size.height - horizonY))
+        drawLine(Muted.copy(alpha = .45f), Offset(0f, horizonY), Offset(size.width, horizonY), strokeWidth = 2.dp.toPx())
+        listOf(0, 1, 2).forEach { index ->
+            val (_, rise, set) = rows[index]
+            val startX = xForTime(rise)
+            val endX = xForTime(set)
+            val midpoint = (startX + endX) / 2f
+            val apexY = when (index) {
+                0 -> horizonY - 55.dp.toPx()
+                1 -> horizonY - 78.dp.toPx()
+                else -> horizonY - 105.dp.toPx()
+            }
+            val color = sunlightColor(index)
+            val path = Path().apply {
+                moveTo(startX, horizonY)
+                quadraticTo(midpoint, apexY, endX, horizonY)
+            }
+            if (index == 1) {
+                val glow = Path().apply {
+                    moveTo(startX, horizonY)
+                    quadraticTo(midpoint, apexY, endX, horizonY)
+                    lineTo(startX, horizonY)
+                    close()
+                }
+                drawPath(glow, color.copy(alpha = .08f))
+            }
+            drawPath(path, color.copy(alpha = if (index == 1) 1f else .72f), style = Stroke(width = if (index == 1) 4.dp.toPx() else 2.dp.toPx(), cap = StrokeCap.Round))
+            drawCircle(color, radius = if (index == 1) 6.dp.toPx() else 4.dp.toPx(), center = Offset(startX, horizonY))
+            drawCircle(color, radius = if (index == 1) 6.dp.toPx() else 4.dp.toPx(), center = Offset(endX, horizonY))
+            if (index == 1) {
+                val sunY = (horizonY + apexY) / 2f
+                val sunX = midpoint
+                drawCircle(color.copy(alpha = .18f), radius = 12.dp.toPx(), center = Offset(sunX, sunY))
+                drawCircle(color, radius = 6.dp.toPx(), center = Offset(sunX, sunY))
+            }
+        }
+    }
+}
+
+@Composable
+private fun SunEventSummary(label: String, earliest: Int, current: Int, latest: Int, modifier: Modifier = Modifier) {
+    Column(modifier.background(MaterialTheme.colorScheme.background.copy(alpha = .38f), RoundedCornerShape(7.dp)).padding(8.dp)) {
+        Text(label, color = MaterialTheme.colorScheme.onSurface, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        SunEventValue(stringResource(R.string.earliest), earliest, sunlightColor(2))
+        SunEventValue(stringResource(R.string.current), current, sunlightColor(1))
+        SunEventValue(stringResource(R.string.latest), latest, sunlightColor(0))
+    }
+}
+
+@Composable
+private fun SunEventValue(label: String, minutes: Int, color: Color) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, color = Muted, fontSize = 9.sp)
+        Text(formatClockMinutes(minutes), color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+    }
 }
 
 private fun sunlightColor(index: Int): Color = when (index) {

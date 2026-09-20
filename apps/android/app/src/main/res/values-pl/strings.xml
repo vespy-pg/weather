@@ -56,6 +56,11 @@
     <string name="shortest_day">Najkrótszy</string>
     <string name="selected_day">Wybrany</string>
     <string name="longest_day">Najdłuższy</string>
+    <string name="sunrise">Wschód</string>
+    <string name="sunset">Zachód</string>
+    <string name="earliest">Najwcześniej</string>
+    <string name="current">Wybrany</string>
+    <string name="latest">Najpóźniej</string>
     <string name="sunrise_difference">Wschód: najkrótszy +%1$s, najdłuższy -%2$s</string>
     <string name="sunset_difference">Zachód: najkrótszy -%1$s, najdłuższy +%2$s</string>
     <string name="european_aqi">Europejski indeks jakości powietrza</string>
