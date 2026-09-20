@@ -963,33 +963,37 @@ private fun ForecastDayBrief(
             Text(title, fontSize = if (compact) 16.sp else 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(stringResource(R.string.day_brief_context), color = Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp))
             DayBriefSection(stringResource(R.string.day_brief_temperature)) {
-                DayBriefRow(
-                    stringResource(R.string.low_high), "${temperatureText(daily?.temperatureMinimum ?: temperatures.minOrNull(), temperatureUnit)} / ${temperatureText(daily?.temperatureMaximum ?: temperatures.maxOrNull(), temperatureUnit)}",
-                    stringResource(R.string.apparent_range), "${temperatureText(daily?.apparentTemperatureMinimum ?: apparent.minOrNull(), temperatureUnit)} / ${temperatureText(daily?.apparentTemperatureMaximum ?: apparent.maxOrNull(), temperatureUnit)}",
+                DayBriefTemperatureRow(
+                    stringResource(R.string.low_high), daily?.temperatureMinimum ?: temperatures.minOrNull(), daily?.temperatureMaximum ?: temperatures.maxOrNull(),
+                    stringResource(R.string.apparent_range), daily?.apparentTemperatureMinimum ?: apparent.minOrNull(), daily?.apparentTemperatureMaximum ?: apparent.maxOrNull(),
+                    temperatureUnit,
                 )
             }
             DayBriefSection(stringResource(R.string.day_brief_rain)) {
-                DayBriefRow(stringResource(R.string.rain_total), String.format(locale, "%.1f mm", precipitation), stringResource(R.string.rain_chance), rainProbability?.let { "${it.toInt()}%" } ?: "-")
-                DayBriefRow(stringResource(R.string.wet_hours), "$wetHours h", stringResource(R.string.cloud_cover), cloudCover?.let { "${it.toInt()}%" } ?: "-")
+                DayBriefRow(stringResource(R.string.rain_total), String.format(locale, "%.1f mm", precipitation), stringResource(R.string.rain_chance), rainProbability?.let { "${it.toInt()}%" } ?: "-", Color(0xFF4AA3FF), Color(0xFF4AA3FF))
+                DayBriefRow(stringResource(R.string.wet_hours), "$wetHours h", stringResource(R.string.cloud_cover), cloudCover?.let { "${it.toInt()}%" } ?: "-", Color(0xFF4AA3FF), Color(0xFF94A4B8))
             }
             DayBriefSection(stringResource(R.string.day_brief_air)) {
-                DayBriefRow(stringResource(R.string.peak_wind), peakWind?.let { "${it.toInt()} km/h" } ?: "-", stringResource(R.string.wind_gusts), peakGust?.let { "${it.toInt()} km/h" } ?: "-")
-                DayBriefRow(stringResource(R.string.humidity), humidity?.let { "${it.toInt()}%" } ?: "-", stringResource(R.string.pressure), pressure?.let { "${it.toInt()} hPa" } ?: "-")
-                DayBriefRow(stringResource(R.string.visibility), visibility?.let { String.format(locale, "%.1f km", it / 1000) } ?: "-", stringResource(R.string.wind_direction), daily?.windDirection?.let(::windDirectionText) ?: "-")
+                DayBriefRow(stringResource(R.string.peak_wind), peakWind?.let { "${it.toInt()} km/h" } ?: "-", stringResource(R.string.wind_gusts), peakGust?.let { "${it.toInt()} km/h" } ?: "-", windColor(peakWind), windColor(peakGust))
+                DayBriefRow(stringResource(R.string.humidity), humidity?.let { "${it.toInt()}%" } ?: "-", stringResource(R.string.pressure), pressure?.let { "${it.toInt()} hPa" } ?: "-", Color(0xFF4AA3FF), Color(0xFFB1C6DA))
+                DayBriefRow(stringResource(R.string.visibility), visibility?.let { String.format(locale, "%.1f km", it / 1000) } ?: "-", stringResource(R.string.wind_direction), daily?.windDirection?.let(::windDirectionText) ?: "-", Color(0xFF64D5C2), ChartWind)
             }
             DayBriefSection(stringResource(R.string.day_brief_sun)) {
-                DayBriefRow(stringResource(R.string.sun_window), "$sunrise - $sunset", stringResource(R.string.daylight), durationText(dayLength))
-                DayBriefRow(stringResource(R.string.sunshine), durationText(daily?.sunshineDuration), stringResource(R.string.uv_max), daily?.uvIndexMaximum?.let { String.format(locale, "%.1f", it) } ?: "-")
-                DayBriefRow(stringResource(R.string.above_shortest_day), "+${durationText(dayLength - shortest)}", stringResource(R.string.below_longest_day), "-${durationText(longest - dayLength)}")
+                SunlightComparison(daily?.sunrise, daily?.sunset, dayLength, shortest, longest)
+                DayBriefRow(stringResource(R.string.daylight), durationText(dayLength), stringResource(R.string.sunshine), durationText(daily?.sunshineDuration), Color(0xFFFFC83D), Color(0xFFFFA928))
+                DayBriefRow(stringResource(R.string.uv_max), daily?.uvIndexMaximum?.let { String.format(locale, "%.1f", it) } ?: "-", stringResource(R.string.sun_window), "$sunrise - $sunset", uvColor(daily?.uvIndexMaximum), Color(0xFFFFC83D))
             }
             DayBriefSection(stringResource(R.string.day_brief_pollen)) {
                 val pollen = daily?.pollen
                 if (pollen == null) Text(stringResource(R.string.pollen_unavailable), color = Muted, fontSize = 12.sp)
-                else {
-                    DayBriefRow(stringResource(R.string.pollen_alder), pollenValue(pollen.alder), stringResource(R.string.pollen_birch), pollenValue(pollen.birch))
-                    DayBriefRow(stringResource(R.string.pollen_grass), pollenValue(pollen.grass), stringResource(R.string.pollen_mugwort), pollenValue(pollen.mugwort))
-                    DayBriefRow(stringResource(R.string.pollen_olive), pollenValue(pollen.olive), stringResource(R.string.pollen_ragweed), pollenValue(pollen.ragweed))
-                }
+                else PollenChart(listOf(
+                    stringResource(R.string.pollen_alder) to pollen.alder,
+                    stringResource(R.string.pollen_birch) to pollen.birch,
+                    stringResource(R.string.pollen_grass) to pollen.grass,
+                    stringResource(R.string.pollen_mugwort) to pollen.mugwort,
+                    stringResource(R.string.pollen_olive) to pollen.olive,
+                    stringResource(R.string.pollen_ragweed) to pollen.ragweed,
+                ))
             }
         }
     }
@@ -1004,18 +1008,97 @@ private fun DayBriefSection(title: String, content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun DayBriefRow(leftLabel: String, leftValue: String, rightLabel: String, rightValue: String) {
+private fun DayBriefRow(leftLabel: String, leftValue: String, rightLabel: String, rightValue: String, leftColor: Color = Color.Unspecified, rightColor: Color = Color.Unspecified) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        DayBriefMetric(leftLabel, leftValue, Modifier.weight(1f))
-        DayBriefMetric(rightLabel, rightValue, Modifier.weight(1f))
+        DayBriefMetric(leftLabel, leftValue, Modifier.weight(1f), leftColor)
+        DayBriefMetric(rightLabel, rightValue, Modifier.weight(1f), rightColor)
     }
 }
 
 @Composable
-private fun DayBriefMetric(label: String, value: String, modifier: Modifier = Modifier) {
+private fun DayBriefMetric(label: String, value: String, modifier: Modifier = Modifier, valueColor: Color = Color.Unspecified) {
     Column(modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 8.dp)) {
         Text(label, color = Muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(value, fontSize = 17.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(value, color = valueColor, fontSize = 17.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun DayBriefTemperatureRow(leftLabel: String, leftLow: Double?, leftHigh: Double?, rightLabel: String, rightLow: Double?, rightHigh: Double?, unit: String) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        DayBriefTemperatureMetric(leftLabel, leftLow, leftHigh, unit, Modifier.weight(1f))
+        DayBriefTemperatureMetric(rightLabel, rightLow, rightHigh, unit, Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun DayBriefTemperatureMetric(label: String, low: Double?, high: Double?, unit: String, modifier: Modifier = Modifier) {
+    Column(modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 8.dp)) {
+        Text(label, color = Muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(temperatureText(low, unit), color = temperatureColor(low), fontSize = 17.sp, fontWeight = FontWeight.Bold)
+            Text(" / ", color = Muted, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+            Text(temperatureText(high, unit), color = temperatureColor(high), fontSize = 17.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+private fun SunlightComparison(sunrise: String?, sunset: String?, dayLength: Double, shortestDay: Double, longestDay: Double) {
+    val sunriseMinutes = clockMinutes(sunrise) ?: return
+    val sunsetMinutes = clockMinutes(sunset) ?: return
+    val shortestDifference = ((dayLength - shortestDay).coerceAtLeast(0.0) / 120).toInt()
+    val longestDifference = ((longestDay - dayLength).coerceAtLeast(0.0) / 120).toInt()
+    val rows = listOf(
+        Triple(stringResource(R.string.shortest_day), sunriseMinutes + shortestDifference, sunsetMinutes - shortestDifference),
+        Triple(stringResource(R.string.selected_day), sunriseMinutes, sunsetMinutes),
+        Triple(stringResource(R.string.longest_day), sunriseMinutes - longestDifference, sunsetMinutes + longestDifference),
+    )
+    Column(
+        modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)).padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(9.dp),
+    ) {
+        rows.forEachIndexed { index, (label, rise, set) -> SunlightRow(label, rise, set, emphasized = index == 1) }
+        Text(stringResource(R.string.sunrise_difference, durationText(shortestDifference * 60.0), durationText(longestDifference * 60.0)), color = Muted, fontSize = 10.sp)
+        Text(stringResource(R.string.sunset_difference, durationText(shortestDifference * 60.0), durationText(longestDifference * 60.0)), color = Muted, fontSize = 10.sp)
+    }
+}
+
+@Composable
+private fun SunlightRow(label: String, sunriseMinutes: Int, sunsetMinutes: Int, emphasized: Boolean) {
+    val color = if (emphasized) Color(0xFFFFC83D) else Color(0xFF8D98AA)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(label, color = if (emphasized) MaterialTheme.colorScheme.onSurface else Muted, fontSize = 11.sp, modifier = Modifier.width(76.dp), maxLines = 1)
+        Text(formatClockMinutes(sunriseMinutes), color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(42.dp))
+        BoxWithConstraints(modifier = Modifier.weight(1f).height(16.dp)) {
+            val start = sunriseMinutes.coerceIn(0, 1440) / 1440f
+            val end = sunsetMinutes.coerceIn(0, 1440) / 1440f
+            Box(Modifier.fillMaxWidth().height(3.dp).align(Alignment.Center).background(Muted.copy(alpha = .18f), RoundedCornerShape(2.dp)))
+            Box(Modifier.fillMaxWidth((end - start).coerceAtLeast(0f)).height(if (emphasized) 6.dp else 4.dp).align(Alignment.CenterStart).offset(x = maxWidth * start).background(color, RoundedCornerShape(3.dp)))
+            Box(Modifier.size(if (emphasized) 10.dp else 7.dp).align(Alignment.CenterStart).offset(x = maxWidth * start - if (emphasized) 5.dp else 3.5.dp).background(color, RoundedCornerShape(50)))
+            Box(Modifier.size(if (emphasized) 10.dp else 7.dp).align(Alignment.CenterStart).offset(x = maxWidth * end - if (emphasized) 5.dp else 3.5.dp).background(color, RoundedCornerShape(50)))
+        }
+        Text(formatClockMinutes(sunsetMinutes), color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(42.dp), maxLines = 1)
+    }
+}
+
+@Composable
+private fun PollenChart(values: List<Pair<String, Double?>>) {
+    val maximum = values.mapNotNull { it.second }.maxOrNull()?.coerceAtLeast(1.0) ?: 1.0
+    Column(
+        modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)).padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        values.forEach { (label, value) ->
+            val color = pollenColor(value)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(label, color = Muted, fontSize = 11.sp, modifier = Modifier.width(68.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Box(Modifier.weight(1f).height(8.dp).background(Muted.copy(alpha = .18f), RoundedCornerShape(4.dp))) {
+                    Box(Modifier.fillMaxWidth(((value ?: 0.0) / maximum).toFloat().coerceIn(0f, 1f)).fillMaxHeight().background(color, RoundedCornerShape(4.dp)))
+                }
+                Text(pollenValue(value), color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(82.dp).padding(start = 8.dp), maxLines = 1)
+            }
+        }
     }
 }
 
@@ -1029,6 +1112,30 @@ private fun durationText(seconds: Double?): String {
 
 @Composable
 private fun pollenValue(value: Double?): String = value?.let { "${String.format(Locale.getDefault(), "%.1f", it)} ${stringResource(R.string.pollen_unit)}" } ?: "-"
+
+private fun windColor(value: Double?): Color = when {
+    value == null -> Muted
+    value < 12 -> Color(0xFF55CF8A)
+    value < 30 -> Color(0xFFFFC83D)
+    value < 50 -> Color(0xFFFF8A3D)
+    else -> Color(0xFFFF4055)
+}
+
+private fun uvColor(value: Double?): Color = when {
+    value == null -> Muted
+    value < 3 -> Color(0xFF55CF8A)
+    value < 6 -> Color(0xFFFFC83D)
+    value < 8 -> Color(0xFFFF8A3D)
+    else -> Color(0xFFFF4055)
+}
+
+private fun pollenColor(value: Double?): Color = when {
+    value == null || value <= 0 -> Muted
+    value < 1 -> Color(0xFF55CF8A)
+    value < 10 -> Color(0xFFFFC83D)
+    value < 50 -> Color(0xFFFF8A3D)
+    else -> Color(0xFFFF4055)
+}
 
 private fun windDirectionText(degrees: Double): String = listOf("N", "NE", "E", "SE", "S", "SW", "W", "NW")[((degrees + 22.5) / 45).toInt() % 8]
 
@@ -1044,6 +1151,15 @@ private fun estimatedDaylightSeconds(date: String, latitude: Double): Double {
 private fun clockTime(timestamp: String): String = runCatching {
     LocalDateTime.parse(timestamp).format(DateTimeFormatter.ofPattern("HH:mm"))
 }.getOrDefault("-")
+
+private fun clockMinutes(timestamp: String?): Int? = timestamp?.let {
+    runCatching { LocalDateTime.parse(it).let { time -> time.hour * 60 + time.minute } }.getOrNull()
+}
+
+private fun formatClockMinutes(minutes: Int): String {
+    val normalized = minutes.coerceIn(0, 1439)
+    return "%02d:%02d".format(Locale.US, normalized / 60, normalized % 60)
+}
 
 @Composable
 private fun Metric(label: String, value: String, modifier: Modifier = Modifier) {

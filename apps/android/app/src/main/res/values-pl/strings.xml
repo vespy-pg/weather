@@ -52,6 +52,11 @@
     <string name="uv_max">Maks. UV</string>
     <string name="above_shortest_day">Powyżej najkrótszego dnia</string>
     <string name="below_longest_day">Do najdłuższego dnia</string>
+    <string name="shortest_day">Najkrótszy</string>
+    <string name="selected_day">Wybrany</string>
+    <string name="longest_day">Najdłuższy</string>
+    <string name="sunrise_difference">Wschód: najkrótszy +%1$s, najdłuższy -%2$s</string>
+    <string name="sunset_difference">Zachód: najkrótszy -%1$s, najdłuższy +%2$s</string>
     <string name="duration_hours_minutes">%1$d godz. %2$d min</string>
     <string name="pollen_alder">Olcha</string>
     <string name="pollen_birch">Brzoza</string>
