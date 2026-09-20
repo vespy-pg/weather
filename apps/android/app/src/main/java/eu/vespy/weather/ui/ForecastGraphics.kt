@@ -679,6 +679,7 @@ object ForecastGraphics {
         pixelScale: Float,
         pressureHighLabel: String = "H",
         pressureLowLabel: String = "L",
+        noDataLabel: String = "NO DATA",
         fixedMinimum: Double? = null,
         fixedMaximum: Double? = null,
     ) {
@@ -694,6 +695,7 @@ object ForecastGraphics {
             "uv" -> drawUvIntensityBand(canvas, bounds, values, maximum, cell, dark, pixelScale)
             "humidity" -> drawHumidityDots(canvas, bounds, values, cell, color, pixelScale)
             "pressure" -> drawPressureBand(canvas, bounds, values, minimum, maximum, cell, dark, pressureHighLabel, pressureLowLabel, pixelScale)
+            "airQuality" -> drawAirQualityDots(canvas, bounds, values, maximum, cell, color, pixelScale)
             "pollen" -> drawPollenCloud(canvas, bounds, values, maximum, cell, pixelScale)
             else -> {
                 val verticalPadding = 6f * pixelScale
@@ -710,11 +712,68 @@ object ForecastGraphics {
                 })
             }
         }
+        drawMissingDataSegments(canvas, bounds, values, cell, palette, noDataLabel, pixelScale)
         canvas.drawLine(bounds.left, bounds.top, bounds.right, bounds.top, Paint(Paint.ANTI_ALIAS_FLAG).apply {
             this.color = palette.separator
             strokeWidth = 1.25f * pixelScale
         })
         drawDaySeparators(canvas, bounds, points, palette, pixelScale)
+    }
+
+    private fun drawMissingDataSegments(
+        canvas: Canvas,
+        bounds: RectF,
+        values: List<Double?>,
+        cell: Float,
+        palette: ForecastPalette,
+        label: String,
+        pixelScale: Float,
+    ) {
+        if (values.isEmpty() || values.none { it == null }) return
+        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (Color.red(palette.background) < 80) Color.argb(42, 190, 200, 214) else Color.argb(34, 58, 72, 92)
+        }
+        val hatch = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (Color.red(palette.background) < 80) Color.argb(78, 190, 200, 214) else Color.argb(62, 58, 72, 92)
+            strokeWidth = 1f * pixelScale
+        }
+        val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = palette.muted
+            textAlign = Paint.Align.CENTER
+            textSize = 8f * pixelScale
+            typeface = Typeface.create("monospace", Typeface.BOLD)
+        }
+        var start = 0
+        while (start < values.size) {
+            if (values[start] != null) {
+                start++
+                continue
+            }
+            var end = start + 1
+            while (end < values.size && values[end] == null) end++
+            val left = bounds.left + start * cell
+            val right = bounds.left + end * cell
+            canvas.drawRect(left, bounds.top, right, bounds.bottom, fill)
+            canvas.save()
+            canvas.clipRect(left, bounds.top, right, bounds.bottom)
+            val step = 9f * pixelScale
+            var x = left - bounds.height()
+            while (x < right) {
+                canvas.drawLine(x, bounds.bottom, x + bounds.height(), bounds.top, hatch)
+                x += step
+            }
+            canvas.restore()
+            val segmentWidth = right - left
+            val labelStep = max(110f * pixelScale, cell * 6f)
+            if (segmentWidth >= 34f * pixelScale) {
+                var labelX = left + min(labelStep / 2f, segmentWidth / 2f)
+                while (labelX < right) {
+                    canvas.drawText(label, labelX, bounds.centerY() - (text.ascent() + text.descent()) / 2f, text)
+                    labelX += labelStep
+                }
+            }
+            start = end
+        }
     }
 
     fun drawMetricLegend(canvas: Canvas, bounds: RectF, dark: Boolean, label: String, color: Int, metricStyle: String, pixelScale: Float) {
@@ -728,18 +787,20 @@ object ForecastGraphics {
             this.color = palette.separator
             strokeWidth = 1.25f * pixelScale
         })
-        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            this.color = color
-            textAlign = Paint.Align.CENTER
-            textSize = 9f * pixelScale
-            typeface = Typeface.create("monospace", Typeface.BOLD)
+        fun drawLabel(text: String, x: Float, textSize: Float, textColor: Int = color) {
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                this.color = textColor
+                textAlign = Paint.Align.CENTER
+                this.textSize = textSize * pixelScale
+                typeface = Typeface.create("monospace", Typeface.BOLD)
+            }
+            canvas.drawText(text, x, bounds.centerY() - (paint.ascent() + paint.descent()) / 2f, paint)
         }
-        val textX = if (metricStyle == "humidity") bounds.centerX() + 5f * pixelScale else bounds.centerX()
-        canvas.drawText(label, textX, bounds.centerY() - (textPaint.ascent() + textPaint.descent()) / 2f, textPaint)
-        if (metricStyle == "humidity") {
-            val x = bounds.centerX() - 8f * pixelScale
+        when (metricStyle) {
+        "humidity" -> {
+            val x = bounds.centerX() - 9f * pixelScale
             val y = bounds.centerY()
-            val size = 5f * pixelScale
+            val size = 8.5f * pixelScale
             val drop = Path().apply {
                 moveTo(x, y - size)
                 cubicTo(x - size * .7f, y, x - size * .55f, y + size * .8f, x, y + size)
@@ -747,18 +808,88 @@ object ForecastGraphics {
                 close()
             }
             canvas.drawPath(drop, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color })
-        } else if (metricStyle == "pollen") {
-            val petalColors = intArrayOf(Color.rgb(85, 207, 138), Color.rgb(255, 200, 61), Color.rgb(255, 138, 61))
-            repeat(6) { index ->
-                val angle = index * PI.toFloat() / 3f
+            drawLabel(label, bounds.centerX() + 11f * pixelScale, 14f)
+        }
+        "pollen" -> {
+            val flowerX = bounds.centerX()
+            val flowerY = bounds.centerY() - 5f * pixelScale
+            val green = Color.rgb(83, 176, 72)
+            canvas.drawLine(flowerX, flowerY + 5f * pixelScale, flowerX, bounds.bottom - 2f * pixelScale, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                this.color = green
+                strokeWidth = 2.2f * pixelScale
+                strokeCap = Paint.Cap.ROUND
+            })
+            val leaf = Path().apply {
+                moveTo(flowerX, bounds.centerY() + 5f * pixelScale)
+                cubicTo(flowerX - 5f * pixelScale, bounds.centerY() + 1f * pixelScale, flowerX - 10f * pixelScale, bounds.centerY() + 4f * pixelScale, flowerX - 11f * pixelScale, bounds.centerY() + 8f * pixelScale)
+                cubicTo(flowerX - 6f * pixelScale, bounds.centerY() + 9f * pixelScale, flowerX - 2f * pixelScale, bounds.centerY() + 8f * pixelScale, flowerX, bounds.centerY() + 5f * pixelScale)
+                close()
+            }
+            canvas.drawPath(leaf, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = green })
+            repeat(5) { index ->
+                val angle = -PI.toFloat() / 2f + index * PI.toFloat() * 2f / 5f
                 canvas.drawCircle(
-                    bounds.centerX() + cos(angle) * 5f * pixelScale,
-                    bounds.centerY() + sin(angle) * 5f * pixelScale,
-                    3.1f * pixelScale,
-                    Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = petalColors[index % petalColors.size] },
+                    flowerX + cos(angle) * 5.8f * pixelScale,
+                    flowerY + sin(angle) * 5.8f * pixelScale,
+                    4.8f * pixelScale,
+                    Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = Color.rgb(241, 84, 91) },
                 )
             }
-            canvas.drawCircle(bounds.centerX(), bounds.centerY(), 3f * pixelScale, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = Color.rgb(255, 220, 75) })
+            canvas.drawCircle(flowerX, flowerY, 4f * pixelScale, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = Color.rgb(255, 199, 45) })
+        }
+        "airQuality" -> {
+            val chimneyLeft = bounds.centerX() - 9f * pixelScale
+            val chimneyTop = bounds.centerY() - 1f * pixelScale
+            val chimneyBottom = bounds.bottom - 3f * pixelScale
+            val chimney = Path().apply {
+                moveTo(chimneyLeft + 2f * pixelScale, chimneyTop)
+                lineTo(chimneyLeft + 8f * pixelScale, chimneyTop)
+                lineTo(chimneyLeft + 10f * pixelScale, chimneyBottom)
+                lineTo(chimneyLeft, chimneyBottom)
+                close()
+            }
+            canvas.save()
+            canvas.clipPath(chimney)
+            canvas.drawRect(chimneyLeft, chimneyTop, chimneyLeft + 10f * pixelScale, chimneyBottom, Paint().apply { this.color = Color.rgb(211, 55, 55) })
+            val stripeHeight = 4f * pixelScale
+            canvas.drawRect(chimneyLeft, chimneyTop + stripeHeight, chimneyLeft + 10f * pixelScale, chimneyTop + stripeHeight * 2f, Paint().apply { this.color = Color.rgb(240, 240, 236) })
+            canvas.drawRect(chimneyLeft, chimneyTop + stripeHeight * 3f, chimneyLeft + 10f * pixelScale, chimneyTop + stripeHeight * 4f, Paint().apply { this.color = Color.rgb(240, 240, 236) })
+            canvas.restore()
+            canvas.drawPath(chimney, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                this.color = Color.rgb(55, 59, 65)
+                style = Paint.Style.STROKE
+                strokeWidth = 1.3f * pixelScale
+            })
+            val smoke = Color.rgb(112, 109, 104)
+            canvas.drawCircle(bounds.centerX() - 5f * pixelScale, bounds.centerY() - 8f * pixelScale, 5.2f * pixelScale, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = smoke })
+            canvas.drawCircle(bounds.centerX() + 2f * pixelScale, bounds.centerY() - 10f * pixelScale, 4.5f * pixelScale, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = smoke })
+            canvas.drawCircle(bounds.centerX() + 8f * pixelScale, bounds.centerY() - 12f * pixelScale, 3.3f * pixelScale, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = smoke })
+            canvas.drawCircle(bounds.centerX() + 13f * pixelScale, bounds.centerY() - 13f * pixelScale, 1.8f * pixelScale, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = smoke })
+        }
+        "uv" -> {
+            val centerX = bounds.centerX()
+            val centerY = bounds.centerY()
+            val purple = Color.rgb(121, 20, 245)
+            repeat(8) { index ->
+                val angle = index * PI.toFloat() / 4f
+                val perpendicularX = -sin(angle)
+                val perpendicularY = cos(angle)
+                val innerRadius = 11.5f * pixelScale
+                val outerRadius = 17f * pixelScale
+                val halfWidth = 2.8f * pixelScale
+                val ray = Path().apply {
+                    moveTo(centerX + cos(angle) * outerRadius, centerY + sin(angle) * outerRadius)
+                    lineTo(centerX + cos(angle) * innerRadius + perpendicularX * halfWidth, centerY + sin(angle) * innerRadius + perpendicularY * halfWidth)
+                    lineTo(centerX + cos(angle) * innerRadius - perpendicularX * halfWidth, centerY + sin(angle) * innerRadius - perpendicularY * halfWidth)
+                    close()
+                }
+                canvas.drawPath(ray, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = purple })
+            }
+            canvas.drawCircle(centerX, centerY, 10.5f * pixelScale, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = purple })
+            drawLabel(label, centerX, 10.5f, Color.WHITE)
+        }
+        "pressure" -> drawLabel(label, bounds.centerX(), 13f)
+        else -> drawLabel(label, bounds.centerX(), 12f)
         }
     }
 
@@ -833,6 +964,33 @@ object ForecastGraphics {
                     val radius = (.75f + density * 1.5f + (seed % 7) * .07f) * (.25f + presence * .75f) * pixelScale
                     canvas.drawCircle(x + xJitter, y, radius, Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         color = withAlpha(colors[seed % colors.size], ((115 + density * 140) * presence).toInt())
+                    })
+                }
+            }
+        }
+    }
+
+    private fun drawAirQualityDots(canvas: Canvas, bounds: RectF, values: List<Double?>, maximum: Double, cell: Float, color: Int, pixelScale: Float) {
+        val columns = max(1, (bounds.width() / (5.8f * pixelScale)).toInt())
+        val rows = 7
+        val rowSpacing = 4.1f * pixelScale
+        val cloudHeight = (rows - 1) * rowSpacing
+        repeat(columns) { column ->
+            val x = bounds.left + (column + .5f) * bounds.width() / columns
+            val pointPosition = (x - bounds.left) / cell - .5f
+            val aqi = interpolatedValue(values, pointPosition) ?: return@repeat
+            val density = (aqi / maximum.coerceAtLeast(1.0)).toFloat().coerceIn(0f, 1f)
+            repeat(rows) { row ->
+                val seed = (column + 17) * 53 + (row + 7) * 37
+                val threshold = ((row + .3f) / rows + (((seed * 29) % 11) - 5) / 110f).coerceIn(0f, 1f)
+                val presence = ((density - threshold) * 6f + .2f).coerceIn(0f, 1f)
+                if (presence > .02f) {
+                    val xJitter = (((seed * 31) % 17) - 8) / 10f * pixelScale
+                    val yJitter = (((seed * 43) % 13) - 6) / 12f * pixelScale
+                    val y = bounds.centerY() - cloudHeight / 2f + row * rowSpacing + yJitter
+                    val radius = (.75f + density * 1.4f + (seed % 5) * .08f) * (.25f + presence * .75f) * pixelScale
+                    canvas.drawCircle(x + xJitter, y, radius, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        this.color = withAlpha(color, ((95 + density * 150) * presence).toInt())
                     })
                 }
             }

@@ -509,6 +509,18 @@ export function hourlyPollen(source, timestamp) {
   return Object.values(values).some(value => value !== null) ? values : null;
 }
 
+export function hourlyAirQuality(source, timestamp) {
+  const sourceIndex = (source?.hourly?.time || []).indexOf(timestamp);
+  if (sourceIndex < 0) return null;
+  const values = AIR_QUALITY_FIELDS.reduce((result, field) => {
+    const value = at(source.hourly, field, sourceIndex);
+    const key = field === 'european_aqi' ? 'europeanAqi' : field.replace('pm2_5', 'pm25').replace('nitrogen_dioxide', 'nitrogenDioxide').replace('sulphur_dioxide', 'sulphurDioxide').replace('carbon_monoxide', 'carbonMonoxide');
+    result[key] = value === null ? null : Number(Number(value).toFixed(1));
+    return result;
+  }, {});
+  return Object.values(values).some(value => value !== null) ? values : null;
+}
+
 export function dailyAirQuality(source, date) {
   const values = AIR_QUALITY_FIELDS.reduce((result, field) => {
     const readings = dailyAirReadings(source, date, field);
@@ -568,7 +580,8 @@ export function normalizeForecast(source, location, {pastDays = 0, pollenSource 
       visibility: at(source.hourly, 'visibility', sourceIndex),
       surfacePressure: at(source.hourly, 'surface_pressure', sourceIndex),
       uvIndex: at(source.hourly, 'uv_index', sourceIndex),
-      pollen: hourlyPollen(pollenSource, timestamp)
+      pollen: hourlyPollen(pollenSource, timestamp),
+      airQuality: hourlyAirQuality(pollenSource, timestamp)
     };
     }),
     daily: dailyTimes.map((date, index) => {

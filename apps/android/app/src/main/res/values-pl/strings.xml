@@ -131,6 +131,8 @@
     <string name="pressure_high_symbol">W</string>
     <string name="pressure_low_symbol">N</string>
     <string name="show_pollen">Godzinowy wykres pyłków</string>
+    <string name="show_air_quality">Godzinowy wykres jakości powietrza</string>
+    <string name="timeline_no_data">BRAK DANYCH</string>
     <string name="show_historical_data">Pokazuj dane historyczne</string>
     <string name="show_dates">Pokazuj daty obok nazw dni</string>
     <string name="show_mushrooms">Warunki dla grzybów</string>

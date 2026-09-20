@@ -45,6 +45,7 @@ data class HourlyWeather(
     val surfacePressure: Double? = null,
     val uvIndex: Double? = null,
     val pollen: PollenForecast? = null,
+    val airQuality: AirQualityForecast? = null,
 )
 
 data class DailyWeather(
@@ -224,6 +225,7 @@ data class ForecastDisplaySettings(
     val showHumidity: Boolean = true,
     val showPressure: Boolean = true,
     val showPollen: Boolean = true,
+    val showAirQuality: Boolean = true,
     val showHistoricalData: Boolean = true,
     val showDates: Boolean = false,
     val showMushrooms: Boolean = false,
@@ -294,6 +296,8 @@ fun List<HourlyWeather>.groupByHours(hours: Int): List<HourlyWeather> {
         }
         fun averagePollen(selector: (PollenForecast) -> Double?): Double? =
             points.mapNotNull { it.pollen?.let(selector) }.takeIf { it.isNotEmpty() }?.average()
+        fun averageAirQuality(selector: (AirQualityForecast) -> Double?): Double? =
+            points.mapNotNull { it.airQuality?.let(selector) }.takeIf { it.isNotEmpty() }?.average()
         val severeCodes = listOf(99, 96, 86, 85, 77, 75, 73, 71, 67, 66, 57, 56, 95, 82, 81, 80, 65, 63, 55, 53, 51, 48, 45, 3)
         val code = points.mapNotNull(HourlyWeather::weatherCode).minByOrNull { severeCodes.indexOf(it).takeIf { index -> index >= 0 } ?: Int.MAX_VALUE }
         points.first().copy(
@@ -321,6 +325,15 @@ fun List<HourlyWeather>.groupByHours(hours: Int): List<HourlyWeather> {
                 olive = averagePollen(PollenForecast::olive),
                 ragweed = averagePollen(PollenForecast::ragweed),
             ).takeIf { pollen -> listOf(pollen.alder, pollen.birch, pollen.grass, pollen.mugwort, pollen.olive, pollen.ragweed).any { it != null } },
+            airQuality = AirQualityForecast(
+                europeanAqi = averageAirQuality(AirQualityForecast::europeanAqi),
+                pm25 = averageAirQuality(AirQualityForecast::pm25),
+                pm10 = averageAirQuality(AirQualityForecast::pm10),
+                nitrogenDioxide = averageAirQuality(AirQualityForecast::nitrogenDioxide),
+                ozone = averageAirQuality(AirQualityForecast::ozone),
+                sulphurDioxide = averageAirQuality(AirQualityForecast::sulphurDioxide),
+                carbonMonoxide = averageAirQuality(AirQualityForecast::carbonMonoxide),
+            ).takeIf { air -> listOf(air.europeanAqi, air.pm25, air.pm10, air.nitrogenDioxide, air.ozone, air.sulphurDioxide, air.carbonMonoxide).any { it != null } },
         )
     }
 }

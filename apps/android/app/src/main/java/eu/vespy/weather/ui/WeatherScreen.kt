@@ -517,7 +517,7 @@ private fun ForecastTimeline(
     }
     val slotWidth = 22.dp * settings.zoom * groupHours
     val trackWidth = slotWidth * max(1, points.size)
-    val metricRows = remember(points, settings.showUvIndex, settings.showHumidity, settings.showPressure, settings.showPollen) {
+    val metricRows = remember(points, settings.showUvIndex, settings.showHumidity, settings.showPressure, settings.showAirQuality, settings.showPollen) {
         buildList {
             if (settings.showUvIndex) {
                 val values = points.map(HourlyWeather::uvIndex)
@@ -529,9 +529,18 @@ private fun ForecastTimeline(
                 val available = values.filterNotNull()
                 add(TimelineMetric("hPa", "pressure", android.graphics.Color.rgb(177, 145, 255), values, available.minOrNull(), available.maxOrNull()))
             }
+            if (settings.showAirQuality) {
+                val values = points.map { it.airQuality?.europeanAqi }
+                add(TimelineMetric("AQI", "airQuality", android.graphics.Color.rgb(150, 158, 170), values, 0.0, max(100.0, values.filterNotNull().maxOrNull() ?: 0.0)))
+            }
             if (settings.showPollen) {
                 val values = points.map { point ->
-                    point.pollen?.let { pollen -> listOf(pollen.alder, pollen.birch, pollen.grass, pollen.mugwort, pollen.olive, pollen.ragweed).filterNotNull().sum().takeIf { it > 0.0 } }
+                    point.pollen?.let { pollen ->
+                        listOf(pollen.alder, pollen.birch, pollen.grass, pollen.mugwort, pollen.olive, pollen.ragweed)
+                            .filterNotNull()
+                            .takeIf { it.isNotEmpty() }
+                            ?.sum()
+                    }
                 }
                 add(TimelineMetric("", "pollen", android.graphics.Color.rgb(255, 200, 61), values, 0.0, values.filterNotNull().maxOrNull()?.coerceAtLeast(1.0)))
             }
@@ -550,6 +559,7 @@ private fun ForecastTimeline(
     val historyLabel = stringResource(R.string.history)
     val pressureHighLabel = stringResource(R.string.pressure_high_symbol)
     val pressureLowLabel = stringResource(R.string.pressure_low_symbol)
+    val noDataLabel = stringResource(R.string.timeline_no_data)
     val legendWidth = if (landscape) 38.dp else 44.dp
     val densityContext = LocalDensity.current
     val slotWidthPx = with(densityContext) { slotWidth.toPx() }
@@ -740,6 +750,7 @@ private fun ForecastTimeline(
                     pixelScale = density,
                     pressureHighLabel = pressureHighLabel,
                     pressureLowLabel = pressureLowLabel,
+                    noDataLabel = noDataLabel,
                     fixedMinimum = metric.minimum,
                     fixedMaximum = metric.maximum,
                 )
@@ -1782,6 +1793,7 @@ private fun SettingsDialog(
                     SettingSwitch(stringResource(R.string.show_humidity), state.displaySettings.showHumidity) { onDisplaySettings(state.displaySettings.copy(showHumidity = it)) }
                     SettingSwitch(stringResource(R.string.show_pressure), state.displaySettings.showPressure) { onDisplaySettings(state.displaySettings.copy(showPressure = it)) }
                     SettingSwitch(stringResource(R.string.show_pollen), state.displaySettings.showPollen) { onDisplaySettings(state.displaySettings.copy(showPollen = it)) }
+                    SettingSwitch(stringResource(R.string.show_air_quality), state.displaySettings.showAirQuality) { onDisplaySettings(state.displaySettings.copy(showAirQuality = it)) }
                     SettingSwitch(stringResource(R.string.show_historical_data), state.displaySettings.showHistoricalData) { onDisplaySettings(state.displaySettings.copy(showHistoricalData = it)) }
                     SettingSwitch(stringResource(R.string.show_dates), state.displaySettings.showDates) { onDisplaySettings(state.displaySettings.copy(showDates = it)) }
                     SettingSwitch(stringResource(R.string.show_mushrooms), state.displaySettings.showMushrooms) { onDisplaySettings(state.displaySettings.copy(showMushrooms = it)) }

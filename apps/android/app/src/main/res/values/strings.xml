@@ -131,6 +131,8 @@
     <string name="pressure_high_symbol">H</string>
     <string name="pressure_low_symbol">L</string>
     <string name="show_pollen">Hourly pollen chart</string>
+    <string name="show_air_quality">Hourly air quality chart</string>
+    <string name="timeline_no_data">NO DATA</string>
     <string name="show_historical_data">Show historical data</string>
     <string name="show_dates">Show dates beside day names</string>
     <string name="show_mushrooms">Mushroom conditions</string>

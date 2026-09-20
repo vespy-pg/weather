@@ -211,6 +211,17 @@ class WeatherApi(private val baseUrl: String = BuildConfig.API_BASE_URL) {
                             ragweed = it.optNullableDouble("ragweed"),
                         )
                     },
+                    airQuality = item.optJSONObject("airQuality")?.let {
+                        AirQualityForecast(
+                            europeanAqi = it.optNullableDouble("europeanAqi"),
+                            pm25 = it.optNullableDouble("pm25"),
+                            pm10 = it.optNullableDouble("pm10"),
+                            nitrogenDioxide = it.optNullableDouble("nitrogenDioxide"),
+                            ozone = it.optNullableDouble("ozone"),
+                            sulphurDioxide = it.optNullableDouble("sulphurDioxide"),
+                            carbonMonoxide = it.optNullableDouble("carbonMonoxide"),
+                        )
+                    },
                 ))
             }
         }

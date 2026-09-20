@@ -3,7 +3,7 @@ import test from 'node:test';
 import {mkdir, mkdtemp, readFile, readdir, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
-import {createServer, dailyAirQuality, dailyPollen, forecastUrl, hourlyPollen, isForecastRoutePath, locationMatchesQualifiers, locationSearchUrl, locationSearchVariants, mushroomCondition, mushroomObservationsUrl, normalizeForecast, normalizeGoogleAnalyticsId, normalizeIssueReport, normalizeLocale, normalizeMushroomObservations, normalizePostalLocations, normalizeReverseLocation, normalizedSearchText, pollenForecastUrl, postalCodeSearchUrl, preferredLanguageForCountry, promotionFeed, purgeExpiredIssueReports, rankLocationCandidates, renderIndexHtml, selectCapitalResult, seoPageMetadata, staticCacheControl} from './server.js';
+import {createServer, dailyAirQuality, dailyPollen, forecastUrl, hourlyAirQuality, hourlyPollen, isForecastRoutePath, locationMatchesQualifiers, locationSearchUrl, locationSearchVariants, mushroomCondition, mushroomObservationsUrl, normalizeForecast, normalizeGoogleAnalyticsId, normalizeIssueReport, normalizeLocale, normalizeMushroomObservations, normalizePostalLocations, normalizeReverseLocation, normalizedSearchText, pollenForecastUrl, postalCodeSearchUrl, preferredLanguageForCountry, promotionFeed, purgeExpiredIssueReports, rankLocationCandidates, renderIndexHtml, selectCapitalResult, seoPageMetadata, staticCacheControl} from './server.js';
 
 test('normalizes issue reports without retaining encoded attachment data in metadata', () => {
   const report = normalizeIssueReport({
@@ -193,6 +193,9 @@ test('pollen forecast uses the European air-quality endpoint and aggregates a da
     time: ['2026-09-20T00:00', '2026-09-20T01:00'],
     alder_pollen: [1, 2], birch_pollen: [3, 4], grass_pollen: [5, 6], mugwort_pollen: [7, 8], olive_pollen: [null, 9], ragweed_pollen: [10, 11]
   }}, '2026-09-20T01:00'), {alder: 2, birch: 4, grass: 6, mugwort: 8, olive: 9, ragweed: 11});
+  assert.deepEqual(hourlyAirQuality({hourly: {
+    time: ['2026-09-20T00:00', '2026-09-20T01:00'], european_aqi: [20, 31], pm2_5: [4, 7], pm10: [8, 12], nitrogen_dioxide: [10, 14], ozone: [42, 55], sulphur_dioxide: [1, 2], carbon_monoxide: [180, 220]
+  }}, '2026-09-20T01:00'), {europeanAqi: 31, pm25: 7, pm10: 12, nitrogenDioxide: 14, ozone: 55, sulphurDioxide: 2, carbonMonoxide: 220});
   assert.deepEqual(dailyAirQuality({hourly: {
     time: ['2026-09-20T00:00', '2026-09-20T12:00', '2026-09-21T00:00'],
     european_aqi: [25, 42, 18], pm2_5: [4, 9, 3], pm10: [8, 14, 7], nitrogen_dioxide: [11, 17, 8], ozone: [42, 61, 39], sulphur_dioxide: [1, 2, 1], carbon_monoxide: [180, 220, 160]
