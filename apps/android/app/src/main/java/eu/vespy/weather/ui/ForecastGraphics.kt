@@ -675,6 +675,7 @@ object ForecastGraphics {
         values: List<Double?>,
         dark: Boolean,
         color: Int,
+        metricStyle: String,
         pixelScale: Float,
         fixedMinimum: Double? = null,
         fixedMaximum: Double? = null,
@@ -695,19 +696,44 @@ object ForecastGraphics {
             this.color = palette.grid
             strokeWidth = pixelScale
         })
-        yValues.forEachIndexed { index, y ->
-            if (y == null) return@forEachIndexed
-            canvas.drawRect(bounds.left + index * cell, y, bounds.left + (index + 1) * cell, bounds.bottom, Paint().apply {
-                this.color = withAlpha(color, 24)
-            })
+        val linePath = smoothLinePath(bounds.left, cell, yValues)
+        val areaPath = Path(linePath).apply {
+            lineTo(bounds.right, bounds.bottom)
+            lineTo(bounds.left, bounds.bottom)
+            close()
         }
-        canvas.drawPath(smoothLinePath(bounds.left, cell, yValues), Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        canvas.drawPath(areaPath, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = LinearGradient(0f, bounds.top, 0f, bounds.bottom, withAlpha(color, if (metricStyle == "uv") 92 else 52), withAlpha(color, 4), Shader.TileMode.CLAMP)
+        })
+        if (metricStyle == "humidity") {
+            listOf(-3f, 3f).forEach { offset ->
+                canvas.save()
+                canvas.translate(0f, offset * pixelScale)
+                canvas.drawPath(linePath, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    this.color = withAlpha(color, 52)
+                    style = Paint.Style.STROKE
+                    strokeWidth = 1.2f * pixelScale
+                    strokeCap = Paint.Cap.ROUND
+                })
+                canvas.restore()
+            }
+        }
+        canvas.drawPath(linePath, Paint(Paint.ANTI_ALIAS_FLAG).apply {
             this.color = color
             style = Paint.Style.STROKE
-            strokeWidth = 2.3f * pixelScale
+            strokeWidth = (if (metricStyle == "pressure") 3.4f else 2.8f) * pixelScale
             strokeCap = Paint.Cap.ROUND
             strokeJoin = Paint.Join.ROUND
         })
+        if (metricStyle == "uv") {
+            points.indices.groupBy { points[it].timestamp.take(10) }.values.forEach { indices ->
+                val peak = indices.maxByOrNull { values.getOrNull(it) ?: Double.NEGATIVE_INFINITY } ?: return@forEach
+                val y = yValues.getOrNull(peak) ?: return@forEach
+                val x = bounds.left + (peak + .5f) * cell
+                canvas.drawCircle(x, y, 6f * pixelScale, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = withAlpha(color, 42) })
+                canvas.drawCircle(x, y, 2.5f * pixelScale, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color })
+            }
+        }
         canvas.drawLine(bounds.left, bounds.top, bounds.right, bounds.top, Paint(Paint.ANTI_ALIAS_FLAG).apply {
             this.color = palette.separator
             strokeWidth = 1.25f * pixelScale

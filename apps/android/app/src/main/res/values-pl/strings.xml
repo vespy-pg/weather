@@ -61,6 +61,17 @@
     <string name="earliest">Najwcześniej</string>
     <string name="current">Wybrany</string>
     <string name="latest">Najpóźniej</string>
+    <string name="moon_path">Droga Księżyca</string>
+    <string name="moon_times_approximate">Przybliżone lokalne godziny wschodu i zachodu Księżyca</string>
+    <string name="next_moon_phases">Fazy Księżyca przez kolejne 7 dni</string>
+    <string name="moon_new">Nów</string>
+    <string name="moon_waxing_crescent">Przybywający sierp</string>
+    <string name="moon_first_quarter">Pierwsza kwadra</string>
+    <string name="moon_waxing_gibbous">Przybywający garb</string>
+    <string name="moon_full">Pełnia</string>
+    <string name="moon_waning_gibbous">Ubywający garb</string>
+    <string name="moon_last_quarter">Ostatnia kwadra</string>
+    <string name="moon_waning_crescent">Ubywający sierp</string>
     <string name="sunrise_difference">Wschód: najkrótszy +%1$s, najdłuższy -%2$s</string>
     <string name="sunset_difference">Zachód: najkrótszy -%1$s, najdłuższy +%2$s</string>
     <string name="european_aqi">Europejski indeks jakości powietrza</string>

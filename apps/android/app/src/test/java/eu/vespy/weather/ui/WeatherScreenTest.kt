@@ -1,7 +1,9 @@
 package eu.vespy.weather.ui
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.LocalDate
 
 class WeatherScreenTest {
     @Test
@@ -31,5 +33,20 @@ class WeatherScreenTest {
         val rows = List(3) { Triple("collapsed", 720, 720) }
 
         assertEquals(690..750, sunlightDomain(rows))
+    }
+
+    @Test
+    fun `moon phase follows known new and full moon dates`() {
+        val newMoon = moonPhase(LocalDate.of(2000, 1, 6))
+        val fullMoon = moonPhase(LocalDate.of(2000, 1, 21))
+
+        assertTrue(newMoon < .04)
+        assertTrue(fullMoon in 0.48..0.55)
+    }
+
+    @Test
+    fun `moon times wrap safely across midnight`() {
+        assertEquals(30, normalizeMinutes(1470))
+        assertEquals(1410, normalizeMinutes(-30))
     }
 }

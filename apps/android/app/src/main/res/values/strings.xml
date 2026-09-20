@@ -61,6 +61,17 @@
     <string name="earliest">Earliest</string>
     <string name="current">Selected</string>
     <string name="latest">Latest</string>
+    <string name="moon_path">Moon path</string>
+    <string name="moon_times_approximate">Approximate local moonrise and moonset times</string>
+    <string name="next_moon_phases">Moon phases over the next 7 days</string>
+    <string name="moon_new">New moon</string>
+    <string name="moon_waxing_crescent">Waxing crescent</string>
+    <string name="moon_first_quarter">First quarter</string>
+    <string name="moon_waxing_gibbous">Waxing gibbous</string>
+    <string name="moon_full">Full moon</string>
+    <string name="moon_waning_gibbous">Waning gibbous</string>
+    <string name="moon_last_quarter">Last quarter</string>
+    <string name="moon_waning_crescent">Waning crescent</string>
     <string name="sunrise_difference">Sunrise: shortest +%1$s, longest -%2$s</string>
     <string name="sunset_difference">Sunset: shortest -%1$s, longest +%2$s</string>
     <string name="european_aqi">European Air Quality Index</string>

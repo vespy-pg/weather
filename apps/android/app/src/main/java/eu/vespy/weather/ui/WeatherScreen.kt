@@ -134,6 +134,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.time.LocalDateTime
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
@@ -520,13 +521,13 @@ private fun ForecastTimeline(
         buildList {
             if (settings.showUvIndex) {
                 val values = points.map(HourlyWeather::uvIndex)
-                add(TimelineMetric("UV", android.graphics.Color.rgb(255, 200, 61), values, 0.0, max(11.0, values.filterNotNull().maxOrNull() ?: 0.0)))
+                add(TimelineMetric("UV", "uv", android.graphics.Color.rgb(255, 200, 61), values, 0.0, max(11.0, values.filterNotNull().maxOrNull() ?: 0.0)))
             }
-            if (settings.showHumidity) add(TimelineMetric("%", android.graphics.Color.rgb(74, 163, 255), points.map(HourlyWeather::relativeHumidity), 0.0, 100.0))
+            if (settings.showHumidity) add(TimelineMetric("%", "humidity", android.graphics.Color.rgb(74, 163, 255), points.map(HourlyWeather::relativeHumidity), 0.0, 100.0))
             if (settings.showPressure) {
                 val values = points.map(HourlyWeather::surfacePressure)
                 val available = values.filterNotNull()
-                add(TimelineMetric("hPa", android.graphics.Color.rgb(177, 145, 255), values, available.minOrNull()?.minus(3), available.maxOrNull()?.plus(3)))
+                add(TimelineMetric("hPa", "pressure", android.graphics.Color.rgb(177, 145, 255), values, available.minOrNull()?.minus(3), available.maxOrNull()?.plus(3)))
             }
         }
     }
@@ -707,6 +708,7 @@ private fun ForecastTimeline(
                     values = metric.values,
                     dark = dark,
                     color = metric.color,
+                    metricStyle = metric.style,
                     pixelScale = density,
                     fixedMinimum = metric.minimum,
                     fixedMaximum = metric.maximum,
@@ -760,6 +762,7 @@ private fun ForecastTimeline(
 
 private data class TimelineMetric(
     val label: String,
+    val style: String,
     val color: Int,
     val values: List<Double?>,
     val minimum: Double?,
@@ -1040,7 +1043,7 @@ private fun ForecastDayBrief(
                 else AirQualityDetails(airQuality)
             }
             DayBriefSection(stringResource(R.string.day_brief_sun)) {
-                SunlightComparison(daily?.sunrise, daily?.sunset, dayLength, shortest, longest)
+                SunlightComparison(date, daily?.sunrise, daily?.sunset, dayLength, shortest, longest)
                 DayBriefRow(stringResource(R.string.daylight), durationText(dayLength), stringResource(R.string.sunshine), durationText(daily?.sunshineDuration), Color(0xFFFFC83D), Color(0xFFFFA928))
                 DayBriefRow(stringResource(R.string.uv_max), daily?.uvIndexMaximum?.let { String.format(locale, "%.1f", it) } ?: "-", stringResource(R.string.sun_window), "$sunrise - $sunset", uvColor(daily?.uvIndexMaximum), Color(0xFFFFC83D))
             }
@@ -1105,7 +1108,7 @@ private fun DayBriefTemperatureMetric(label: String, low: Double?, high: Double?
 }
 
 @Composable
-private fun SunlightComparison(sunrise: String?, sunset: String?, dayLength: Double, shortestDay: Double, longestDay: Double) {
+private fun SunlightComparison(date: String, sunrise: String?, sunset: String?, dayLength: Double, shortestDay: Double, longestDay: Double) {
     val sunriseMinutes = clockMinutes(sunrise) ?: return
     val sunsetMinutes = clockMinutes(sunset) ?: return
     val aboveShortest = (dayLength - shortestDay).coerceAtLeast(0.0)
@@ -1151,6 +1154,7 @@ private fun SunlightComparison(sunrise: String?, sunset: String?, dayLength: Dou
                     modifier = Modifier.weight(1f),
                 )
             }
+            MoonPanel(LocalDate.parse(date), sunriseMinutes)
         }
         DayBriefRow(
             stringResource(R.string.above_shortest_day), "+${durationText(aboveShortest)}",
@@ -1159,6 +1163,102 @@ private fun SunlightComparison(sunrise: String?, sunset: String?, dayLength: Dou
         )
     }
 }
+
+@Composable
+private fun MoonPanel(date: LocalDate, sunriseMinutes: Int) {
+    val phase = moonPhase(date)
+    val moonrise = normalizeMinutes(sunriseMinutes + (phase * 1440).roundToInt())
+    val moonset = normalizeMinutes(moonrise + 720)
+    val illumination = ((1 - cos(2 * PI * phase)) / 2 * 100).roundToInt()
+    Column(modifier = Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            MoonPhaseIcon(phase, Modifier.size(34.dp))
+            Column(Modifier.padding(start = 9.dp).weight(1f)) {
+                Text(stringResource(R.string.moon_path), color = Color(0xFFC2D2FF), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text("${moonPhaseName(phase)} - $illumination%", color = Muted, fontSize = 10.sp)
+            }
+            Text("~${formatClockMinutes(moonrise)} - ~${formatClockMinutes(moonset)}", color = Color(0xFFC2D2FF), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        }
+        MoonPathChart(moonrise, phase)
+        Text(stringResource(R.string.moon_times_approximate), color = Muted, fontSize = 9.sp)
+        Text(stringResource(R.string.next_moon_phases), color = Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            (0..6).forEach { offset ->
+                val phaseDate = date.plusDays(offset.toLong())
+                val itemPhase = moonPhase(phaseDate)
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                    MoonPhaseIcon(itemPhase, Modifier.size(24.dp))
+                    Text(phaseDate.dayOfMonth.toString(), color = if (offset == 0) MaterialTheme.colorScheme.onSurface else Muted, fontSize = 9.sp, fontWeight = if (offset == 0) FontWeight.Bold else FontWeight.Normal)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MoonPathChart(moonrise: Int, phase: Double) {
+    Canvas(Modifier.fillMaxWidth().height(76.dp)) {
+        val horizonY = size.height - 10.dp.toPx()
+        val moonColor = Color(0xFFC2D2FF)
+        drawRect(Color(0xFF0B1220).copy(alpha = .62f), Offset(0f, horizonY), Size(size.width, size.height - horizonY))
+        drawLine(Muted.copy(alpha = .4f), Offset(0f, horizonY), Offset(size.width, horizonY), strokeWidth = 1.5.dp.toPx())
+        val path = Path()
+        var drawing = false
+        for (step in 0..96) {
+            val minute = step * 15
+            val sinceRise = normalizeMinutes(minute - moonrise)
+            if (sinceRise <= 720) {
+                val x = size.width * minute / 1440f
+                val y = horizonY - sin(PI * sinceRise / 720.0).toFloat() * 48.dp.toPx()
+                if (!drawing) path.moveTo(x, y) else path.lineTo(x, y)
+                drawing = true
+            } else {
+                drawing = false
+            }
+        }
+        drawPath(path, moonColor.copy(alpha = .78f), style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round))
+        val transit = normalizeMinutes(moonrise + 360)
+        val transitX = size.width * transit / 1440f
+        val transitY = horizonY - 48.dp.toPx()
+        drawCircle(moonColor.copy(alpha = .13f), 13.dp.toPx(), Offset(transitX, transitY))
+        drawMoonPhase(phase, Offset(transitX, transitY), 7.dp.toPx(), moonColor, Color(0xFF0B1220))
+    }
+}
+
+@Composable
+private fun MoonPhaseIcon(phase: Double, modifier: Modifier = Modifier) {
+    val lit = Color(0xFFC2D2FF)
+    val shadow = MaterialTheme.colorScheme.surfaceVariant
+    Canvas(modifier) { drawMoonPhase(phase, center, size.minDimension * .43f, lit, shadow) }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawMoonPhase(phase: Double, center: Offset, radius: Float, lit: Color, shadow: Color) {
+    val normalized = ((phase % 1) + 1) % 1
+    val illumination = ((1 - cos(2 * PI * normalized)) / 2).toFloat()
+    drawCircle(lit, radius, center)
+    val shift = if (normalized < .5) -2 * radius * illumination else 2 * radius * illumination
+    drawCircle(shadow, radius, Offset(center.x + shift, center.y))
+    drawCircle(lit.copy(alpha = .72f), radius, center, style = Stroke(width = max(1f, radius * .11f)))
+}
+
+internal fun moonPhase(date: LocalDate): Double {
+    val days = ChronoUnit.DAYS.between(LocalDate.of(2000, 1, 6), date).toDouble() + .76
+    return ((days / 29.53058867) % 1.0 + 1.0) % 1.0
+}
+
+@Composable
+private fun moonPhaseName(phase: Double): String = stringResource(when ((phase * 8 + .5).toInt() % 8) {
+    0 -> R.string.moon_new
+    1 -> R.string.moon_waxing_crescent
+    2 -> R.string.moon_first_quarter
+    3 -> R.string.moon_waxing_gibbous
+    4 -> R.string.moon_full
+    5 -> R.string.moon_waning_gibbous
+    6 -> R.string.moon_last_quarter
+    else -> R.string.moon_waning_crescent
+})
+
+internal fun normalizeMinutes(minutes: Int): Int = ((minutes % 1440) + 1440) % 1440
 
 @Composable
 private fun SunPathChart(rows: List<Triple<String, Int, Int>>, domainStart: Int, domainEnd: Int) {
