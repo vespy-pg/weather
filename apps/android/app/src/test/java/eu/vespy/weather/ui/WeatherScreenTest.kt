@@ -49,4 +49,13 @@ class WeatherScreenTest {
         assertEquals(30, normalizeMinutes(1470))
         assertEquals(1410, normalizeMinutes(-30))
     }
+
+    @Test
+    fun `scroll gesture stops at now without attracting nearby positions`() {
+        assertEquals(NowBoundaryResult(100f, true), stopAtNowBoundary(80f, 120f, 100f, -1, false))
+        assertEquals(NowBoundaryResult(100f, true), stopAtNowBoundary(120f, 80f, 100f, 1, false))
+        assertEquals(NowBoundaryResult(92f, false), stopAtNowBoundary(80f, 92f, 100f, -1, false))
+        assertEquals(NowBoundaryResult(100f, true), stopAtNowBoundary(100f, 140f, 100f, -1, true))
+        assertEquals(NowBoundaryResult(120f, false), stopAtNowBoundary(100f, 120f, 100f, 0, false))
+    }
 }

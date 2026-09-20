@@ -69,8 +69,8 @@ class WeatherModelsTest {
     @Test
     fun groupingMatchesWebGranularityAndAggregatesValues() {
         val points = listOf(
-            point("2026-09-16T00:00", 10.0, 0.2),
-            point("2026-09-16T01:00", 12.0, 0.3),
+            point("2026-09-16T00:00", 10.0, 0.2).copy(relativeHumidity = 40.0, surfacePressure = 1000.0, uvIndex = 0.0, pollen = PollenForecast(0.0, 0.0, 2.0, 0.0, 0.0, 0.0)),
+            point("2026-09-16T01:00", 12.0, 0.3).copy(relativeHumidity = 60.0, surfacePressure = 1002.0, uvIndex = 2.0, pollen = PollenForecast(0.0, 0.0, 6.0, 0.0, 0.0, 0.0)),
             point("2026-09-16T02:00", 14.0, 0.0),
             point("2026-09-16T03:00", 16.0, 0.5),
             point("2026-09-16T04:00", 20.0, 1.0),
@@ -81,6 +81,10 @@ class WeatherModelsTest {
         assertEquals(2, grouped.size)
         assertEquals(13.0, grouped[0].temperature!!, 0.001)
         assertEquals(1.0, grouped[0].precipitation!!, 0.001)
+        assertEquals(50.0, grouped[0].relativeHumidity!!, 0.001)
+        assertEquals(1001.0, grouped[0].surfacePressure!!, 0.001)
+        assertEquals(1.0, grouped[0].uvIndex!!, 0.001)
+        assertEquals(4.0, grouped[0].pollen!!.grass!!, 0.001)
         assertEquals("2026-09-16T04:00", grouped[1].timestamp)
     }
 

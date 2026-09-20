@@ -292,6 +292,8 @@ fun List<HourlyWeather>.groupByHours(hours: Int): List<HourlyWeather> {
             val y = directions.sumOf { kotlin.math.sin(Math.toRadians(it)) }
             return (Math.toDegrees(kotlin.math.atan2(y, x)) + 360.0) % 360.0
         }
+        fun averagePollen(selector: (PollenForecast) -> Double?): Double? =
+            points.mapNotNull { it.pollen?.let(selector) }.takeIf { it.isNotEmpty() }?.average()
         val severeCodes = listOf(99, 96, 86, 85, 77, 75, 73, 71, 67, 66, 57, 56, 95, 82, 81, 80, 65, 63, 55, 53, 51, 48, 45, 3)
         val code = points.mapNotNull(HourlyWeather::weatherCode).minByOrNull { severeCodes.indexOf(it).takeIf { index -> index >= 0 } ?: Int.MAX_VALUE }
         points.first().copy(
@@ -307,6 +309,18 @@ fun List<HourlyWeather>.groupByHours(hours: Int): List<HourlyWeather> {
             windDirection = averageDirection(),
             windGusts = maximum(HourlyWeather::windGusts),
             tornado = points.any(HourlyWeather::tornado),
+            relativeHumidity = average(HourlyWeather::relativeHumidity),
+            visibility = average(HourlyWeather::visibility),
+            surfacePressure = average(HourlyWeather::surfacePressure),
+            uvIndex = average(HourlyWeather::uvIndex),
+            pollen = PollenForecast(
+                alder = averagePollen(PollenForecast::alder),
+                birch = averagePollen(PollenForecast::birch),
+                grass = averagePollen(PollenForecast::grass),
+                mugwort = averagePollen(PollenForecast::mugwort),
+                olive = averagePollen(PollenForecast::olive),
+                ragweed = averagePollen(PollenForecast::ragweed),
+            ).takeIf { pollen -> listOf(pollen.alder, pollen.birch, pollen.grass, pollen.mugwort, pollen.olive, pollen.ragweed).any { it != null } },
         )
     }
 }

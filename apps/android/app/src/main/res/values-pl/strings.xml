@@ -128,6 +128,8 @@
     <string name="show_uv_index">Wykres indeksu UV</string>
     <string name="show_humidity">Wykres wilgotności</string>
     <string name="show_pressure">Wykres ciśnienia atmosferycznego</string>
+    <string name="pressure_high_symbol">W</string>
+    <string name="pressure_low_symbol">N</string>
     <string name="show_pollen">Godzinowy wykres pyłków</string>
     <string name="show_historical_data">Pokazuj dane historyczne</string>
     <string name="show_dates">Pokazuj daty obok nazw dni</string>

@@ -548,12 +548,16 @@ private fun ForecastTimeline(
     } else if (landscape) 34.dp else 45.dp
     val todayLabel = stringResource(R.string.today)
     val historyLabel = stringResource(R.string.history)
+    val pressureHighLabel = stringResource(R.string.pressure_high_symbol)
+    val pressureLowLabel = stringResource(R.string.pressure_low_symbol)
     val legendWidth = if (landscape) 38.dp else 44.dp
     val densityContext = LocalDensity.current
     val slotWidthPx = with(densityContext) { slotWidth.toPx() }
     val nowIndex = remember(points, forecast.current.timestamp) { points.currentIndex(forecast.current.timestamp).coerceAtLeast(0) }
     val nowPosition = if (settings.showHistoricalData) nowIndex * slotWidthPx else 0f
     var position by remember(points, settings.zoom, settings.showHistoricalData) { mutableFloatStateOf(nowPosition) }
+    var nowBarrierSide by remember(points, settings.zoom, settings.showHistoricalData) { mutableIntStateOf(0) }
+    var nowBoundaryReached by remember(points, settings.zoom, settings.showHistoricalData) { mutableStateOf(false) }
     var focusedDate by remember(points, nowIndex) { mutableStateOf(points.getOrNull(nowIndex)?.timestamp?.take(10)) }
     var zoomAnchorTimestamp by remember { mutableStateOf<String?>(null) }
     Column {
@@ -622,13 +626,31 @@ private fun ForecastTimeline(
                 }
             }
         }
+        val nowBoundaryModifier = Modifier.pointerInput(points, nowPosition) {
+            awaitEachGesture {
+                awaitFirstDown(requireUnconsumed = false)
+                nowBarrierSide = when {
+                    position < nowPosition -> -1
+                    position > nowPosition -> 1
+                    else -> 0
+                }
+                nowBoundaryReached = false
+                do {
+                    val event = awaitPointerEvent()
+                } while (event.changes.any { it.pressed })
+            }
+        }
         val scrollableState = rememberScrollableState { delta ->
             val oldPosition = position
-            position = (oldPosition - delta).coerceIn(0f, maxPosition)
+            val proposedPosition = (oldPosition - delta).coerceIn(0f, maxPosition)
+            val boundary = stopAtNowBoundary(oldPosition, proposedPosition, nowPosition, nowBarrierSide, nowBoundaryReached)
+            position = boundary.position
+            nowBoundaryReached = boundary.stopped
             oldPosition - position
         }
         Box(
             modifier = Modifier.fillMaxSize()
+                .then(nowBoundaryModifier)
                 .scrollable(scrollableState, Orientation.Horizontal, flingBehavior = ScrollableDefaults.flingBehavior())
                 .then(pinchModifier)
                 .then(dayHeaderModifier),
@@ -716,6 +738,8 @@ private fun ForecastTimeline(
                     color = metric.color,
                     metricStyle = metric.style,
                     pixelScale = density,
+                    pressureHighLabel = pressureHighLabel,
+                    pressureLowLabel = pressureLowLabel,
                     fixedMinimum = metric.minimum,
                     fixedMaximum = metric.maximum,
                 )
@@ -775,6 +799,15 @@ private data class TimelineMetric(
     val minimum: Double?,
     val maximum: Double?,
 )
+
+internal data class NowBoundaryResult(val position: Float, val stopped: Boolean)
+
+internal fun stopAtNowBoundary(oldPosition: Float, proposedPosition: Float, nowPosition: Float, gestureSide: Int, alreadyStopped: Boolean): NowBoundaryResult {
+    if (alreadyStopped) return NowBoundaryResult(nowPosition, true)
+    val crossesNow = (gestureSide < 0 && oldPosition <= nowPosition && proposedPosition >= nowPosition) ||
+        (gestureSide > 0 && oldPosition >= nowPosition && proposedPosition <= nowPosition)
+    return if (crossesNow) NowBoundaryResult(nowPosition, true) else NowBoundaryResult(proposedPosition, false)
+}
 
 @Composable
 private fun HourlyLabels(points: List<HourlyWeather>, slotWidth: Dp, height: Dp) {
