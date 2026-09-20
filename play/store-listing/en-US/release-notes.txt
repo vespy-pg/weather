@@ -1,1 +1,1 @@
-Adds daily details, air quality, pollen, Sun and Moon paths, lunar phases and hourly UV, humidity and pressure charts. Improves zooming, widgets and reports.
+Adds daily details, air quality, hourly pollen, Sun and Moon paths, 30-day lunar phases and visual UV, humidity and pressure timelines. Improves zooming, widgets and reports.

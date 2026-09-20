@@ -50,6 +50,7 @@ class WeatherPreferences(context: Context) {
         showUvIndex = preferences.getBoolean(KEY_SHOW_UV_INDEX, true),
         showHumidity = preferences.getBoolean(KEY_SHOW_HUMIDITY, true),
         showPressure = preferences.getBoolean(KEY_SHOW_PRESSURE, true),
+        showPollen = preferences.getBoolean(KEY_SHOW_POLLEN, true),
         showHistoricalData = preferences.getBoolean(KEY_SHOW_HISTORICAL_DATA, true),
         showDates = preferences.getBoolean(KEY_SHOW_DATES, false),
         showMushrooms = preferences.getBoolean(KEY_SHOW_MUSHROOMS, false),
@@ -110,6 +111,7 @@ class WeatherPreferences(context: Context) {
             .putBoolean(KEY_SHOW_UV_INDEX, settings.showUvIndex)
             .putBoolean(KEY_SHOW_HUMIDITY, settings.showHumidity)
             .putBoolean(KEY_SHOW_PRESSURE, settings.showPressure)
+            .putBoolean(KEY_SHOW_POLLEN, settings.showPollen)
             .putBoolean(KEY_SHOW_HISTORICAL_DATA, settings.showHistoricalData)
             .putBoolean(KEY_SHOW_DATES, settings.showDates)
             .putBoolean(KEY_SHOW_MUSHROOMS, settings.showMushrooms)
@@ -245,6 +247,7 @@ class WeatherPreferences(context: Context) {
         const val KEY_SHOW_UV_INDEX = "show_uv_index"
         const val KEY_SHOW_HUMIDITY = "show_humidity"
         const val KEY_SHOW_PRESSURE = "show_pressure"
+        const val KEY_SHOW_POLLEN = "show_pollen"
         const val KEY_SHOW_HISTORICAL_DATA = "show_historical_data"
         const val KEY_SHOW_DATES = "show_dates"
         const val KEY_SHOW_MUSHROOMS = "show_mushrooms"

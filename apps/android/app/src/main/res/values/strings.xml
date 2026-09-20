@@ -63,7 +63,7 @@
     <string name="latest">Latest</string>
     <string name="moon_path">Moon path</string>
     <string name="moon_times_approximate">Approximate local moonrise and moonset times</string>
-    <string name="next_moon_phases">Moon phases over the next 7 days</string>
+    <string name="next_moon_phases">Moon phases over the next 30 days</string>
     <string name="moon_new">New moon</string>
     <string name="moon_waxing_crescent">Waxing crescent</string>
     <string name="moon_first_quarter">First quarter</string>
@@ -128,6 +128,7 @@
     <string name="show_uv_index">UV index chart</string>
     <string name="show_humidity">Humidity chart</string>
     <string name="show_pressure">Atmospheric pressure chart</string>
+    <string name="show_pollen">Hourly pollen chart</string>
     <string name="show_historical_data">Show historical data</string>
     <string name="show_dates">Show dates beside day names</string>
     <string name="show_mushrooms">Mushroom conditions</string>

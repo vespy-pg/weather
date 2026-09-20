@@ -157,6 +157,7 @@ object IssueDiagnostics {
         .put("showUvIndex", showUvIndex)
         .put("showHumidity", showHumidity)
         .put("showPressure", showPressure)
+        .put("showPollen", showPollen)
         .put("showHistoricalData", showHistoricalData)
         .put("showDates", showDates)
         .put("showMushrooms", showMushrooms)

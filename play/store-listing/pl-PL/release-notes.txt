@@ -1,1 +1,1 @@
-Dodano szczegóły dnia, jakość powietrza, pyłki, drogi Słońca i Księżyca, fazy Księżyca oraz wykresy UV, wilgotności i ciśnienia. Poprawiono widgety i raporty.
+Dodano szczegóły dnia, jakość powietrza, godzinowe pyłki, drogi Słońca i Księżyca, 30-dniowe fazy Księżyca oraz wizualne osie UV, wilgotności i ciśnienia. Poprawiono widgety i raporty.

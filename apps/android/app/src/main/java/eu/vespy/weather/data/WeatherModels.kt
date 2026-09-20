@@ -44,6 +44,7 @@ data class HourlyWeather(
     val visibility: Double? = null,
     val surfacePressure: Double? = null,
     val uvIndex: Double? = null,
+    val pollen: PollenForecast? = null,
 )
 
 data class DailyWeather(
@@ -222,6 +223,7 @@ data class ForecastDisplaySettings(
     val showUvIndex: Boolean = true,
     val showHumidity: Boolean = true,
     val showPressure: Boolean = true,
+    val showPollen: Boolean = true,
     val showHistoricalData: Boolean = true,
     val showDates: Boolean = false,
     val showMushrooms: Boolean = false,

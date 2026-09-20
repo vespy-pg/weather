@@ -687,51 +687,25 @@ object ForecastGraphics {
         val minimum = fixedMinimum ?: available.minOrNull() ?: 0.0
         val maximum = fixedMaximum ?: available.maxOrNull() ?: minimum + 1.0
         val range = (maximum - minimum).coerceAtLeast(1.0)
-        val verticalPadding = 6f * pixelScale
-        val yValues = values.map { value ->
-            value?.let { bounds.bottom - verticalPadding - ((it - minimum) / range).toFloat().coerceIn(0f, 1f) * (bounds.height() - verticalPadding * 2) }
-        }
         val cell = bounds.width() / points.size
-        canvas.drawLine(bounds.left, bounds.centerY(), bounds.right, bounds.centerY(), Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            this.color = palette.grid
-            strokeWidth = pixelScale
-        })
-        val linePath = smoothLinePath(bounds.left, cell, yValues)
-        val areaPath = Path(linePath).apply {
-            lineTo(bounds.right, bounds.bottom)
-            lineTo(bounds.left, bounds.bottom)
-            close()
-        }
-        canvas.drawPath(areaPath, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = LinearGradient(0f, bounds.top, 0f, bounds.bottom, withAlpha(color, if (metricStyle == "uv") 92 else 52), withAlpha(color, 4), Shader.TileMode.CLAMP)
-        })
-        if (metricStyle == "humidity") {
-            listOf(-3f, 3f).forEach { offset ->
-                canvas.save()
-                canvas.translate(0f, offset * pixelScale)
+        when (metricStyle) {
+            "uv" -> drawUvIntensityBand(canvas, bounds, values, maximum, cell, dark, pixelScale)
+            "humidity" -> drawHumidityDots(canvas, bounds, values, cell, color, pixelScale)
+            "pressure" -> drawPressureBand(canvas, bounds, points, values, minimum, maximum, cell, dark, pixelScale)
+            "pollen" -> drawPollenCloud(canvas, bounds, values, maximum, cell, pixelScale)
+            else -> {
+                val verticalPadding = 6f * pixelScale
+                val yValues = values.map { value ->
+                    value?.let { bounds.bottom - verticalPadding - ((it - minimum) / range).toFloat().coerceIn(0f, 1f) * (bounds.height() - verticalPadding * 2) }
+                }
+                val linePath = smoothLinePath(bounds.left, cell, yValues)
                 canvas.drawPath(linePath, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    this.color = withAlpha(color, 52)
+                    this.color = color
                     style = Paint.Style.STROKE
-                    strokeWidth = 1.2f * pixelScale
+                    strokeWidth = 2.8f * pixelScale
                     strokeCap = Paint.Cap.ROUND
+                    strokeJoin = Paint.Join.ROUND
                 })
-                canvas.restore()
-            }
-        }
-        canvas.drawPath(linePath, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            this.color = color
-            style = Paint.Style.STROKE
-            strokeWidth = (if (metricStyle == "pressure") 3.4f else 2.8f) * pixelScale
-            strokeCap = Paint.Cap.ROUND
-            strokeJoin = Paint.Join.ROUND
-        })
-        if (metricStyle == "uv") {
-            points.indices.groupBy { points[it].timestamp.take(10) }.values.forEach { indices ->
-                val peak = indices.maxByOrNull { values.getOrNull(it) ?: Double.NEGATIVE_INFINITY } ?: return@forEach
-                val y = yValues.getOrNull(peak) ?: return@forEach
-                val x = bounds.left + (peak + .5f) * cell
-                canvas.drawCircle(x, y, 6f * pixelScale, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = withAlpha(color, 42) })
-                canvas.drawCircle(x, y, 2.5f * pixelScale, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color })
             }
         }
         canvas.drawLine(bounds.left, bounds.top, bounds.right, bounds.top, Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -741,7 +715,7 @@ object ForecastGraphics {
         drawDaySeparators(canvas, bounds, points, palette, pixelScale)
     }
 
-    fun drawMetricLegend(canvas: Canvas, bounds: RectF, dark: Boolean, label: String, color: Int, pixelScale: Float) {
+    fun drawMetricLegend(canvas: Canvas, bounds: RectF, dark: Boolean, label: String, color: Int, metricStyle: String, pixelScale: Float) {
         val palette = palette(dark)
         canvas.drawRect(bounds, Paint().apply { this.color = palette.background })
         canvas.drawLine(bounds.left, bounds.top, bounds.right, bounds.top, Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -758,7 +732,166 @@ object ForecastGraphics {
             textSize = 9f * pixelScale
             typeface = Typeface.create("monospace", Typeface.BOLD)
         }
-        canvas.drawText(label, bounds.centerX(), bounds.centerY() - (textPaint.ascent() + textPaint.descent()) / 2f, textPaint)
+        val textX = if (metricStyle == "humidity") bounds.centerX() + 5f * pixelScale else bounds.centerX()
+        canvas.drawText(label, textX, bounds.centerY() - (textPaint.ascent() + textPaint.descent()) / 2f, textPaint)
+        if (metricStyle == "humidity") {
+            val x = bounds.centerX() - 8f * pixelScale
+            val y = bounds.centerY()
+            val size = 5f * pixelScale
+            val drop = Path().apply {
+                moveTo(x, y - size)
+                cubicTo(x - size * .7f, y, x - size * .55f, y + size * .8f, x, y + size)
+                cubicTo(x + size * .55f, y + size * .8f, x + size * .7f, y, x, y - size)
+                close()
+            }
+            canvas.drawPath(drop, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color })
+        } else if (metricStyle == "pollen") {
+            val petalColors = intArrayOf(Color.rgb(85, 207, 138), Color.rgb(255, 200, 61), Color.rgb(255, 138, 61))
+            repeat(6) { index ->
+                val angle = index * PI.toFloat() / 3f
+                canvas.drawCircle(
+                    bounds.centerX() + cos(angle) * 5f * pixelScale,
+                    bounds.centerY() + sin(angle) * 5f * pixelScale,
+                    3.1f * pixelScale,
+                    Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = petalColors[index % petalColors.size] },
+                )
+            }
+            canvas.drawCircle(bounds.centerX(), bounds.centerY(), 3f * pixelScale, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = Color.rgb(255, 220, 75) })
+        }
+    }
+
+    private fun drawUvIntensityBand(canvas: Canvas, bounds: RectF, values: List<Double?>, maximum: Double, cell: Float, dark: Boolean, pixelScale: Float) {
+        val bandHeight = 8f * pixelScale
+        val top = bounds.centerY() - bandHeight / 2f
+        val empty = if (dark) Color.rgb(31, 29, 47) else Color.rgb(239, 236, 252)
+        canvas.drawRect(bounds.left, top, bounds.right, top + bandHeight, Paint().apply { color = empty })
+        values.forEachIndexed { index, value ->
+            val intensity = ((value ?: 0.0) / maximum.coerceAtLeast(1.0)).toFloat().coerceIn(0f, 1f)
+            val segmentColor = blendColor(empty, Color.rgb(121, 20, 245), intensity.pow(.72f))
+            canvas.drawRect(bounds.left + index * cell, top, bounds.left + (index + 1) * cell + .5f, top + bandHeight, Paint().apply { color = segmentColor })
+        }
+    }
+
+    private fun drawHumidityDots(canvas: Canvas, bounds: RectF, values: List<Double?>, cell: Float, color: Int, pixelScale: Float) {
+        values.forEachIndexed { index, value ->
+            val humidity = ((value ?: 0.0) / 100.0).toFloat().coerceIn(0f, 1f)
+            if (value == null) return@forEachIndexed
+            val columns = max(1, (cell / (5.5f * pixelScale)).toInt())
+            val rows = (1 + humidity * 6).toInt().coerceIn(1, 7)
+            val rowSpacing = 4.1f * pixelScale
+            val cloudHeight = (rows - 1) * rowSpacing
+            repeat(columns) { column ->
+                repeat(rows) { row ->
+                    val seed = (index + 5) * 71 + (column + 3) * 47 + (row + 11) * 43
+                    val xJitter = (((seed * 29) % 17) - 8) / 10f * pixelScale
+                    val yJitter = (((seed * 41) % 13) - 6) / 12f * pixelScale
+                    val x = bounds.left + index * cell + (column + .5f) * cell / columns + xJitter
+                    val y = bounds.centerY() - cloudHeight / 2f + row * rowSpacing + yJitter
+                    val radius = (.65f + humidity * 1.45f + (seed % 5) * .08f) * pixelScale
+                    canvas.drawCircle(x, y, radius, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        this.color = withAlpha(color, (80 + humidity * 175).toInt())
+                    })
+                }
+            }
+        }
+    }
+
+    private fun drawPollenCloud(canvas: Canvas, bounds: RectF, values: List<Double?>, maximum: Double, cell: Float, pixelScale: Float) {
+        val colors = intArrayOf(Color.rgb(85, 207, 138), Color.rgb(255, 200, 61), Color.rgb(255, 138, 61))
+        values.forEachIndexed { index, value ->
+            val concentration = value ?: return@forEachIndexed
+            val density = (concentration / maximum.coerceAtLeast(1.0)).toFloat().coerceIn(0f, 1f)
+            if (density <= 0f) return@forEachIndexed
+            val columns = max(1, (cell / (6f * pixelScale)).toInt())
+            val rows = (1 + density * 6).toInt().coerceIn(1, 7)
+            repeat(columns) { column ->
+                repeat(rows) { row ->
+                    val seed = (index + 7) * 83 + (column + 5) * 47 + (row + 13) * 29
+                    val x = bounds.left + index * cell + (column + .5f) * cell / columns + (((seed * 31) % 19) - 9) / 10f * pixelScale
+                    val lane = (row + .5f) / rows
+                    val y = bounds.top + 4f * pixelScale + lane * (bounds.height() - 8f * pixelScale) + (((seed * 43) % 17) - 8) / 10f * pixelScale
+                    val radius = (.75f + density * 1.5f + (seed % 7) * .07f) * pixelScale
+                    canvas.drawCircle(x, y, radius, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = withAlpha(colors[seed % colors.size], (115 + density * 140).toInt())
+                    })
+                }
+            }
+        }
+    }
+
+    private fun drawPressureBand(canvas: Canvas, bounds: RectF, points: List<HourlyWeather>, values: List<Double?>, minimum: Double, maximum: Double, cell: Float, dark: Boolean, pixelScale: Float) {
+        val centerY = bounds.centerY()
+        val available = values.filterNotNull()
+        val average = available.average().takeIf { !it.isNaN() } ?: (minimum + maximum) / 2.0
+        val maximumDeviation = max(kotlin.math.abs(maximum - average), kotlin.math.abs(minimum - average)).coerceAtLeast(.1)
+        val baseColor = if (dark) Color.rgb(47, 55, 69) else Color.rgb(220, 228, 240)
+        canvas.drawLine(bounds.left, centerY, bounds.right, centerY, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = baseColor
+            strokeWidth = 2f * pixelScale
+        })
+        fun halfThickness(value: Double) = (3.8f + kotlin.math.abs(value - average).toFloat() / maximumDeviation.toFloat() * 10.5f) * pixelScale
+        for (index in 0 until values.lastIndex) {
+            val startValue = values[index] ?: continue
+            val endValue = values[index + 1] ?: continue
+            val x1 = bounds.left + (index + .5f) * cell
+            val x2 = bounds.left + (index + 1.5f) * cell
+            val h1 = halfThickness(startValue)
+            val h2 = halfThickness(endValue)
+            val path = Path().apply {
+                moveTo(x1, centerY - h1)
+                lineTo(x2, centerY - h2)
+                lineTo(x2, centerY + h2)
+                lineTo(x1, centerY + h1)
+                close()
+            }
+            val segmentAverage = (startValue + endValue) / 2.0
+            val intensity = (kotlin.math.abs(segmentAverage - average) / maximumDeviation).toFloat().coerceIn(0f, 1f)
+            val bandColor = if (segmentAverage >= average) blendColor(Color.rgb(220, 238, 255), Color.rgb(43, 132, 232), intensity)
+                else blendColor(Color.rgb(255, 226, 232), Color.rgb(230, 61, 91), intensity)
+            canvas.drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = withAlpha(bandColor, 225) })
+        }
+        points.indices.groupBy { points[it].timestamp.take(10) }.values.forEach { dayIndices ->
+            val valid = dayIndices.mapNotNull { index -> values.getOrNull(index)?.let { index to it } }
+            val high = valid.maxByOrNull { it.second }
+            val low = valid.minByOrNull { it.second }
+            high?.let { drawPressureMarker(canvas, bounds, it.first, cell, "H", Color.rgb(28, 112, 224), converge = true, pixelScale = pixelScale) }
+            low?.takeIf { it.first != high?.first }?.let { drawPressureMarker(canvas, bounds, it.first, cell, "L", Color.rgb(218, 34, 91), converge = false, pixelScale = pixelScale) }
+        }
+    }
+
+    private fun drawPressureMarker(canvas: Canvas, bounds: RectF, index: Int, cell: Float, label: String, color: Int, converge: Boolean, pixelScale: Float) {
+        val x = bounds.left + (index + .5f) * cell
+        val y = bounds.centerY()
+        val radius = 7f * pixelScale
+        repeat(4) { step ->
+            val distance = radius + (.45f + step * .55f) * cell
+            drawChevron(canvas, x - distance, y, pointsRight = converge, color, pixelScale)
+            drawChevron(canvas, x + distance, y, pointsRight = !converge, color, pixelScale)
+        }
+        canvas.drawCircle(x, y, radius, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color })
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = Color.WHITE
+            textAlign = Paint.Align.CENTER
+            textSize = 8f * pixelScale
+            typeface = Typeface.DEFAULT_BOLD
+        }
+        canvas.drawText(label, x, y - (textPaint.ascent() + textPaint.descent()) / 2f, textPaint)
+    }
+
+    private fun drawChevron(canvas: Canvas, x: Float, y: Float, pointsRight: Boolean, color: Int, pixelScale: Float) {
+        val direction = if (pointsRight) 1f else -1f
+        val path = Path().apply {
+            moveTo(x - direction * 2.2f * pixelScale, y - 2.5f * pixelScale)
+            lineTo(x + direction * 1.8f * pixelScale, y)
+            lineTo(x - direction * 2.2f * pixelScale, y + 2.5f * pixelScale)
+        }
+        canvas.drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = withAlpha(color, 190)
+            style = Paint.Style.STROKE
+            strokeWidth = 1.1f * pixelScale
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+        })
     }
 
     private fun drawDemoWatermarks(canvas: Canvas, bounds: RectF, points: List<HourlyWeather>, label: String, everyDay: Boolean, pixelScale: Float, palette: ForecastPalette) {
@@ -1025,6 +1158,14 @@ object ForecastGraphics {
     private fun parseDateTime(value: String?): LocalDateTime? = runCatching { LocalDateTime.parse(value) }.getOrNull()
     private fun shortTemperature(value: Double?, unit: String): String = value?.let { "${(if (unit == "F") it * 9 / 5 + 32 else it).toInt()}°" } ?: "-"
     private fun withAlpha(color: Int, alpha: Int) = Color.argb(alpha.coerceIn(0, 255), Color.red(color), Color.green(color), Color.blue(color))
+    private fun blendColor(start: Int, end: Int, progress: Float): Int {
+        val amount = progress.coerceIn(0f, 1f)
+        return Color.rgb(
+            (Color.red(start) + (Color.red(end) - Color.red(start)) * amount).toInt(),
+            (Color.green(start) + (Color.green(end) - Color.green(start)) * amount).toInt(),
+            (Color.blue(start) + (Color.blue(end) - Color.blue(start)) * amount).toInt(),
+        )
+    }
 
     fun temperatureColor(value: Double?, thresholds: TemperatureThresholds = TemperatureThresholds()): Int {
         if (value == null) return Color.rgb(141, 152, 170)

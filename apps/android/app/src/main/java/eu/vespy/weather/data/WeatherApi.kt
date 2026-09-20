@@ -201,6 +201,16 @@ class WeatherApi(private val baseUrl: String = BuildConfig.API_BASE_URL) {
                     visibility = item.optNullableDouble("visibility"),
                     surfacePressure = item.optNullableDouble("surfacePressure"),
                     uvIndex = item.optNullableDouble("uvIndex"),
+                    pollen = item.optJSONObject("pollen")?.let {
+                        PollenForecast(
+                            alder = it.optNullableDouble("alder"),
+                            birch = it.optNullableDouble("birch"),
+                            grass = it.optNullableDouble("grass"),
+                            mugwort = it.optNullableDouble("mugwort"),
+                            olive = it.optNullableDouble("olive"),
+                            ragweed = it.optNullableDouble("ragweed"),
+                        )
+                    },
                 ))
             }
         }

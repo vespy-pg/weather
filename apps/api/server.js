@@ -498,6 +498,17 @@ export function dailyPollen(source, date) {
   return Object.values(values).some(value => value !== null) ? values : null;
 }
 
+export function hourlyPollen(source, timestamp) {
+  const sourceIndex = (source?.hourly?.time || []).indexOf(timestamp);
+  if (sourceIndex < 0) return null;
+  const values = POLLEN_FIELDS.reduce((result, field) => {
+    const value = at(source.hourly, field, sourceIndex);
+    result[field.replace('_pollen', '')] = value === null ? null : Number(Number(value).toFixed(1));
+    return result;
+  }, {});
+  return Object.values(values).some(value => value !== null) ? values : null;
+}
+
 export function dailyAirQuality(source, date) {
   const values = AIR_QUALITY_FIELDS.reduce((result, field) => {
     const readings = dailyAirReadings(source, date, field);
@@ -556,7 +567,8 @@ export function normalizeForecast(source, location, {pastDays = 0, pollenSource 
       windGusts: at(source.hourly, 'wind_gusts_10m', sourceIndex),
       visibility: at(source.hourly, 'visibility', sourceIndex),
       surfacePressure: at(source.hourly, 'surface_pressure', sourceIndex),
-      uvIndex: at(source.hourly, 'uv_index', sourceIndex)
+      uvIndex: at(source.hourly, 'uv_index', sourceIndex),
+      pollen: hourlyPollen(pollenSource, timestamp)
     };
     }),
     daily: dailyTimes.map((date, index) => {

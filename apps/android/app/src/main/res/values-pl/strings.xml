@@ -63,7 +63,7 @@
     <string name="latest">Najpóźniej</string>
     <string name="moon_path">Droga Księżyca</string>
     <string name="moon_times_approximate">Przybliżone lokalne godziny wschodu i zachodu Księżyca</string>
-    <string name="next_moon_phases">Fazy Księżyca przez kolejne 7 dni</string>
+    <string name="next_moon_phases">Fazy Księżyca przez kolejne 30 dni</string>
     <string name="moon_new">Nów</string>
     <string name="moon_waxing_crescent">Przybywający sierp</string>
     <string name="moon_first_quarter">Pierwsza kwadra</string>
@@ -128,6 +128,7 @@
     <string name="show_uv_index">Wykres indeksu UV</string>
     <string name="show_humidity">Wykres wilgotności</string>
     <string name="show_pressure">Wykres ciśnienia atmosferycznego</string>
+    <string name="show_pollen">Godzinowy wykres pyłków</string>
     <string name="show_historical_data">Pokazuj dane historyczne</string>
     <string name="show_dates">Pokazuj daty obok nazw dni</string>
     <string name="show_mushrooms">Warunki dla grzybów</string>

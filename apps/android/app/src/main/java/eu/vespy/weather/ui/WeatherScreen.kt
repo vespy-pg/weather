@@ -517,7 +517,7 @@ private fun ForecastTimeline(
     }
     val slotWidth = 22.dp * settings.zoom * groupHours
     val trackWidth = slotWidth * max(1, points.size)
-    val metricRows = remember(points, settings.showUvIndex, settings.showHumidity, settings.showPressure) {
+    val metricRows = remember(points, settings.showUvIndex, settings.showHumidity, settings.showPressure, settings.showPollen) {
         buildList {
             if (settings.showUvIndex) {
                 val values = points.map(HourlyWeather::uvIndex)
@@ -527,7 +527,13 @@ private fun ForecastTimeline(
             if (settings.showPressure) {
                 val values = points.map(HourlyWeather::surfacePressure)
                 val available = values.filterNotNull()
-                add(TimelineMetric("hPa", "pressure", android.graphics.Color.rgb(177, 145, 255), values, available.minOrNull()?.minus(3), available.maxOrNull()?.plus(3)))
+                add(TimelineMetric("hPa", "pressure", android.graphics.Color.rgb(177, 145, 255), values, available.minOrNull(), available.maxOrNull()))
+            }
+            if (settings.showPollen) {
+                val values = points.map { point ->
+                    point.pollen?.let { pollen -> listOf(pollen.alder, pollen.birch, pollen.grass, pollen.mugwort, pollen.olive, pollen.ragweed).filterNotNull().sum().takeIf { it > 0.0 } }
+                }
+                add(TimelineMetric("", "pollen", android.graphics.Color.rgb(255, 200, 61), values, 0.0, values.filterNotNull().maxOrNull()?.coerceAtLeast(1.0)))
             }
         }
     }
@@ -741,6 +747,7 @@ private fun ForecastTimeline(
                         dark = dark,
                         label = metric.label,
                         color = metric.color,
+                        metricStyle = metric.style,
                         pixelScale = density,
                     )
                 }
@@ -1182,13 +1189,16 @@ private fun MoonPanel(date: LocalDate, sunriseMinutes: Int) {
         MoonPathChart(moonrise, phase)
         Text(stringResource(R.string.moon_times_approximate), color = Muted, fontSize = 9.sp)
         Text(stringResource(R.string.next_moon_phases), color = Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            (0..6).forEach { offset ->
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            (0 until 30).forEach { offset ->
                 val phaseDate = date.plusDays(offset.toLong())
                 val itemPhase = moonPhase(phaseDate)
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(36.dp)) {
                     MoonPhaseIcon(itemPhase, Modifier.size(24.dp))
-                    Text(phaseDate.dayOfMonth.toString(), color = if (offset == 0) MaterialTheme.colorScheme.onSurface else Muted, fontSize = 9.sp, fontWeight = if (offset == 0) FontWeight.Bold else FontWeight.Normal)
+                    Text("${phaseDate.dayOfMonth}.${phaseDate.monthValue}", color = if (offset == 0) MaterialTheme.colorScheme.onSurface else Muted, fontSize = 9.sp, fontWeight = if (offset == 0) FontWeight.Bold else FontWeight.Normal)
                 }
             }
         }
@@ -1738,6 +1748,7 @@ private fun SettingsDialog(
                     SettingSwitch(stringResource(R.string.show_uv_index), state.displaySettings.showUvIndex) { onDisplaySettings(state.displaySettings.copy(showUvIndex = it)) }
                     SettingSwitch(stringResource(R.string.show_humidity), state.displaySettings.showHumidity) { onDisplaySettings(state.displaySettings.copy(showHumidity = it)) }
                     SettingSwitch(stringResource(R.string.show_pressure), state.displaySettings.showPressure) { onDisplaySettings(state.displaySettings.copy(showPressure = it)) }
+                    SettingSwitch(stringResource(R.string.show_pollen), state.displaySettings.showPollen) { onDisplaySettings(state.displaySettings.copy(showPollen = it)) }
                     SettingSwitch(stringResource(R.string.show_historical_data), state.displaySettings.showHistoricalData) { onDisplaySettings(state.displaySettings.copy(showHistoricalData = it)) }
                     SettingSwitch(stringResource(R.string.show_dates), state.displaySettings.showDates) { onDisplaySettings(state.displaySettings.copy(showDates = it)) }
                     SettingSwitch(stringResource(R.string.show_mushrooms), state.displaySettings.showMushrooms) { onDisplaySettings(state.displaySettings.copy(showMushrooms = it)) }
