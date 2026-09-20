@@ -1,1 +1,1 @@
-Updates Android compatibility and resolves an outdated Fragment SDK warning while retaining the latest widget and issue-report diagnostics improvements.
+Adds detailed daily weather summaries, air-quality and pollen forecasts, sunlight comparisons and pinch-to-zoom. Improves widget layouts, location management and issue reporting.

@@ -34,7 +34,7 @@ android {
         applicationId = "eu.vespy.weather"
         minSdk = 26
         targetSdk = 37
-        versionCode = 8
+        versionCode = 9
         versionName = "0.1.7"
 
         buildConfigField("String", "API_BASE_URL", "\"${weatherApiBaseUrl.get()}\"")

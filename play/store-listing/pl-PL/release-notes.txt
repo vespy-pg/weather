@@ -1,1 +1,1 @@
-Zaktualizowano zgodność z Androidem i usunięto ostrzeżenie o nieaktualnym pakiecie Fragment, zachowując najnowsze ulepszenia widgetów i raportów diagnostycznych.
+Dodano szczegółowe podsumowania dnia, jakość powietrza, pyłki, porównanie długości dnia i powiększanie gestem. Poprawiono widgety, lokalizacje i zgłaszanie problemów.
