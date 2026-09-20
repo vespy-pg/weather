@@ -210,6 +210,7 @@ class WeatherApi(private val baseUrl: String = BuildConfig.API_BASE_URL) {
                 val item = dailySource.getJSONObject(index)
                 val mushroom = item.optJSONObject("mushroom")
                 val pollen = item.optJSONObject("pollen")
+                val airQuality = item.optJSONObject("airQuality")
                 add(DailyWeather(
                     date = item.optString("date"),
                     sunrise = item.optNullableString("sunrise"),
@@ -244,6 +245,17 @@ class WeatherApi(private val baseUrl: String = BuildConfig.API_BASE_URL) {
                             mugwort = it.optNullableDouble("mugwort"),
                             olive = it.optNullableDouble("olive"),
                             ragweed = it.optNullableDouble("ragweed"),
+                        )
+                    },
+                    airQuality = airQuality?.let {
+                        AirQualityForecast(
+                            europeanAqi = it.optNullableDouble("europeanAqi"),
+                            pm25 = it.optNullableDouble("pm25"),
+                            pm10 = it.optNullableDouble("pm10"),
+                            nitrogenDioxide = it.optNullableDouble("nitrogenDioxide"),
+                            ozone = it.optNullableDouble("ozone"),
+                            sulphurDioxide = it.optNullableDouble("sulphurDioxide"),
+                            carbonMonoxide = it.optNullableDouble("carbonMonoxide"),
                         )
                     },
                 ))

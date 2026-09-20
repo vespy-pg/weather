@@ -30,6 +30,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.BoxWithConstraintsScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -978,6 +979,11 @@ private fun ForecastDayBrief(
                 DayBriefRow(stringResource(R.string.humidity), humidity?.let { "${it.toInt()}%" } ?: "-", stringResource(R.string.pressure), pressure?.let { "${it.toInt()} hPa" } ?: "-", Color(0xFF4AA3FF), Color(0xFFB1C6DA))
                 DayBriefRow(stringResource(R.string.visibility), visibility?.let { String.format(locale, "%.1f km", it / 1000) } ?: "-", stringResource(R.string.wind_direction), daily?.windDirection?.let(::windDirectionText) ?: "-", Color(0xFF64D5C2), ChartWind)
             }
+            DayBriefSection(stringResource(R.string.day_brief_air_quality)) {
+                val airQuality = daily?.airQuality
+                if (airQuality == null) Text(stringResource(R.string.air_quality_unavailable), color = Muted, fontSize = 12.sp)
+                else AirQualityDetails(airQuality)
+            }
             DayBriefSection(stringResource(R.string.day_brief_sun)) {
                 SunlightComparison(daily?.sunrise, daily?.sunset, dayLength, shortest, longest)
                 DayBriefRow(stringResource(R.string.daylight), durationText(dayLength), stringResource(R.string.sunshine), durationText(daily?.sunshineDuration), Color(0xFFFFC83D), Color(0xFFFFA928))
@@ -1047,38 +1053,95 @@ private fun DayBriefTemperatureMetric(label: String, low: Double?, high: Double?
 private fun SunlightComparison(sunrise: String?, sunset: String?, dayLength: Double, shortestDay: Double, longestDay: Double) {
     val sunriseMinutes = clockMinutes(sunrise) ?: return
     val sunsetMinutes = clockMinutes(sunset) ?: return
-    val shortestDifference = ((dayLength - shortestDay).coerceAtLeast(0.0) / 120).toInt()
-    val longestDifference = ((longestDay - dayLength).coerceAtLeast(0.0) / 120).toInt()
+    val aboveShortest = (dayLength - shortestDay).coerceAtLeast(0.0)
+    val belowLongest = (longestDay - dayLength).coerceAtLeast(0.0)
+    val shortestDifference = (aboveShortest / 120).toInt()
+    val longestDifference = (belowLongest / 120).toInt()
     val rows = listOf(
         Triple(stringResource(R.string.shortest_day), sunriseMinutes + shortestDifference, sunsetMinutes - shortestDifference),
         Triple(stringResource(R.string.selected_day), sunriseMinutes, sunsetMinutes),
         Triple(stringResource(R.string.longest_day), sunriseMinutes - longestDifference, sunsetMinutes + longestDifference),
     )
-    Column(
-        modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)).padding(10.dp),
-        verticalArrangement = Arrangement.spacedBy(9.dp),
-    ) {
-        rows.forEachIndexed { index, (label, rise, set) -> SunlightRow(label, rise, set, emphasized = index == 1) }
-        Text(stringResource(R.string.sunrise_difference, durationText(shortestDifference * 60.0), durationText(longestDifference * 60.0)), color = Muted, fontSize = 10.sp)
-        Text(stringResource(R.string.sunset_difference, durationText(shortestDifference * 60.0), durationText(longestDifference * 60.0)), color = Muted, fontSize = 10.sp)
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(
+            modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)).padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            rows.forEachIndexed { index, (label, rise, set) ->
+                val color = sunlightColor(index)
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(7.dp).background(color, RoundedCornerShape(50)))
+                    Text(label, color = if (index == 1) MaterialTheme.colorScheme.onSurface else Muted, fontSize = 10.sp, modifier = Modifier.padding(start = 5.dp).weight(1f))
+                    Text("${formatClockMinutes(rise)} - ${formatClockMinutes(set)}", color = color, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth().height(54.dp)) {
+                Box(Modifier.fillMaxWidth().height(2.dp).align(Alignment.Center).background(Muted.copy(alpha = .18f), RoundedCornerShape(2.dp)))
+                rows.forEachIndexed { index, (_, rise, set) -> SunlightBand(rise, set, sunlightColor(index), index * 16) }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                listOf("00", "06", "12", "18", "24").forEach { Text(it, color = Muted, fontSize = 8.sp) }
+            }
+        }
+        DayBriefRow(
+            stringResource(R.string.above_shortest_day), "+${durationText(aboveShortest)}",
+            stringResource(R.string.below_longest_day), "-${durationText(belowLongest)}",
+            Color(0xFFFFC83D), Color(0xFFFFC83D),
+        )
     }
 }
 
 @Composable
-private fun SunlightRow(label: String, sunriseMinutes: Int, sunsetMinutes: Int, emphasized: Boolean) {
-    val color = if (emphasized) Color(0xFFFFC83D) else Color(0xFF8D98AA)
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(label, color = if (emphasized) MaterialTheme.colorScheme.onSurface else Muted, fontSize = 11.sp, modifier = Modifier.width(76.dp), maxLines = 1)
-        Text(formatClockMinutes(sunriseMinutes), color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(42.dp))
-        BoxWithConstraints(modifier = Modifier.weight(1f).height(16.dp)) {
-            val start = sunriseMinutes.coerceIn(0, 1440) / 1440f
-            val end = sunsetMinutes.coerceIn(0, 1440) / 1440f
-            Box(Modifier.fillMaxWidth().height(3.dp).align(Alignment.Center).background(Muted.copy(alpha = .18f), RoundedCornerShape(2.dp)))
-            Box(Modifier.fillMaxWidth((end - start).coerceAtLeast(0f)).height(if (emphasized) 6.dp else 4.dp).align(Alignment.CenterStart).offset(x = maxWidth * start).background(color, RoundedCornerShape(3.dp)))
-            Box(Modifier.size(if (emphasized) 10.dp else 7.dp).align(Alignment.CenterStart).offset(x = maxWidth * start - if (emphasized) 5.dp else 3.5.dp).background(color, RoundedCornerShape(50)))
-            Box(Modifier.size(if (emphasized) 10.dp else 7.dp).align(Alignment.CenterStart).offset(x = maxWidth * end - if (emphasized) 5.dp else 3.5.dp).background(color, RoundedCornerShape(50)))
+private fun BoxWithConstraintsScope.SunlightBand(sunriseMinutes: Int, sunsetMinutes: Int, color: Color, y: Int) {
+    val start = sunriseMinutes.coerceIn(0, 1440) / 1440f
+    val end = sunsetMinutes.coerceIn(0, 1440) / 1440f
+    val thickness = if (y == 16) 7.dp else 4.dp
+    Box(Modifier.fillMaxWidth((end - start).coerceAtLeast(0f)).height(thickness).offset(x = maxWidth * start, y = (y + 8).dp).background(color, RoundedCornerShape(4.dp)))
+    Box(Modifier.size(if (y == 16) 11.dp else 8.dp).offset(x = maxWidth * start - if (y == 16) 5.5.dp else 4.dp, y = (y + 6).dp).background(color, RoundedCornerShape(50)))
+    Box(Modifier.size(if (y == 16) 11.dp else 8.dp).offset(x = maxWidth * end - if (y == 16) 5.5.dp else 4.dp, y = (y + 6).dp).background(color, RoundedCornerShape(50)))
+}
+
+private fun sunlightColor(index: Int): Color = when (index) {
+    0 -> Color(0xFF91A0B4)
+    1 -> Color(0xFFFFC83D)
+    else -> Color(0xFFED8A42)
+}
+
+@Composable
+private fun AirQualityDetails(airQuality: eu.vespy.weather.data.AirQualityForecast) {
+    val aqi = airQuality.europeanAqi
+    val aqiColor = airQualityColor(aqi)
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)).padding(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.european_aqi), color = Muted, fontSize = 11.sp)
+                Text(aqi?.let { it.toInt().toString() } ?: "-", color = aqiColor, fontSize = 28.sp, fontWeight = FontWeight.Black)
+            }
+            Text(airQualityLabel(aqi), color = aqiColor, fontSize = 17.sp, fontWeight = FontWeight.Bold)
         }
-        Text(formatClockMinutes(sunsetMinutes), color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(42.dp), maxLines = 1)
+        PollutantChartRow("PM2.5", airQuality.pm25, 75.0)
+        PollutantChartRow("PM10", airQuality.pm10, 150.0)
+        PollutantChartRow("NO₂", airQuality.nitrogenDioxide, 340.0)
+        PollutantChartRow("O₃", airQuality.ozone, 380.0)
+        PollutantChartRow("SO₂", airQuality.sulphurDioxide, 750.0)
+        PollutantChartRow("CO", airQuality.carbonMonoxide, 10_000.0)
+        Text(stringResource(R.string.air_quality_peak_context), color = Muted, fontSize = 10.sp)
+    }
+}
+
+@Composable
+private fun PollutantChartRow(label: String, value: Double?, scaleMaximum: Double) {
+    val fraction = ((value ?: 0.0) / scaleMaximum).toFloat().coerceIn(0f, 1f)
+    val color = airQualityColor((fraction * 100).toDouble())
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(label, color = Muted, fontSize = 11.sp, modifier = Modifier.width(44.dp))
+        Box(Modifier.weight(1f).height(8.dp).background(Muted.copy(alpha = .18f), RoundedCornerShape(4.dp))) {
+            Box(Modifier.fillMaxWidth(fraction).fillMaxHeight().background(color, RoundedCornerShape(4.dp)))
+        }
+        Text(value?.let { "${String.format(Locale.getDefault(), "%.1f", it)} µg/m³" } ?: "-", color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(92.dp).padding(start = 8.dp), maxLines = 1)
     }
 }
 
@@ -1136,6 +1199,26 @@ private fun pollenColor(value: Double?): Color = when {
     value < 50 -> Color(0xFFFF8A3D)
     else -> Color(0xFFFF4055)
 }
+
+private fun airQualityColor(value: Double?): Color = when {
+    value == null -> Muted
+    value <= 20 -> Color(0xFF55CF8A)
+    value <= 40 -> Color(0xFFB3D14B)
+    value <= 60 -> Color(0xFFFFC83D)
+    value <= 80 -> Color(0xFFFF8A3D)
+    else -> Color(0xFFFF4055)
+}
+
+@Composable
+private fun airQualityLabel(value: Double?): String = stringResource(when {
+    value == null -> R.string.air_quality_unavailable
+    value <= 20 -> R.string.air_quality_good
+    value <= 40 -> R.string.air_quality_fair
+    value <= 60 -> R.string.air_quality_moderate
+    value <= 80 -> R.string.air_quality_poor
+    value <= 100 -> R.string.air_quality_very_poor
+    else -> R.string.air_quality_extremely_poor
+})
 
 private fun windDirectionText(degrees: Double): String = listOf("N", "NE", "E", "SE", "S", "SW", "W", "NW")[((degrees + 22.5) / 45).toInt() % 8]
 

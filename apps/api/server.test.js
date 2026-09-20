@@ -3,7 +3,7 @@ import test from 'node:test';
 import {mkdir, mkdtemp, readFile, readdir, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
-import {createServer, dailyPollen, forecastUrl, isForecastRoutePath, locationMatchesQualifiers, locationSearchUrl, locationSearchVariants, mushroomCondition, mushroomObservationsUrl, normalizeForecast, normalizeGoogleAnalyticsId, normalizeIssueReport, normalizeLocale, normalizeMushroomObservations, normalizePostalLocations, normalizeReverseLocation, normalizedSearchText, pollenForecastUrl, postalCodeSearchUrl, preferredLanguageForCountry, promotionFeed, purgeExpiredIssueReports, rankLocationCandidates, renderIndexHtml, selectCapitalResult, seoPageMetadata, staticCacheControl} from './server.js';
+import {createServer, dailyAirQuality, dailyPollen, forecastUrl, isForecastRoutePath, locationMatchesQualifiers, locationSearchUrl, locationSearchVariants, mushroomCondition, mushroomObservationsUrl, normalizeForecast, normalizeGoogleAnalyticsId, normalizeIssueReport, normalizeLocale, normalizeMushroomObservations, normalizePostalLocations, normalizeReverseLocation, normalizedSearchText, pollenForecastUrl, postalCodeSearchUrl, preferredLanguageForCountry, promotionFeed, purgeExpiredIssueReports, rankLocationCandidates, renderIndexHtml, selectCapitalResult, seoPageMetadata, staticCacheControl} from './server.js';
 
 test('normalizes issue reports without retaining encoded attachment data in metadata', () => {
   const report = normalizeIssueReport({
@@ -184,10 +184,15 @@ test('pollen forecast uses the European air-quality endpoint and aggregates a da
   assert.equal(url.hostname, 'air-quality-api.open-meteo.com');
   assert.equal(url.searchParams.get('forecast_days'), '4');
   assert.match(url.searchParams.get('hourly'), /grass_pollen/);
+  assert.match(url.searchParams.get('hourly'), /european_aqi/);
   assert.deepEqual(dailyPollen({hourly: {
     time: ['2026-09-20T00:00', '2026-09-20T12:00', '2026-09-21T00:00'],
     alder_pollen: [1, 3, 2], birch_pollen: [null, 4, 1], grass_pollen: [8, 6, 2], mugwort_pollen: [0, 1, 0], olive_pollen: [null, null, null], ragweed_pollen: [2, 5, 1]
   }}, '2026-09-20'), {alder: 3, birch: 4, grass: 8, mugwort: 1, olive: null, ragweed: 5});
+  assert.deepEqual(dailyAirQuality({hourly: {
+    time: ['2026-09-20T00:00', '2026-09-20T12:00', '2026-09-21T00:00'],
+    european_aqi: [25, 42, 18], pm2_5: [4, 9, 3], pm10: [8, 14, 7], nitrogen_dioxide: [11, 17, 8], ozone: [42, 61, 39], sulphur_dioxide: [1, 2, 1], carbon_monoxide: [180, 220, 160]
+  }}, '2026-09-20'), {europeanAqi: 42, pm25: 9, pm10: 14, nitrogenDioxide: 17, ozone: 61, sulphurDioxide: 2, carbonMonoxide: 220});
 });
 
 test('scores mushroom conditions from recent rain, moisture, humidity, and temperature', () => {

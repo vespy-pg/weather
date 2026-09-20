@@ -65,6 +65,7 @@ data class DailyWeather(
     val windDirection: Double? = null,
     val uvIndexMaximum: Double? = null,
     val pollen: PollenForecast? = null,
+    val airQuality: AirQualityForecast? = null,
 )
 
 data class PollenForecast(
@@ -74,6 +75,16 @@ data class PollenForecast(
     val mugwort: Double?,
     val olive: Double?,
     val ragweed: Double?,
+)
+
+data class AirQualityForecast(
+    val europeanAqi: Double?,
+    val pm25: Double?,
+    val pm10: Double?,
+    val nitrogenDioxide: Double?,
+    val ozone: Double?,
+    val sulphurDioxide: Double?,
+    val carbonMonoxide: Double?,
 )
 
 data class MushroomCondition(

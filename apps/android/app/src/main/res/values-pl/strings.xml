@@ -35,6 +35,7 @@
     <string name="day_brief_temperature">TEMPERATURA</string>
     <string name="day_brief_rain">OPAD I ZACHMURZENIE</string>
     <string name="day_brief_air">WIATR I POWIETRZE</string>
+    <string name="day_brief_air_quality">JAKOŚĆ POWIETRZA</string>
     <string name="day_brief_sun">SŁOŃCE I UV</string>
     <string name="day_brief_pollen">PROGNOZA PYŁKÓW</string>
     <string name="apparent_range">Odczuwalna</string>
@@ -57,6 +58,15 @@
     <string name="longest_day">Najdłuższy</string>
     <string name="sunrise_difference">Wschód: najkrótszy +%1$s, najdłuższy -%2$s</string>
     <string name="sunset_difference">Zachód: najkrótszy -%1$s, najdłuższy +%2$s</string>
+    <string name="european_aqi">Europejski indeks jakości powietrza</string>
+    <string name="air_quality_good">Dobra</string>
+    <string name="air_quality_fair">Umiarkowanie dobra</string>
+    <string name="air_quality_moderate">Umiarkowana</string>
+    <string name="air_quality_poor">Zła</string>
+    <string name="air_quality_very_poor">Bardzo zła</string>
+    <string name="air_quality_extremely_poor">Ekstremalnie zła</string>
+    <string name="air_quality_unavailable">Brak prognozy jakości powietrza dla tej daty lub lokalizacji</string>
+    <string name="air_quality_peak_context">Najwyższe stężenia w ciągu dnia. Niższe wartości są lepsze.</string>
     <string name="duration_hours_minutes">%1$d godz. %2$d min</string>
     <string name="pollen_alder">Olcha</string>
     <string name="pollen_birch">Brzoza</string>

@@ -479,15 +479,30 @@ export function mushroomCondition(source, dailyIndex) {
 }
 
 const POLLEN_FIELDS = ['alder_pollen', 'birch_pollen', 'grass_pollen', 'mugwort_pollen', 'olive_pollen', 'ragweed_pollen'];
+const AIR_QUALITY_FIELDS = ['european_aqi', 'pm2_5', 'pm10', 'nitrogen_dioxide', 'ozone', 'sulphur_dioxide', 'carbon_monoxide'];
+
+function dailyAirReadings(source, date, field) {
+  const timestamps = source?.hourly?.time || [];
+  return timestamps.flatMap((timestamp, index) => String(timestamp).startsWith(date) ? [at(source.hourly, field, index)] : [])
+    .filter(value => value !== null && value !== undefined && value !== '')
+    .map(Number)
+    .filter(Number.isFinite);
+}
 
 export function dailyPollen(source, date) {
-  const timestamps = source?.hourly?.time || [];
   const values = POLLEN_FIELDS.reduce((result, field) => {
-    const readings = timestamps.flatMap((timestamp, index) => String(timestamp).startsWith(date) ? [at(source.hourly, field, index)] : [])
-      .filter(value => value !== null && value !== undefined && value !== '')
-      .map(Number)
-      .filter(Number.isFinite);
+    const readings = dailyAirReadings(source, date, field);
     result[field.replace('_pollen', '')] = readings.length ? Number(Math.max(...readings).toFixed(1)) : null;
+    return result;
+  }, {});
+  return Object.values(values).some(value => value !== null) ? values : null;
+}
+
+export function dailyAirQuality(source, date) {
+  const values = AIR_QUALITY_FIELDS.reduce((result, field) => {
+    const readings = dailyAirReadings(source, date, field);
+    const key = field === 'european_aqi' ? 'europeanAqi' : field.replace('pm2_5', 'pm25').replace('nitrogen_dioxide', 'nitrogenDioxide').replace('sulphur_dioxide', 'sulphurDioxide').replace('carbon_monoxide', 'carbonMonoxide');
+    result[key] = readings.length ? Number(Math.max(...readings).toFixed(1)) : null;
     return result;
   }, {});
   return Object.values(values).some(value => value !== null) ? values : null;
@@ -564,6 +579,7 @@ export function normalizeForecast(source, location, {pastDays = 0, pollenSource 
       windDirection: at(source.daily, 'wind_direction_10m_dominant', sourceIndex),
       uvIndexMaximum: at(source.daily, 'uv_index_max', sourceIndex),
       pollen: dailyPollen(pollenSource, date),
+      airQuality: dailyAirQuality(pollenSource, date),
       mushroom: mushroomCondition(source, sourceIndex)
     };
     }),
@@ -598,7 +614,7 @@ export function pollenForecastUrl({latitude, longitude, timezone}) {
     longitude: String(longitude),
     timezone: timezone || 'auto',
     forecast_days: '4',
-    hourly: POLLEN_FIELDS.join(',')
+    hourly: [...POLLEN_FIELDS, ...AIR_QUALITY_FIELDS].join(',')
   });
   return `https://air-quality-api.open-meteo.com/v1/air-quality?${parameters}`;
 }
