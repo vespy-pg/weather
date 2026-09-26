@@ -17,7 +17,7 @@ import {
   uniqueLocations,
   withLocation
 } from './location-state.js';
-import {applicationRouteUrl, forecastRouteUrl, parseCoordinatePair, parseForecastRoute, shouldUseRouteLocation} from './route-state.js';
+import {applicationRouteUrl, forecastRouteUrl, parseCoordinatePair, parseForecastRoute, persistentRouteQuery, shouldUseRouteLocation} from './route-state.js?v=2';
 import {weatherRefreshIsDue} from './weather-refresh.js';
 import {
   celsiusToDisplay,
@@ -481,10 +481,7 @@ function updateSeoMetadata(locationOverride = settings.location) {
 
 function updateBrowserRoute() {
   if (IS_GITHUB_PAGES || !Number.isFinite(Number(settings.location?.latitude)) || !Number.isFinite(Number(settings.location?.longitude))) return;
-  const query = {};
-  ['demo', 'guide', 'share'].forEach(key => {
-    if (QUERY.has(key)) query[key] = QUERY.get(key);
-  });
+  const query = persistentRouteQuery(QUERY, IS_EMBEDDED);
   const url = forecastRouteUrl(location.origin, {language: settings.language, location: settings.location, query});
   history.replaceState(null, '', `${url.pathname}${url.search}`);
   updateSeoMetadata();
