@@ -1,1 +1,1 @@
-Dodano opcjonalne wiersze wartości dla warstw pogody, ulepszone objaśnienia osi czasu i interaktywne szczegóły prognozy. Widgety przejmują wybraną lokalizację aplikacji, a zarządzanie lokalizacjami, ostrzeżenia, historia i renderowanie działają pewniej.
+Usprawniono zmianę lokalizacji na urządzeniach, na których usługi widżetów są niedostępne.

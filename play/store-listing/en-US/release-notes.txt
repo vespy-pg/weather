@@ -1,1 +1,1 @@
-Adds optional numeric rows for weather layers, improved timeline guides and interactive forecast details. Widgets now inherit the selected app location, while location management, warnings, history and rendering are more reliable.
+Improves location switching on devices where widget services are unavailable.
