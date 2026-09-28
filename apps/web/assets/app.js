@@ -1,8 +1,8 @@
-import {drawForecastSky, drawWeatherChart, drawWindFlow, setTemperatureColorThresholds} from './charts.js';
+import {drawForecastSky, drawTimelineMetric, drawWeatherChart, drawWindFlow, setTemperatureColorThresholds, temperatureColor} from './charts.js';
 import {initializeAnalytics, trackEvent} from './analytics.js';
 import {createWeatherDemo} from './weather-demo.js';
 import {escapeHtml, formatForecastDate, formatTime, measurement, numericValue, shortTemperature, temperature} from './components.js';
-import {forecastSkyLayout, groupHourlyForecast, hoursPerGroup, resistedHistoryPosition, stopTimelineAtNow, temperatureRange, timelineCurrentIndex, timelineHourlyWindow, withinTimelineMagnet} from './forecast-view.js';
+import {forecastSkyLayout, groupHourlyForecast, hoursPerGroup, resistedHistoryPosition, stopTimelineAtNow, temperatureRange, timelineCurrentIndex, timelineHourlyWindow} from './forecast-view.js';
 import {forecastSummaryEvents} from './forecast-summary.js';
 import {applyWidgetQuery, widgetBoolean, widgetDays, widgetQuery} from './embed-options.js';
 import {normalizeLanguage, preferredSupportedLanguage, setLanguage, supportedLanguages, t} from './i18n.js';
@@ -19,6 +19,7 @@ import {
 } from './location-state.js';
 import {applicationRouteUrl, forecastRouteUrl, parseCoordinatePair, parseForecastRoute, shouldUseRouteLocation} from './route-state.js';
 import {weatherRefreshIsDue} from './weather-refresh.js';
+import {POLLEN_TYPES, POLLUTANTS, aggregate, airQualityColor, dateAtTimelinePosition, daylightComparison, moonPhase, moonPhaseIndex, pointsForDate, pollenPeak, uvColor, windColor as dayWindColor} from './day-brief.js';
 import {
   celsiusToDisplay,
   DEFAULT_THRESHOLDS,
@@ -69,6 +70,11 @@ const DEFAULT_SETTINGS = {
   showPrecipitation: true,
   showWind: true,
   showWindArrows: false,
+  showUv: true,
+  showHumidity: true,
+  showPressure: true,
+  showAirQuality: true,
+  showPollen: true,
   showMushrooms: false,
   showHistoricalData: true,
   showDates: false,
@@ -178,6 +184,9 @@ let mushroomObservationRequest = 0;
 let mushroomObservations = null;
 const promotionImpressions = new Set();
 let forecastWelcomeDisplayed = false;
+let displayedTimelineHourly = [];
+let selectedForecastDate = null;
+let selectedDayTimer = 0;
 
 function safePromotionUrl(value, {asset = false} = {}) {
   try {
@@ -429,7 +438,9 @@ function embedCode(locationOverride = settings.location, theme = settings.theme,
       demo: IS_DEMO ? 1 : null
     }
   });
-  const height = (settings.embedLegend ? 680 : 390) + (settings.showMushrooms ? 54 : 0);
+  const metricHeight = [settings.showUv, settings.showHumidity, settings.showPressure, settings.showAirQuality, settings.showPollen]
+    .filter(Boolean).length * 53;
+  const height = (settings.embedLegend ? 680 : 390) + metricHeight + (settings.showMushrooms ? 54 : 0);
   return `<iframe src="${url}" title="${t('embed.title')}" width="100%" height="${height}" loading="lazy" scrolling="no" style="border:0;border-radius:12px" allow="geolocation"></iframe>`;
 }
 
@@ -733,6 +744,170 @@ function renderMushrooms(hourly) {
   renderMushroomObservations();
 }
 
+function renderTimelineMetrics(hourly) {
+  const metrics = [
+    ['Uv', 'uv', settings.showUv, {}],
+    ['Humidity', 'humidity', settings.showHumidity, {}],
+    ['Pressure', 'pressure', settings.showPressure, {highLabel: settings.language === 'pl-PL' ? 'W' : 'H', lowLabel: settings.language === 'pl-PL' ? 'N' : 'L'}],
+    ['AirQuality', 'airQuality', settings.showAirQuality, {}],
+    ['Pollen', 'pollen', settings.showPollen, {}]
+  ];
+  metrics.forEach(([name, type, visible, options]) => {
+    const track = document.getElementById(`forecast${name}Track`);
+    track.hidden = !visible;
+    if (visible) drawTimelineMetric(document.getElementById(`forecast${name}Canvas`), hourly, type, options);
+  });
+}
+
+function durationText(seconds) {
+  const minutes = Math.max(0, Math.round((numericValue(seconds) || 0) / 60));
+  return `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, '0')} min`;
+}
+
+function clockMinutes(value) {
+  const match = /T(\d{2}):(\d{2})/.exec(String(value || ''));
+  return match ? Number(match[1]) * 60 + Number(match[2]) : null;
+}
+
+function clockFromMinutes(value) {
+  const minutes = ((Math.round(value) % 1440) + 1440) % 1440;
+  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+}
+
+function dayMetric(label, value, color = '') {
+  return `<div class="day-brief-value"><small>${escapeHtml(label)}</small><strong${color ? ` style="color:${color}"` : ''}>${escapeHtml(value)}</strong></div>`;
+}
+
+function daySection(title, content, className = '') {
+  return `<section class="day-brief-section ${className}"><h3>${escapeHtml(title)}</h3>${content}</section>`;
+}
+
+function airQualityLabel(value) {
+  if (value === null) return t('dayBrief.noData');
+  if (value <= 20) return t('dayBrief.good');
+  if (value <= 40) return t('dayBrief.fair');
+  if (value <= 60) return t('dayBrief.moderate');
+  if (value <= 80) return t('dayBrief.poor');
+  if (value <= 100) return t('dayBrief.veryPoor');
+  return t('dayBrief.extremelyPoor');
+}
+
+function chartRows(values, maximum, colorForValue, formatter) {
+  return values.map(([label, value, itemMaximum]) => {
+    const number = numericValue(value);
+    const scaleMaximum = numericValue(itemMaximum) ?? maximum;
+    const color = colorForValue(number, scaleMaximum);
+    const width = number === null ? 0 : Math.max(0, Math.min(100, number / Math.max(1, scaleMaximum) * 100));
+    return `<div class="day-brief-bar-row" style="--color:${color}"><span>${escapeHtml(label)}</span><span class="day-brief-bar"><i style="--value:${width}%"></i></span><b>${escapeHtml(formatter(number))}</b></div>`;
+  }).join('');
+}
+
+function sunComparisonHtml(day, comparison) {
+  const rise = clockMinutes(day?.sunrise);
+  const set = clockMinutes(day?.sunset);
+  if (rise === null || set === null) return `<div class="day-brief-empty">${escapeHtml(t('dayBrief.noData'))}</div>`;
+  const aboveHalf = comparison.aboveShortest / 120;
+  const belowHalf = comparison.belowLongest / 120;
+  const rows = [
+    {label: t('dayBrief.shortestDay'), rise: Math.min(1440, rise + aboveHalf), set: Math.max(0, set - aboveHalf), color: '#91a0b4'},
+    {label: t('dayBrief.selectedDay'), rise, set, color: '#ffc83d'},
+    {label: t('dayBrief.longestDay'), rise: Math.max(0, rise - belowHalf), set: Math.min(1440, set + belowHalf), color: '#ed8a42'}
+  ];
+  const domainStart = Math.max(0, Math.min(...rows.map(row => row.rise)) - 30);
+  const domainEnd = Math.min(1440, Math.max(...rows.map(row => row.set)) + 30);
+  const span = Math.max(1, domainEnd - domainStart);
+  const x = minutes => (minutes - domainStart) / span * 1000;
+  const peakByIndex = [48, 27, 9];
+  const paths = [2, 1, 0].map(index => {
+    const row = rows[index];
+    const start = x(row.rise);
+    const end = x(row.set);
+    const middle = (start + end) / 2;
+    return `<path d="M${start.toFixed(2)} 108 Q${middle.toFixed(2)} ${peakByIndex[index]} ${end.toFixed(2)} 108" fill="none" stroke="${row.color}" stroke-width="${index === 1 ? 3.4 : 2}"/>`;
+  }).join('');
+  const sunX = x((rise + set) / 2);
+  const legend = rows.map(row => `<div class="sun-comparison-row"><i style="--sun-color:${row.color}"></i><span>${escapeHtml(row.label)}</span><b>${clockFromMinutes(row.rise)}</b><em>${clockFromMinutes(row.set)}</em></div>`).join('');
+  return `<div class="sun-comparison-legend">${legend}</div><div class="sun-comparison"><svg viewBox="0 0 1000 130" preserveAspectRatio="none" aria-label="${escapeHtml(t('dayBrief.sun'))}"><rect x="0" y="108" width="1000" height="22" fill="#18232d"/><line x1="0" y1="108" x2="1000" y2="108" stroke="#8d98aa" stroke-opacity=".62" stroke-width="2"/>${paths}<circle cx="${sunX.toFixed(2)}" cy="27" r="11" fill="#ffc83d"/><circle cx="${sunX.toFixed(2)}" cy="27" r="18" fill="#ffc83d" fill-opacity=".12"/></svg></div>
+    <div class="sun-comparison-meta"><span>${escapeHtml(t('dayBrief.sunrise'))}: <b>${clockFromMinutes(rise)}</b></span><span>${escapeHtml(t('dayBrief.sunset'))}: <b>${clockFromMinutes(set)}</b></span><span>${escapeHtml(t('dayBrief.aboveShortest'))}: <b>+${durationText(comparison.aboveShortest)}</b></span><span>${escapeHtml(t('dayBrief.belowLongest'))}: <b>${durationText(comparison.belowLongest)}</b></span></div>`;
+}
+
+function moonIconHtml(phase) {
+  return `<span class="moon-icon" aria-hidden="true">${['🌑', '🌒', '🌓', '🌔', '🌕', '🌖', '🌗', '🌘'][moonPhaseIndex(phase)]}</span>`;
+}
+
+function moonPathData(rise) {
+  const paths = [];
+  let current = [];
+  for (let minute = 0; minute <= 1440; minute += 15) {
+    const sinceRise = ((minute - rise) % 1440 + 1440) % 1440;
+    if (sinceRise <= 720) {
+      current.push(`${minute / 1440 * 1000},${90 - Math.sin(Math.PI * sinceRise / 720) * 68}`);
+    } else if (current.length) {
+      paths.push(current);
+      current = [];
+    }
+  }
+  if (current.length) paths.push(current);
+  return paths.map(path => `<path d="M${path.join(' L')}" fill="none" stroke="#c2d2ff" stroke-width="3"/>`).join('');
+}
+
+function moonHtml(date, sunrise) {
+  const phase = moonPhase(date);
+  const phaseKeys = ['moonNew', 'moonWaxingCrescent', 'moonFirstQuarter', 'moonWaxingGibbous', 'moonFull', 'moonWaningGibbous', 'moonLastQuarter', 'moonWaningCrescent'];
+  const rise = ((clockMinutes(sunrise) ?? 360) + phase * 1440) % 1440;
+  const set = (rise + 720) % 1440;
+  const transit = (rise + 360) % 1440;
+  const x = transit / 1440 * 1000;
+  const days = Array.from({length: 30}, (_, offset) => {
+    const next = new Date(`${date}T12:00:00`);
+    next.setDate(next.getDate() + offset);
+    const nextDate = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`;
+    return `<div class="moon-day">${moonIconHtml(moonPhase(nextDate))}<small>${next.getDate()}.${next.getMonth() + 1}</small></div>`;
+  }).join('');
+  return `<div class="day-brief-values">${dayMetric(t(`dayBrief.${phaseKeys[moonPhaseIndex(phase)]}`), `${Math.round((1 - Math.cos(2 * Math.PI * phase)) / 2 * 100)}%`, '#c2d2ff')}${dayMetric(t('dayBrief.moon'), `~${clockFromMinutes(rise)} - ~${clockFromMinutes(set)}`, '#c2d2ff')}</div>
+    <svg class="moon-path" viewBox="0 0 1000 100" preserveAspectRatio="none"><rect x="0" y="90" width="1000" height="10" fill="#18232d"/><line x1="0" y1="90" x2="1000" y2="90" stroke="#8d98aa" stroke-opacity=".52" stroke-width="2"/>${moonPathData(rise)}<circle cx="${x.toFixed(2)}" cy="22" r="18" fill="#c2d2ff" fill-opacity=".13"/><circle cx="${x.toFixed(2)}" cy="22" r="9" fill="#c2d2ff"/></svg>
+    <small class="muted">${escapeHtml(t('dayBrief.moonApproximate'))}</small><h3>${escapeHtml(t('dayBrief.nextMoonPhases'))}</h3><div class="moon-calendar">${days}</div>`;
+}
+
+function renderSelectedDay(date, {scrollIntoView = false} = {}) {
+  if (!weather?.available || IS_EMBEDDED) return;
+  const availableDates = (weather.daily || []).map(day => day.date);
+  const selectedDate = availableDates.includes(date) ? date : availableDates.find(item => item >= String(weather.current?.timestamp || '').slice(0, 10)) || availableDates[0];
+  if (!selectedDate) return;
+  selectedForecastDate = selectedDate;
+  const day = weather.daily.find(item => item.date === selectedDate) || {};
+  const points = pointsForDate(weather.hourly, selectedDate);
+  const condition = weatherPresentation(day.weatherCode ?? points[0]?.weatherCode);
+  const minimum = numericValue(day.temperatureMinimum) ?? aggregate(points.map(point => point.temperature), 'minimum');
+  const maximum = numericValue(day.temperatureMaximum) ?? aggregate(points.map(point => point.temperature), 'maximum');
+  const apparentMinimum = numericValue(day.apparentTemperatureMinimum) ?? aggregate(points.map(point => point.apparentTemperature), 'minimum');
+  const apparentMaximum = numericValue(day.apparentTemperatureMaximum) ?? aggregate(points.map(point => point.apparentTemperature), 'maximum');
+  const precipitation = numericValue(day.precipitation) ?? aggregate(points.map(point => point.precipitation), 'sum');
+  const rainChance = numericValue(day.precipitationProbability) ?? aggregate(points.map(point => point.precipitationProbability), 'maximum');
+  const wetHours = points.filter(point => (numericValue(point.precipitation) || 0) > 0).length;
+  const cloud = aggregate(points.map(point => point.cloudCover));
+  const peakWind = numericValue(day.windSpeedMaximum) ?? aggregate(points.map(point => point.windSpeed), 'maximum');
+  const peakGust = numericValue(day.windGustsMaximum) ?? aggregate(points.map(point => point.windGusts), 'maximum');
+  const humidity = aggregate(points.map(point => point.relativeHumidity));
+  const pressure = aggregate(points.map(point => point.surfacePressure));
+  const visibility = aggregate(points.map(point => point.visibility), 'minimum');
+  const aqi = day.airQuality || null;
+  const pollen = day.pollen || null;
+  const comparison = daylightComparison(selectedDate, weather.location?.latitude ?? settings.location.latitude, day.daylightDuration);
+  const container = document.getElementById('forecastDayBrief');
+  container.innerHTML = `<div class="day-brief-heading"><div><p class="eyebrow">${escapeHtml(t('dayBrief.eyebrow'))}</p><h2 id="forecastDayBriefTitle">${escapeHtml(formatForecastDate(selectedDate, {weekday: 'long', day: 'numeric', month: 'long'}))}</h2></div><div class="day-brief-condition">${condition[0]} ${escapeHtml(condition[1])}</div></div>
+    <div class="day-brief-grid">
+      ${daySection(t('dayBrief.temperature'), `<div class="day-brief-values">${dayMetric(t('dayBrief.minimum'), temperature(minimum), temperatureColor(minimum))}${dayMetric(t('dayBrief.maximum'), temperature(maximum), temperatureColor(maximum))}${dayMetric(t('dayBrief.feelsMinimum'), temperature(apparentMinimum), temperatureColor(apparentMinimum))}${dayMetric(t('dayBrief.feelsMaximum'), temperature(apparentMaximum), temperatureColor(apparentMaximum))}</div>`)}
+      ${daySection(t('dayBrief.precipitation'), `<div class="day-brief-values">${dayMetric(t('dayBrief.rainTotal'), measurement(precipitation, ' mm', 1), '#4aa3ff')}${dayMetric(t('dayBrief.rainChance'), measurement(rainChance, '%'), '#4aa3ff')}${dayMetric(t('dayBrief.wetHours'), `${wetHours} h`, '#4aa3ff')}${dayMetric(t('dayBrief.cloudCover'), measurement(cloud, '%'), '#94a4b8')}</div>`)}
+      ${daySection(t('dayBrief.wind'), `<div class="day-brief-values">${dayMetric(t('dayBrief.windPeak'), measurement(peakWind, ' km/h'), dayWindColor(peakWind))}${dayMetric(t('dayBrief.windGust'), measurement(peakGust, ' km/h'), dayWindColor(peakGust))}${dayMetric(t('dayBrief.humidity'), measurement(humidity, '%'), '#4aa3ff')}${dayMetric(t('dayBrief.pressure'), measurement(pressure, ' hPa'), '#b1c6da')}${dayMetric(t('dayBrief.visibility'), visibility === null ? '-' : measurement(visibility / 1000, ' km', 1), '#64d5c2')}${dayMetric(t('dayBrief.direction'), numericValue(day.windDirection) === null ? '-' : windDirection(day.windDirection), '#9bc7d7')}</div>`, 'full')}
+      ${daySection(t('dayBrief.airQuality'), aqi ? `${dayMetric(t('dayBrief.europeanAqi'), numericValue(aqi.europeanAqi) === null ? '-' : `${Math.round(aqi.europeanAqi)} - ${airQualityLabel(numericValue(aqi.europeanAqi))}`, airQualityColor(aqi.europeanAqi))}${chartRows(POLLUTANTS.map(([key, label, scale]) => [label, aqi[key], scale]), 1, (value, scale) => airQualityColor(value === null ? null : value / scale * 100), value => value === null ? '-' : `${value.toFixed(1)} µg/m3`)}` : `<div class="day-brief-empty">${escapeHtml(t('dayBrief.noData'))}</div>`)}
+      ${daySection(t('dayBrief.pollen'), pollen ? chartRows(POLLEN_TYPES.map(type => [t(`dayBrief.${type}`), pollen[type]]), Math.max(1, pollenPeak(pollen)), value => value === null ? '#8d98aa' : value < 1 ? '#55cf8a' : value < 10 ? '#ffc83d' : value < 50 ? '#ff8a3d' : '#ff4055', value => value === null ? '-' : `${value.toFixed(1)} ${t('dayBrief.pollenUnit')}`) : `<div class="day-brief-empty">${escapeHtml(t('dayBrief.noData'))}</div>`)}
+      ${daySection(t('dayBrief.sun'), `${sunComparisonHtml(day, comparison)}<div class="day-brief-values">${dayMetric(t('dayBrief.selectedDay'), durationText(comparison.current), '#ffc83d')}${dayMetric(t('dayBrief.sunshine'), durationText(day.sunshineDuration), '#ffa928')}${dayMetric(t('dayBrief.uvMaximum'), numericValue(day.uvIndexMaximum)?.toFixed(1) || '-', uvColor(day.uvIndexMaximum))}${dayMetric(`${t('dayBrief.sunrise')} - ${t('dayBrief.sunset')}`, `${clockFromMinutes(clockMinutes(day.sunrise) ?? 0)} - ${clockFromMinutes(clockMinutes(day.sunset) ?? 0)}`, '#ffc83d')}</div>`)}
+      ${daySection(t('dayBrief.moon'), moonHtml(selectedDate, day.sunrise))}
+    </div>`;
+  if (scrollIntoView) container.scrollIntoView({behavior: 'smooth', block: 'start'});
+}
+
 function updateTemperatureAxis(range) {
   const canvasTop = document.querySelector('.forecast-track-temperature').offsetTop;
   const chartHeight = document.getElementById('forecastChart').getBoundingClientRect().height || 140;
@@ -876,6 +1051,7 @@ function drawForecast() {
   const zoom = ZOOM_LEVELS[zoomIndex];
   const groupHours = hoursPerGroup(zoom);
   const displayedHourly = groupHourlyForecast(hourly, groupHours);
+  displayedTimelineHourly = displayedHourly;
   const visualScale = zoomVisualScale(zoom);
   const skyHourly = settings.showPrecipitation ? displayedHourly : displayedHourly.map(point => ({...point, precipitation: 0, precipitationProbability: 0, snowfall: 0}));
   const range = temperatureRange(displayedHourly, settings.showApparentTemperature);
@@ -915,6 +1091,7 @@ function drawForecast() {
   drawWeatherChart(document.getElementById('forecastChart'), displayedHourly, weather.daily, {timeline: true, showApparentTemperature: settings.showApparentTemperature, visualScale, temperatureRange: range});
   if (settings.showWind) drawWindFlow(document.getElementById('forecastWindCanvas'), displayedHourly, {visualScale});
   renderWind(displayedHourly);
+  renderTimelineMetrics(displayedHourly);
   renderMushrooms(displayedHourly);
 }
 
@@ -936,7 +1113,6 @@ function scheduleSettingsPreview({fullForecast = false, forecast = true, legend 
 function renderForecast() {
   const current = weather?.current;
   if (!weather?.available || !current) return;
-  const condition = weatherPresentation(current.weatherCode);
   document.getElementById('forecastRangeLabel').textContent = t('forecast.summaryLabel');
   document.getElementById('forecastSummary').textContent = forecastSummaryEvents(weather)
     .map(code => t(`forecast.summary.${code}`))
@@ -944,24 +1120,9 @@ function renderForecast() {
   document.getElementById('locationTitle').textContent = weather.location?.name || settings.location.name;
   document.getElementById('updatedAt').textContent = t('status.updated', {time: formatTime(current.timestamp)});
   renderWeatherAlert();
-  document.getElementById('currentWeather').innerHTML = [
-    [t('metric.weather'), `${condition[0]} ${temperature(current.temperature)}`, condition[1]],
-    [t('metric.feels'), temperature(current.apparentTemperature), t('metric.apparent')],
-    [t('metric.humidity'), measurement(current.relativeHumidity, '%'), t('metric.relativeHumidity')],
-    [t('metric.clouds'), measurement(current.cloudCover, '%'), t('metric.skyCoverage')],
-    [t('metric.wind'), measurement(current.windSpeed, ' km/h'), t('metric.gusts', {direction: windDirection(current.windDirection), value: measurement(current.windGusts, ' km/h')})],
-    [t('metric.pressure'), measurement(current.surfacePressure, ' hPa'), t('metric.surfacePressure')]
-  ].map(([label, value, detail]) => `<article class="metric-card"><div class="metric-label">${escapeHtml(label)}</div><div class="metric-value">${value}</div><div class="metric-detail">${escapeHtml(detail)}</div></article>`).join('');
-
   const currentDate = String(current.timestamp || '').slice(0, 10);
-  document.getElementById('dailyForecast').innerHTML = weather.daily.filter(day => day.date >= currentDate).slice(0, 10).map(day => {
-    const dayCondition = weatherPresentation(day.weatherCode);
-    return `<article class="forecast-day">
-      <div class="forecast-day-heading"><strong>${escapeHtml(formatForecastDate(day.date, {weekday: 'short', day: 'numeric', month: 'short'}))}</strong><span class="forecast-day-symbol">${dayCondition[0]}</span></div>
-      <div class="forecast-day-temperature">${temperature(day.temperatureMinimum)} / ${temperature(day.temperatureMaximum)}</div>
-      <div class="forecast-day-detail">${escapeHtml(dayCondition[1])}<br>${t('metric.precipitation')}: ${measurement(day.precipitation, ' mm', 1)} (${measurement(day.precipitationProbability, '%')})<br>${t('metric.wind')}: ${measurement(day.windSpeedMaximum, ' km/h')}</div>
-    </article>`;
-  }).join('');
+  if (!selectedForecastDate || !weather.daily.some(day => day.date === selectedForecastDate)) selectedForecastDate = currentDate;
+  renderSelectedDay(selectedForecastDate);
   drawForecast();
 }
 
@@ -979,7 +1140,7 @@ function renderWeatherAlert() {
 }
 
 function renderError(message) {
-  document.getElementById('currentWeather').innerHTML = `<article class="metric-card error-card"><div class="metric-label">${t('error.forecast')}</div><div class="metric-value">${t('error.unavailable')}</div><div class="metric-detail">${escapeHtml(message)}</div></article>`;
+  document.getElementById('forecastDayBrief').innerHTML = `<article class="day-brief-section error-card"><div class="metric-label">${t('error.forecast')}</div><div class="metric-value">${t('error.unavailable')}</div><div class="metric-detail">${escapeHtml(message)}</div></article>`;
   document.getElementById('updatedAt').textContent = t('error.update');
 }
 
@@ -1146,8 +1307,7 @@ function renderLocationLoading(status = t('status.loading')) {
   document.getElementById('locationTitle').textContent = '';
   document.getElementById('updatedAt').textContent = status;
   document.querySelector('.forecast-panel').setAttribute('aria-busy', 'true');
-  document.getElementById('currentWeather').innerHTML = Array.from({length: 6}, () => `<article class="metric-card skeleton-card" aria-hidden="true"><span class="skeleton-line short"></span><span class="skeleton-line large"></span><span class="skeleton-line medium"></span></article>`).join('');
-  document.getElementById('dailyForecast').innerHTML = Array.from({length: 10}, () => `<article class="forecast-day skeleton-card" aria-hidden="true"><span class="skeleton-line medium"></span><span class="skeleton-line large"></span><span class="skeleton-line"></span><span class="skeleton-line medium"></span></article>`).join('');
+  document.getElementById('forecastDayBrief').innerHTML = '<div class="day-brief-loading" aria-hidden="true"></div>';
 }
 
 function clearLocationLoading() {
@@ -1248,6 +1408,11 @@ function fillSettingsForm() {
   document.getElementById('showPrecipitation').checked = settings.showPrecipitation;
   document.getElementById('showWind').checked = settings.showWind;
   document.getElementById('showWindArrows').checked = settings.showWindArrows;
+  document.getElementById('showUv').checked = settings.showUv;
+  document.getElementById('showHumidity').checked = settings.showHumidity;
+  document.getElementById('showPressure').checked = settings.showPressure;
+  document.getElementById('showAirQuality').checked = settings.showAirQuality;
+  document.getElementById('showPollen').checked = settings.showPollen;
   document.getElementById('showMushrooms').checked = settings.showMushrooms;
   document.getElementById('showHistoricalData').checked = settings.showHistoricalData;
   document.getElementById('showDates').checked = settings.showDates;
@@ -1331,6 +1496,11 @@ function settingsFromForm() {
     showPrecipitation: document.getElementById('showPrecipitation').checked,
     showWind: document.getElementById('showWind').checked,
     showWindArrows: document.getElementById('showWindArrows').checked,
+    showUv: document.getElementById('showUv').checked,
+    showHumidity: document.getElementById('showHumidity').checked,
+    showPressure: document.getElementById('showPressure').checked,
+    showAirQuality: document.getElementById('showAirQuality').checked,
+    showPollen: document.getElementById('showPollen').checked,
     showMushrooms: document.getElementById('showMushrooms').checked,
     showHistoricalData: document.getElementById('showHistoricalData').checked,
     showDates: document.getElementById('showDates').checked,
@@ -1351,6 +1521,11 @@ function saveFormChanges({reloadWeather = false} = {}) {
   const previousPrecipitation = settings.showPrecipitation;
   const previousWind = settings.showWind;
   const previousWindArrows = settings.showWindArrows;
+  const previousUv = settings.showUv;
+  const previousHumidity = settings.showHumidity;
+  const previousPressure = settings.showPressure;
+  const previousAirQuality = settings.showAirQuality;
+  const previousPollen = settings.showPollen;
   const previousMushrooms = settings.showMushrooms;
   const previousHistoricalData = settings.showHistoricalData;
   const previousDates = settings.showDates;
@@ -1366,6 +1541,11 @@ function saveFormChanges({reloadWeather = false} = {}) {
     || previousPrecipitation !== settings.showPrecipitation
     || previousWind !== settings.showWind
     || previousWindArrows !== settings.showWindArrows
+    || previousUv !== settings.showUv
+    || previousHumidity !== settings.showHumidity
+    || previousPressure !== settings.showPressure
+    || previousAirQuality !== settings.showAirQuality
+    || previousPollen !== settings.showPollen
     || previousMushrooms !== settings.showMushrooms
     || historicalDataChanged
     || previousDates !== settings.showDates;
@@ -1686,7 +1866,6 @@ document.getElementById('forecastTimelineScroll').addEventListener('wheel', even
 
 const forecastTimelineScroll = document.getElementById('forecastTimelineScroll');
 const timelineHistoryResistance = () => Math.min(150, Math.max(80, forecastTimelineScroll.clientWidth * .16)) * .0625;
-const timelineMagneticDistance = () => forecastBaseHourWidth() * ZOOM_LEVELS[zoomIndex] * 6;
 let timelineWheelResistance = 0;
 let timelineWheelResetTimer = 0;
 let timelineWheelStartPosition = null;
@@ -1704,9 +1883,20 @@ function scheduleTimelineLegendPosition() {
   });
 }
 
-function snapTimelineToNowIfClose() {
-  if (!settings.showHistoricalData || !withinTimelineMagnet(forecastTimelineScroll.scrollLeft, timelineNowScrollLeft, timelineMagneticDistance())) return;
-  forecastTimelineScroll.scrollTo({left: timelineNowScrollLeft, behavior: 'smooth'});
+function selectedDateFromTimeline() {
+  if (!displayedTimelineHourly.length) return null;
+  const timeline = document.getElementById('forecastTimeline');
+  const dataWidth = Math.max(1, timeline.clientWidth - 86);
+  const slotWidth = dataWidth / displayedTimelineHourly.length;
+  return dateAtTimelinePosition(displayedTimelineHourly, forecastTimelineScroll.scrollLeft / slotWidth + 1);
+}
+
+function scheduleSelectedDayFromTimeline() {
+  window.clearTimeout(selectedDayTimer);
+  selectedDayTimer = window.setTimeout(() => {
+    const date = selectedDateFromTimeline();
+    if (date && date !== selectedForecastDate) renderSelectedDay(date);
+  }, 160);
 }
 
 function scheduleTimelineNowSnap() {
@@ -1714,7 +1904,7 @@ function scheduleTimelineNowSnap() {
   timelineWheelResetTimer = window.setTimeout(() => {
     timelineWheelResistance = 0;
     timelineWheelStartPosition = null;
-    snapTimelineToNowIfClose();
+    scheduleSelectedDayFromTimeline();
   }, 180);
 }
 
@@ -1767,12 +1957,13 @@ function settleTimelineTouch() {
     timelineTouchBoundaryLocked = false;
     forecastTimelineScroll.classList.remove('now-boundary-locked');
     if (wasLocked) forecastTimelineScroll.scrollLeft = timelineNowScrollLeft;
-    snapTimelineToNowIfClose();
+    scheduleSelectedDayFromTimeline();
   }, 140);
 }
 
 forecastTimelineScroll.addEventListener('scroll', () => {
   scheduleTimelineLegendPosition();
+  scheduleSelectedDayFromTimeline();
   if (!settings.showHistoricalData || timelineTouchStartPosition === null) return;
   const bounded = stopTimelineAtNow(timelineTouchStartPosition, forecastTimelineScroll.scrollLeft, timelineNowScrollLeft);
   if (bounded !== forecastTimelineScroll.scrollLeft) {
@@ -1791,6 +1982,18 @@ forecastTimelineScroll.addEventListener('touchend', () => {
 forecastTimelineScroll.addEventListener('touchcancel', () => {
   timelineTouchActive = false;
   settleTimelineTouch();
+});
+
+document.getElementById('forecastWeatherCanvas').addEventListener('click', event => {
+  if (IS_EMBEDDED || event.offsetY > 49 || !displayedTimelineHourly.length) return;
+  const canvas = event.currentTarget;
+  const dataWidth = Math.max(1, canvas.getBoundingClientRect().width - 34);
+  const index = Math.max(0, Math.min(displayedTimelineHourly.length - 1, Math.floor(event.offsetX / dataWidth * displayedTimelineHourly.length)));
+  const date = String(displayedTimelineHourly[index]?.timestamp || '').slice(0, 10);
+  const firstIndex = displayedTimelineHourly.findIndex(point => String(point.timestamp || '').startsWith(date));
+  const slotWidth = dataWidth / displayedTimelineHourly.length;
+  forecastTimelineScroll.scrollTo({left: Math.max(0, firstIndex * slotWidth), behavior: 'smooth'});
+  renderSelectedDay(date, {scrollIntoView: true});
 });
 
 let pinchStartDistance = 0;

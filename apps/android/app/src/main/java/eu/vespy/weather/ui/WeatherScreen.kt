@@ -43,13 +43,14 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -75,8 +76,10 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -126,9 +129,12 @@ import eu.vespy.weather.data.WeatherForecast
 import eu.vespy.weather.data.currentIndex
 import eu.vespy.weather.data.groupByHours
 import eu.vespy.weather.data.timelineWindow
+import eu.vespy.weather.data.visibleAlerts
+import eu.vespy.weather.data.isAlertDismissed
 import eu.vespy.weather.widget.WeatherWidgetProvider
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
@@ -187,6 +193,7 @@ fun VespyWeatherApp(viewModel: WeatherViewModel) {
     }
     val context = LocalContext.current
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    var openLocationsInSettings by rememberSaveable { mutableStateOf(false) }
     var recreateAfterSettingsClose by rememberSaveable { mutableStateOf(false) }
     val updateDisplaySettings: (ForecastDisplaySettings) -> Unit = { settings ->
         val languageChanged = settings.language != viewModel.state.displaySettings.language
@@ -198,6 +205,7 @@ fun VespyWeatherApp(viewModel: WeatherViewModel) {
     }
     val dismissSettings: () -> Unit = {
         showSettings = false
+        openLocationsInSettings = false
         if (recreateAfterSettingsClose) {
             recreateAfterSettingsClose = false
             (context as? Activity)?.recreate()
@@ -218,6 +226,9 @@ fun VespyWeatherApp(viewModel: WeatherViewModel) {
                             onLocation = viewModel::selectLocation,
                             onRetry = viewModel::refresh,
                             onSettings = { showSettings = true },
+                            onManageLocations = { openLocationsInSettings = true; showSettings = true },
+                            onDismissAlert = viewModel::dismissAlert,
+                            onRestoreAlerts = viewModel::restoreCurrentAlerts,
                             onDisplaySettings = updateDisplaySettings,
                             darkTheme = darkTheme,
                             modifier = Modifier.weight(1f),
@@ -239,6 +250,9 @@ fun VespyWeatherApp(viewModel: WeatherViewModel) {
                             onLocation = viewModel::selectLocation,
                             onRetry = viewModel::refresh,
                             onSettings = { showSettings = true },
+                            onManageLocations = { openLocationsInSettings = true; showSettings = true },
+                            onDismissAlert = viewModel::dismissAlert,
+                            onRestoreAlerts = viewModel::restoreCurrentAlerts,
                             onDisplaySettings = updateDisplaySettings,
                             darkTheme = darkTheme,
                             modifier = Modifier.weight(1f),
@@ -255,6 +269,7 @@ fun VespyWeatherApp(viewModel: WeatherViewModel) {
                 }
                 if (showSettings) SettingsDialog(
                     state = state,
+                    initiallyOpenLocations = openLocationsInSettings,
                     onDismiss = dismissSettings,
                     onSelectLocation = viewModel::selectLocation,
                     onAddLocation = viewModel::addLocation,
@@ -281,6 +296,9 @@ private fun ForecastPane(
     onLocation: (eu.vespy.weather.data.WeatherLocation) -> Unit,
     onRetry: () -> Unit,
     onSettings: () -> Unit,
+    onManageLocations: () -> Unit,
+    onDismissAlert: (String) -> Unit,
+    onRestoreAlerts: () -> Unit,
     onDisplaySettings: (ForecastDisplaySettings) -> Unit,
     darkTheme: Boolean,
     modifier: Modifier = Modifier,
@@ -296,10 +314,17 @@ private fun ForecastPane(
                 active = state.location,
                 compact = landscape,
                 onLocation = onLocation,
-                onManage = onSettings,
+                onManage = onManageLocations,
                 modifier = Modifier.weight(1f),
             )
             Spacer(Modifier.width(8.dp))
+            val hiddenCurrentAlerts = state.forecast?.let { forecast ->
+                forecast.alerts.any { state.location.isAlertDismissed(it.id, state.dismissedAlertKeys) }
+            } == true
+            if (hiddenCurrentAlerts) {
+                HiddenAlertsButton(onRestoreAlerts)
+                Spacer(Modifier.width(8.dp))
+            }
             SettingsButton(onSettings)
         }
 
@@ -311,7 +336,9 @@ private fun ForecastPane(
                     modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(7.dp),
                 ) {
-                    state.forecast.alerts.firstOrNull()?.let { WeatherAlertBanner(it, landscape) }
+                    state.forecast.visibleAlerts(state.location, state.dismissedAlertKeys).firstOrNull()?.let {
+                        WeatherAlertBanner(it, landscape, onDismissAlert)
+                    }
                     ForecastCard(state.forecast, landscape, state.temperatureUnit, state.displaySettings, onDisplaySettings, darkTheme, state.demo)
                 }
             }
@@ -320,16 +347,16 @@ private fun ForecastPane(
 }
 
 @Composable
-private fun WeatherAlertBanner(alert: WeatherAlert, compact: Boolean) {
+private fun WeatherAlertBanner(alert: WeatherAlert, compact: Boolean, onDismiss: (String) -> Unit) {
     val uriHandler = LocalUriHandler.current
+    val dismissDescription = stringResource(R.string.dismiss_weather_alert)
     val accent = when (alert.severity) {
         "extreme" -> Color(0xFFE5484D)
         "severe" -> Color(0xFFF47B32)
         else -> Color(0xFFE6B62F)
     }
     Surface(
-        modifier = Modifier.fillMaxWidth().padding(top = 7.dp, bottom = 7.dp)
-            .clickable(enabled = alert.sourceUrl.startsWith("https://")) { uriHandler.openUri(alert.sourceUrl) },
+        modifier = Modifier.fillMaxWidth().padding(top = 7.dp, bottom = 7.dp),
         shape = RoundedCornerShape(10.dp),
         border = androidx.compose.foundation.BorderStroke(2.dp, accent),
         color = MaterialTheme.colorScheme.surface,
@@ -345,9 +372,38 @@ private fun WeatherAlertBanner(alert: WeatherAlert, compact: Boolean) {
                 Text(stringResource(R.string.weather_alert_label), color = accent, fontFamily = FontFamily.Monospace, fontSize = 8.sp, fontWeight = FontWeight.Black)
                 Text(alert.headline, fontSize = if (compact) 11.sp else 14.sp, lineHeight = if (compact) 12.sp else 16.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 if (!compact) Text(alert.description ?: alert.instruction.orEmpty(), color = Muted, fontSize = 11.sp, lineHeight = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(stringResource(R.string.weather_alert_source, alert.source), color = MaterialTheme.colorScheme.primary, fontSize = 9.sp)
+                Text(
+                    stringResource(R.string.weather_alert_source, alert.source),
+                    modifier = Modifier.clickable(enabled = alert.sourceUrl.startsWith("https://")) { uriHandler.openUri(alert.sourceUrl) },
+                    color = MaterialTheme.colorScheme.primary,
+                    fontSize = 9.sp,
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .size(if (compact) 28.dp else 32.dp)
+                    .clickable { onDismiss(alert.id) }
+                    .semantics { contentDescription = dismissDescription },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("×", color = Muted, fontSize = if (compact) 18.sp else 22.sp, fontWeight = FontWeight.Bold)
             }
         }
+    }
+}
+
+@Composable
+private fun HiddenAlertsButton(onClick: () -> Unit) {
+    val description = stringResource(R.string.show_hidden_weather_alerts)
+    Box(
+        modifier = Modifier
+            .size(34.dp)
+            .clickable(onClick = onClick)
+            .semantics { contentDescription = description }
+            .border(1.dp, Color(0xFFE6B62F).copy(alpha = .7f), RoundedCornerShape(9.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text("!", color = Color(0xFFE6B62F), fontSize = 18.sp, fontWeight = FontWeight.Black)
     }
 }
 
@@ -395,7 +451,7 @@ private fun LocationTitleDropdown(
                 )
             }
             DropdownMenuItem(
-                text = { Text("+ ${stringResource(R.string.saved_locations)}", fontSize = 15.sp) },
+                text = { Text("✎ ${stringResource(R.string.edit_locations)}", fontSize = 15.sp) },
                 onClick = {
                     expanded = false
                     onManage()
@@ -495,6 +551,18 @@ private fun ZoomButton(label: String, enabled: Boolean, size: Dp, fontSize: Int,
     ) { Text(label, color = if (enabled) MaterialTheme.colorScheme.onSurface else Muted.copy(alpha = .35f), fontSize = fontSize.sp, fontWeight = FontWeight.Bold) }
 }
 
+private enum class TimelineHelpKind {
+    SKY,
+    TEMPERATURE,
+    WIND,
+    UV,
+    HUMIDITY,
+    PRESSURE,
+    AIR_QUALITY,
+    POLLEN,
+    MUSHROOMS,
+}
+
 @Composable
 private fun ForecastTimeline(
     forecast: WeatherForecast,
@@ -517,23 +585,27 @@ private fun ForecastTimeline(
     }
     val slotWidth = 22.dp * settings.zoom * groupHours
     val trackWidth = slotWidth * max(1, points.size)
-    val metricRows = remember(points, settings.showUvIndex, settings.showHumidity, settings.showPressure, settings.showAirQuality, settings.showPollen) {
+    val metricRows = remember(
+        points,
+        settings.showUvIndex, settings.showHumidity, settings.showPressure, settings.showAirQuality, settings.showPollen,
+        settings.showUvValues, settings.showHumidityValues, settings.showPressureValues, settings.showAirQualityValues, settings.showPollenValues,
+    ) {
         buildList {
-            if (settings.showUvIndex) {
+            if (settings.showUvIndex || settings.showUvValues) {
                 val values = points.map(HourlyWeather::uvIndex)
-                add(TimelineMetric("UV", "uv", android.graphics.Color.rgb(255, 200, 61), values, 0.0, max(11.0, values.filterNotNull().maxOrNull() ?: 0.0)))
+                add(TimelineMetric("UV", "uv", android.graphics.Color.rgb(255, 200, 61), values, 0.0, max(11.0, values.filterNotNull().maxOrNull() ?: 0.0), showValues = settings.showUvValues, showChart = settings.showUvIndex))
             }
-            if (settings.showHumidity) add(TimelineMetric("%", "humidity", android.graphics.Color.rgb(74, 163, 255), points.map(HourlyWeather::relativeHumidity), 0.0, 100.0))
-            if (settings.showPressure) {
+            if (settings.showHumidity || settings.showHumidityValues) add(TimelineMetric("%", "humidity", android.graphics.Color.rgb(74, 163, 255), points.map(HourlyWeather::relativeHumidity), 0.0, 100.0, showValues = settings.showHumidityValues, showChart = settings.showHumidity))
+            if (settings.showPressure || settings.showPressureValues) {
                 val values = points.map(HourlyWeather::surfacePressure)
                 val available = values.filterNotNull()
-                add(TimelineMetric("hPa", "pressure", android.graphics.Color.rgb(177, 145, 255), values, available.minOrNull(), available.maxOrNull()))
+                add(TimelineMetric("hPa", "pressure", android.graphics.Color.rgb(177, 145, 255), values, available.minOrNull(), available.maxOrNull(), available.takeIf { it.isNotEmpty() }?.average(), settings.showPressureValues, settings.showPressure))
             }
-            if (settings.showAirQuality) {
+            if (settings.showAirQuality || settings.showAirQualityValues) {
                 val values = points.map { it.airQuality?.europeanAqi }
-                add(TimelineMetric("AQI", "airQuality", android.graphics.Color.rgb(150, 158, 170), values, 0.0, max(100.0, values.filterNotNull().maxOrNull() ?: 0.0)))
+                add(TimelineMetric("AQI", "airQuality", android.graphics.Color.rgb(150, 158, 170), values, 0.0, max(100.0, values.filterNotNull().maxOrNull() ?: 0.0), showValues = settings.showAirQualityValues, showChart = settings.showAirQuality))
             }
-            if (settings.showPollen) {
+            if (settings.showPollen || settings.showPollenValues) {
                 val values = points.map { point ->
                     point.pollen?.let { pollen ->
                         listOf(pollen.alder, pollen.birch, pollen.grass, pollen.mugwort, pollen.olive, pollen.ragweed)
@@ -542,52 +614,59 @@ private fun ForecastTimeline(
                             ?.sum()
                     }
                 }
-                add(TimelineMetric("", "pollen", android.graphics.Color.rgb(255, 200, 61), values, 0.0, values.filterNotNull().maxOrNull()?.coerceAtLeast(1.0)))
+                add(TimelineMetric("", "pollen", android.graphics.Color.rgb(255, 200, 61), values, 0.0, values.filterNotNull().maxOrNull()?.coerceAtLeast(1.0), showValues = settings.showPollenValues, showChart = settings.showPollen))
             }
         }
     }
     val metricRowHeight = if (landscape) 30.dp else 40.dp
-    val environmentHeight = metricRowHeight * metricRows.size
-    val mushroomHeight = if (settings.showMushrooms) (if (landscape) 34.dp else 44.dp) else 0.dp
-    val timelineHeight = (if (landscape) 290.dp else 368.dp) + environmentHeight + mushroomHeight
+    val valueRowHeight = if (landscape) 24.dp else 30.dp
+    val environmentHeight = metricRows.fold(0.dp) { height, metric -> height + (if (metric.showChart) metricRowHeight else 0.dp) + if (metric.showValues) valueRowHeight else 0.dp }
+    val mushroomChartHeight = if (settings.showMushrooms) (if (landscape) 34.dp else 44.dp) else 0.dp
+    val mushroomValueHeight = if (settings.showMushroomValues) valueRowHeight else 0.dp
+    val mushroomHeight = mushroomChartHeight + mushroomValueHeight
+    val skyValuesHeight = if (settings.showSkyValues) valueRowHeight * 3 else 0.dp
+    val timelineHeight = (if (landscape) 290.dp else 368.dp) + skyValuesHeight + environmentHeight + mushroomHeight
     val labelHeight = 72.dp
     val skyHeight = if (landscape) 62.dp else 93.dp
-    val windHeight = if (!settings.showWind) 0.dp else if (settings.showWindArrows) {
+    val windChartHeight = if (!settings.showWind) 0.dp else if (settings.showWindArrows) {
         if (landscape) 48.dp else 60.dp
     } else if (landscape) 34.dp else 45.dp
+    val windValueHeight = if (settings.showWindValues) valueRowHeight else 0.dp
+    val windHeight = windChartHeight + windValueHeight
     val todayLabel = stringResource(R.string.today)
     val historyLabel = stringResource(R.string.history)
     val pressureHighLabel = stringResource(R.string.pressure_high_symbol)
     val pressureLowLabel = stringResource(R.string.pressure_low_symbol)
-    val noDataLabel = stringResource(R.string.timeline_no_data)
     val legendWidth = if (landscape) 38.dp else 44.dp
     val densityContext = LocalDensity.current
     val slotWidthPx = with(densityContext) { slotWidth.toPx() }
     val nowIndex = remember(points, forecast.current.timestamp) { points.currentIndex(forecast.current.timestamp).coerceAtLeast(0) }
     val nowPosition = if (settings.showHistoricalData) nowIndex * slotWidthPx else 0f
-    var position by remember(points, settings.zoom, settings.showHistoricalData) { mutableFloatStateOf(nowPosition) }
+    val positionState = remember(points, settings.zoom, settings.showHistoricalData) { mutableFloatStateOf(nowPosition) }
     var nowBarrierSide by remember(points, settings.zoom, settings.showHistoricalData) { mutableIntStateOf(0) }
     var nowBoundaryReached by remember(points, settings.zoom, settings.showHistoricalData) { mutableStateOf(false) }
     var focusedDate by remember(points, nowIndex) { mutableStateOf(points.getOrNull(nowIndex)?.timestamp?.take(10)) }
     var zoomAnchorTimestamp by remember { mutableStateOf<String?>(null) }
+    var legendHelp by remember { mutableStateOf<TimelineHelpKind?>(null) }
+    var selectedSegmentIndex by remember(points) { mutableStateOf<Int?>(null) }
+    var expandedSegmentIndex by remember(points) { mutableStateOf<Int?>(null) }
+    val detailsRequester = remember { BringIntoViewRequester() }
+    val coroutineScope = rememberCoroutineScope()
     Column {
     BoxWithConstraints(modifier = Modifier.fillMaxWidth().height(timelineHeight).clipToBounds()) {
         val viewportPx = with(densityContext) { maxWidth.toPx() }
         val contentPx = with(densityContext) { (legendWidth + trackWidth).toPx() }
         val maxPosition = (contentPx - viewportPx).coerceAtLeast(0f)
         val legendWidthPx = with(densityContext) { legendWidth.toPx() }
-        fun pointIndexAtViewportCenter(): Int = ((position + viewportPx / 2f - legendWidthPx) / slotWidthPx)
+        fun pointIndexAtViewportCenter(): Int = ((positionState.floatValue + viewportPx / 2f - legendWidthPx) / slotWidthPx)
             .toInt().coerceIn(0, points.lastIndex)
-        fun firstVisiblePointIndex(): Int = ((position - legendWidthPx) / slotWidthPx)
+        fun firstVisiblePointIndex(): Int = ((positionState.floatValue - legendWidthPx) / slotWidthPx)
             .toInt().coerceIn(0, points.lastIndex)
         fun detailsPointIndex(): Int = (firstVisiblePointIndex() + 1).coerceAtMost(points.lastIndex)
-        LaunchedEffect(position, viewportPx, slotWidthPx, legendWidthPx, points) {
-            focusedDate = points.getOrNull(detailsPointIndex())?.timestamp?.take(10)
-        }
         LaunchedEffect(settings.zoom, zoomAnchorTimestamp, viewportPx, points) {
             val anchor = zoomAnchorTimestamp ?: return@LaunchedEffect
             val anchorIndex = points.indexOfLast { it.timestamp <= anchor }.coerceAtLeast(0)
-            position = (legendWidthPx + (anchorIndex + .5f) * slotWidthPx - viewportPx / 2f).coerceIn(0f, maxPosition)
+            positionState.floatValue = (legendWidthPx + (anchorIndex + .5f) * slotWidthPx - viewportPx / 2f).coerceIn(0f, maxPosition)
             zoomAnchorTimestamp = null
         }
         val pinchModifier = Modifier.pointerInput(points, settings.zoom) {
@@ -622,17 +701,27 @@ private fun ForecastTimeline(
                 } while (event.changes.any { it.pressed })
             }
         }
-        val dayHeaderModifier = Modifier.pointerInput(points, position, slotWidthPx, legendWidthPx, viewportPx) {
+        val timelineTapModifier = Modifier.pointerInput(points, slotWidthPx, legendWidthPx, viewportPx) {
             detectTapGestures { tap ->
-                if (tap.y > labelHeight.toPx()) return@detectTapGestures
-                val pointIndex = ((position + tap.x - legendWidthPx) / slotWidthPx).toInt().coerceIn(0, points.lastIndex)
-                val date = points[pointIndex].timestamp.take(10)
-                val dayStart = points.indexOfFirst { it.timestamp.take(10) == date }
-                val nextDayStart = ((dayStart + 1) until points.size).firstOrNull { points[it].timestamp.take(10) != date }
-                    ?: points.size
-                if (pointIndex in dayStart until min(dayStart + 3, nextDayStart)) {
-                    focusedDate = date
-                    position = (legendWidthPx + dayStart * slotWidthPx).coerceIn(0f, maxPosition)
+                if (legendHelp != null) {
+                    legendHelp = null
+                    return@detectTapGestures
+                }
+                val pointIndex = ((positionState.floatValue + tap.x - legendWidthPx) / slotWidthPx).toInt().coerceIn(0, points.lastIndex)
+                if (tap.y <= labelHeight.toPx()) {
+                    val date = points[pointIndex].timestamp.take(10)
+                    val dayStart = points.indexOfFirst { it.timestamp.take(10) == date }
+                    val nextDayStart = ((dayStart + 1) until points.size).firstOrNull { points[it].timestamp.take(10) != date }
+                        ?: points.size
+                    if (pointIndex in dayStart until min(dayStart + 3, nextDayStart)) {
+                        focusedDate = date
+                        positionState.floatValue = (legendWidthPx + dayStart * slotWidthPx).coerceIn(0f, maxPosition)
+                        coroutineScope.launch {
+                            detailsRequester.bringIntoView()
+                        }
+                    }
+                } else if (tap.x >= legendWidthPx) {
+                    selectedSegmentIndex = if (selectedSegmentIndex == null) pointIndex else null
                 }
             }
         }
@@ -640,8 +729,8 @@ private fun ForecastTimeline(
             awaitEachGesture {
                 awaitFirstDown(requireUnconsumed = false)
                 nowBarrierSide = when {
-                    position < nowPosition -> -1
-                    position > nowPosition -> 1
+                    positionState.floatValue < nowPosition -> -1
+                    positionState.floatValue > nowPosition -> 1
                     else -> 0
                 }
                 nowBoundaryReached = false
@@ -651,53 +740,96 @@ private fun ForecastTimeline(
             }
         }
         val scrollableState = rememberScrollableState { delta ->
-            val oldPosition = position
+            val oldPosition = positionState.floatValue
             val proposedPosition = (oldPosition - delta).coerceIn(0f, maxPosition)
             val boundary = stopAtNowBoundary(oldPosition, proposedPosition, nowPosition, nowBarrierSide, nowBoundaryReached)
-            position = boundary.position
+            positionState.floatValue = boundary.position
             nowBoundaryReached = boundary.stopped
-            oldPosition - position
+            oldPosition - positionState.floatValue
         }
-        Box(
-            modifier = Modifier.fillMaxSize()
-                .then(nowBoundaryModifier)
-                .scrollable(scrollableState, Orientation.Horizontal, flingBehavior = ScrollableDefaults.flingBehavior())
-                .then(pinchModifier)
-                .then(dayHeaderModifier),
-        ) {
-            Canvas(
-                modifier = Modifier.fillMaxSize(),
-            ) {
-            val nativeCanvas = drawContext.canvas.nativeCanvas
-            val firstVisible = ((position - legendWidthPx) / slotWidthPx).toInt().coerceAtLeast(0)
-            val bufferedStart = (firstVisible - 2).coerceAtLeast(0)
-            val visibleCount = (size.width / slotWidthPx).toInt() + 5
-            val bufferedEnd = (bufferedStart + visibleCount).coerceAtMost(points.size)
-            val visiblePoints = points.subList(bufferedStart, bufferedEnd)
-            val visibleLeft = legendWidthPx + bufferedStart * slotWidthPx
-            nativeCanvas.save()
-            nativeCanvas.translate(-position, 0f)
+        LaunchedEffect(scrollableState, points, settings.zoom) {
+            snapshotFlow { scrollableState.isScrollInProgress }.collect { scrolling ->
+                if (!scrolling) {
+                    focusedDate = points.getOrNull(detailsPointIndex())?.timestamp?.take(10)
+                }
+            }
+        }
+        val tileWidthPx = (viewportPx * 2f).roundToInt().coerceAtLeast(1)
+        val tileHeightPx = with(densityContext) { timelineHeight.roundToPx() }.coerceAtLeast(1)
+        val trackWidthPx = with(densityContext) { trackWidth.toPx() }
+        val labelHeightPx = with(densityContext) { labelHeight.toPx() }
+        val skyHeightPx = with(densityContext) { skyHeight.toPx() }
+        val windHeightPx = with(densityContext) { windHeight.toPx() }
+        val environmentHeightPx = with(densityContext) { environmentHeight.toPx() }
+        val mushroomHeightPx = with(densityContext) { mushroomHeight.toPx() }
+        val mushroomValueHeightPx = with(densityContext) { mushroomValueHeight.toPx() }
+        val skyValuesHeightPx = with(densityContext) { skyValuesHeight.toPx() }
+        val windChartHeightPx = with(densityContext) { windChartHeight.toPx() }
+        val windValueHeightPx = with(densityContext) { windValueHeight.toPx() }
+        val metricRowHeightPx = with(densityContext) { metricRowHeight.toPx() }
+        val valueRowHeightPx = with(densityContext) { valueRowHeight.toPx() }
+        val legendTapModifier = Modifier.pointerInput(metricRows, timelineHeight, windHeight, mushroomHeight) {
+            detectTapGestures { tap ->
+                val temperatureBottom = size.height - windHeightPx - environmentHeightPx - mushroomHeightPx
+                val environmentTop = size.height - environmentHeightPx - mushroomHeightPx
+                val kind = when {
+                    tap.y < labelHeightPx + skyHeightPx + skyValuesHeightPx -> TimelineHelpKind.SKY
+                    tap.y < temperatureBottom -> TimelineHelpKind.TEMPERATURE
+                    windHeightPx > 0f && tap.y < environmentTop -> TimelineHelpKind.WIND
+                    tap.y < environmentTop + environmentHeightPx -> {
+                        var top = environmentTop
+                        metricRows.firstOrNull { metric ->
+                            val bottom = top + (if (metric.showChart) metricRowHeightPx else 0f) + if (metric.showValues) valueRowHeightPx else 0f
+                            val hit = tap.y in top..bottom
+                            top = bottom
+                            hit
+                        }?.style?.toTimelineHelpKind()
+                    }
+                    mushroomHeightPx > 0f -> TimelineHelpKind.MUSHROOMS
+                    else -> null
+                }
+                if (kind != null) legendHelp = if (legendHelp == kind) null else kind
+            }
+        }
+        val pixelScale = densityContext.density
+        val tileCache = remember(
+            points,
+            forecast.daily,
+            dark,
+            settings,
+            temperatureUnit,
+            metricRows,
+            tileWidthPx,
+            tileHeightPx,
+            todayLabel,
+            historyLabel,
+            pressureHighLabel,
+            pressureLowLabel,
+            demo,
+        ) { TimelineTileCache(4) }
+        fun drawTimelineContent(nativeCanvas: android.graphics.Canvas, height: Float) {
             ForecastGraphics.drawTimeline(
                 canvas = nativeCanvas,
-                bounds = android.graphics.RectF(visibleLeft, 0f, visibleLeft + visiblePoints.size * slotWidthPx, size.height),
-                points = visiblePoints,
+                bounds = android.graphics.RectF(legendWidthPx, 0f, legendWidthPx + trackWidthPx, height),
+                points = points,
                 days = forecast.daily,
                 dark = dark,
                 todayLabel = todayLabel,
-                labelHeight = labelHeight.toPx(),
-                skyHeight = skyHeight.toPx(),
-                windHeight = windHeight.toPx(),
-                environmentHeight = environmentHeight.toPx(),
-                mushroomHeight = mushroomHeight.toPx(),
+                labelHeight = labelHeightPx,
+                skyHeight = skyHeightPx,
+                skyValuesHeight = skyValuesHeightPx,
+                windHeight = windHeightPx,
+                environmentHeight = environmentHeightPx,
+                mushroomHeight = mushroomHeightPx,
                 temperatureUnit = temperatureUnit,
-                pixelScale = density,
+                pixelScale = pixelScale,
                 textScale = 1.6f,
                 precipitationScale = 1.8f,
                 showWeekdayNames = true,
                 fullWeekdayNames = true,
-                dayLabelTextSize = 16f * density,
-                hourTextSize = 13f * density,
-                temperatureTextSize = 24f * density * settings.temperatureTextScale,
+                dayLabelTextSize = 16f * pixelScale,
+                hourTextSize = 13f * pixelScale,
+                temperatureTextSize = 24f * pixelScale * settings.temperatureTextScale,
                 windScale = 1.22f,
                 showTemperatureValues = settings.showHourlyTemperatures,
                 showApparentTemperature = settings.showApparentTemperature,
@@ -714,53 +846,153 @@ private fun ForecastTimeline(
                 temperatureMaximum = temperatureRange?.second,
                 demoLabel = "DEMO".takeIf { demo },
                 demoEveryDay = demo,
-                pointOffset = bufferedStart,
+                pointOffset = 0,
+                drawAnnotations = false,
             )
-            if (settings.showWind && windHeight.toPx() > 0f) {
-                ForecastGraphics.drawWindLayer(
+            if (settings.showSkyValues) {
+                val top = labelHeightPx + skyHeightPx
+                ForecastGraphics.drawValueTable(
+                    nativeCanvas,
+                    android.graphics.RectF(legendWidthPx, top, legendWidthPx + trackWidthPx, top + skyValuesHeightPx),
+                    listOf(
+                        points.map { timelineValue(it.precipitationProbability, 0) },
+                        points.map { timelineValue(it.precipitation, 1) },
+                        points.map { timelineValue(it.cloudCover, 0) },
+                    ),
+                    dark,
+                    pixelScale,
+                )
+            }
+            if (windHeightPx > 0f) {
+                val windTop = height - windHeightPx - environmentHeightPx - mushroomHeightPx
+                if (settings.showWind) ForecastGraphics.drawWindLayer(
                     canvas = nativeCanvas,
                     bounds = android.graphics.RectF(
                         legendWidthPx,
-                        size.height - windHeight.toPx() - environmentHeight.toPx() - mushroomHeight.toPx(),
-                        legendWidthPx + trackWidth.toPx(),
-                        size.height - environmentHeight.toPx() - mushroomHeight.toPx(),
+                        windTop,
+                        legendWidthPx + trackWidthPx,
+                        windTop + windChartHeightPx,
                     ),
                     points = points,
                     dark = dark,
-                    pixelScale = density,
+                    pixelScale = pixelScale,
                     windScale = 1.22f,
                     showAnnotations = settings.showWindArrows,
+                    pointOffset = 0,
+                )
+                if (settings.showWindValues) ForecastGraphics.drawValueTable(
+                    nativeCanvas,
+                    android.graphics.RectF(legendWidthPx, windTop + windChartHeightPx, legendWidthPx + trackWidthPx, windTop + windChartHeightPx + windValueHeightPx),
+                    listOf(points.map { timelineValue(it.windSpeed, 0) }),
+                    dark,
+                    pixelScale,
                 )
             }
-            val environmentTop = size.height - environmentHeight.toPx() - mushroomHeight.toPx()
-            metricRows.forEachIndexed { index, metric ->
-                ForecastGraphics.drawMetricLayer(
+            val environmentTop = height - environmentHeightPx - mushroomHeightPx
+            var metricTop = environmentTop
+            metricRows.forEach { metric ->
+                if (metric.showChart) ForecastGraphics.drawMetricLayer(
                     canvas = nativeCanvas,
                     bounds = android.graphics.RectF(
                         legendWidthPx,
-                        environmentTop + index * metricRowHeight.toPx(),
-                        legendWidthPx + trackWidth.toPx(),
-                        environmentTop + (index + 1) * metricRowHeight.toPx(),
+                        metricTop,
+                        legendWidthPx + trackWidthPx,
+                        metricTop + metricRowHeightPx,
                     ),
                     points = points,
                     values = metric.values,
                     dark = dark,
                     color = metric.color,
                     metricStyle = metric.style,
-                    pixelScale = density,
+                    pixelScale = pixelScale,
                     pressureHighLabel = pressureHighLabel,
                     pressureLowLabel = pressureLowLabel,
-                    noDataLabel = noDataLabel,
                     fixedMinimum = metric.minimum,
                     fixedMaximum = metric.maximum,
+                    fixedAverage = metric.average,
+                )
+                if (metric.showChart) metricTop += metricRowHeightPx
+                if (metric.showValues) {
+                    ForecastGraphics.drawValueTable(
+                        nativeCanvas,
+                        android.graphics.RectF(legendWidthPx, metricTop, legendWidthPx + trackWidthPx, metricTop + valueRowHeightPx),
+                        listOf(metric.values.map { timelineMetricValue(metric.style, it) }),
+                        dark,
+                        pixelScale,
+                    )
+                    metricTop += valueRowHeightPx
+                }
+            }
+            if (settings.showMushroomValues) {
+                val values = points.map { point -> forecast.daily.firstOrNull { it.date == point.timestamp.take(10) }?.mushroom?.score?.toDouble() }
+                ForecastGraphics.drawValueTable(
+                    nativeCanvas,
+                    android.graphics.RectF(legendWidthPx, height - mushroomValueHeightPx, legendWidthPx + trackWidthPx, height),
+                    listOf(values.map { timelineValue(it, 0) }),
+                    dark,
+                    pixelScale,
                 )
             }
-            nativeCanvas.restore()
+            ForecastGraphics.drawTimelineAnnotations(
+                canvas = nativeCanvas,
+                bounds = android.graphics.RectF(legendWidthPx, 0f, legendWidthPx + trackWidthPx, height),
+                points = points,
+                dark = dark,
+                currentTimestamp = forecast.current.timestamp,
+                showHistory = settings.showHistoricalData,
+                historyLabel = historyLabel,
+                pixelScale = pixelScale,
+            )
+        }
+        fun createTimelineTile(tileIndex: Int): Bitmap =
+            Bitmap.createBitmap(tileWidthPx, tileHeightPx, Bitmap.Config.ARGB_8888).also { bitmap ->
+                val tileCanvas = android.graphics.Canvas(bitmap)
+                tileCanvas.translate(-tileIndex * tileWidthPx.toFloat(), 0f)
+                drawTimelineContent(tileCanvas, tileHeightPx.toFloat())
             }
-            val legendOffset = if (settings.showHistoricalData) -max(0f, position - nowPosition) else 0f
+        LaunchedEffect(tileCache, tileWidthPx) {
+            snapshotFlow { (positionState.floatValue / tileWidthPx).toInt() }.collect { currentTile ->
+                withContext(Dispatchers.Default) {
+                    listOf(currentTile - 1, currentTile + 1, currentTile + 2)
+                        .filter { it >= 0 }
+                        .forEach { tileIndex ->
+                            if (!tileCache.contains(tileIndex)) {
+                                tileCache.getOrCreate(tileIndex) { createTimelineTile(tileIndex) }
+                            }
+                        }
+                }
+            }
+        }
+        Box(
+            modifier = Modifier.fillMaxSize()
+                .then(nowBoundaryModifier)
+                .scrollable(scrollableState, Orientation.Horizontal, flingBehavior = ScrollableDefaults.flingBehavior())
+                .then(pinchModifier)
+                .then(timelineTapModifier),
+        ) {
+            Canvas(
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                val position = positionState.floatValue
+                val firstTile = (position / tileWidthPx).toInt().coerceAtLeast(0)
+                val lastTile = ((position + size.width) / tileWidthPx).toInt()
+                for (tileIndex in firstTile..lastTile) {
+                    val tile = tileCache.getOrCreate(tileIndex) { createTimelineTile(tileIndex) }
+                    drawContext.canvas.nativeCanvas.drawBitmap(
+                        tile,
+                        tileIndex * tileWidthPx - position,
+                        0f,
+                        null,
+                    )
+                }
+            }
             Canvas(
                 modifier = Modifier.width(legendWidth).fillMaxHeight()
-                    .offset { IntOffset(legendOffset.roundToInt(), 0) }
+                    .offset {
+                        val legendOffset = if (settings.showHistoricalData) -max(0f, positionState.floatValue - nowPosition) else 0f
+                        IntOffset(legendOffset.roundToInt(), 0)
+                    }
+                    .then(legendTapModifier)
                     .zIndex(2f),
             ) {
                 ForecastGraphics.drawLegend(
@@ -774,29 +1006,124 @@ private fun ForecastTimeline(
                     mushroomHeight = mushroomHeight.toPx(),
                     pixelScale = density,
                 )
+                if (settings.showSkyValues) ForecastGraphics.drawValueTableLegend(
+                    drawContext.canvas.nativeCanvas,
+                    android.graphics.RectF(0f, labelHeight.toPx() + skyHeight.toPx(), size.width, labelHeight.toPx() + skyHeight.toPx() + skyValuesHeight.toPx()),
+                    listOf("%", "mm", "☁"),
+                    dark,
+                    density,
+                )
+                if (settings.showWindValues) {
+                    val top = size.height - windHeight.toPx() - environmentHeight.toPx() - mushroomHeight.toPx() + windChartHeight.toPx()
+                    val bounds = android.graphics.RectF(0f, top, size.width, top + windValueHeight.toPx())
+                    if (settings.showWind) ForecastGraphics.drawValueTableLegend(
+                        drawContext.canvas.nativeCanvas, bounds, listOf("km/h"), dark, density,
+                    ) else ForecastGraphics.drawCompactValueLegend(
+                        drawContext.canvas.nativeCanvas, bounds, "wind", "km/h", dark, density, android.graphics.Color.rgb(155, 199, 215),
+                    )
+                }
                 val environmentTop = size.height - environmentHeight.toPx() - mushroomHeight.toPx()
-                metricRows.forEachIndexed { index, metric ->
-                    ForecastGraphics.drawMetricLegend(
+                var metricTop = environmentTop
+                metricRows.forEach { metric ->
+                    if (metric.showChart) ForecastGraphics.drawMetricLegend(
                         canvas = drawContext.canvas.nativeCanvas,
-                        bounds = android.graphics.RectF(0f, environmentTop + index * metricRowHeight.toPx(), size.width, environmentTop + (index + 1) * metricRowHeight.toPx()),
+                        bounds = android.graphics.RectF(0f, metricTop, size.width, metricTop + metricRowHeight.toPx()),
                         dark = dark,
                         label = metric.label,
                         color = metric.color,
                         metricStyle = metric.style,
                         pixelScale = density,
                     )
+                    if (metric.showChart) metricTop += metricRowHeight.toPx()
+                    if (metric.showValues) {
+                        val bounds = android.graphics.RectF(0f, metricTop, size.width, metricTop + valueRowHeight.toPx())
+                        if (metric.showChart) ForecastGraphics.drawValueTableLegend(
+                            drawContext.canvas.nativeCanvas, bounds, listOf(metricValueUnit(metric.style)), dark, density,
+                        ) else ForecastGraphics.drawCompactValueLegend(
+                            drawContext.canvas.nativeCanvas, bounds, metric.style, metricValueUnit(metric.style), dark, density, metric.color,
+                        )
+                        metricTop += valueRowHeight.toPx()
+                    }
+                }
+                if (settings.showMushroomValues) {
+                    val bounds = android.graphics.RectF(0f, size.height - mushroomValueHeight.toPx(), size.width, size.height)
+                    if (settings.showMushrooms) ForecastGraphics.drawValueTableLegend(
+                        drawContext.canvas.nativeCanvas, bounds, listOf("/100"), dark, density,
+                    ) else ForecastGraphics.drawCompactValueLegend(
+                        drawContext.canvas.nativeCanvas, bounds, "mushrooms", "/100", dark, density, android.graphics.Color.rgb(224, 83, 66),
+                    )
+                }
+                drawContext.canvas.nativeCanvas.drawLine(
+                    size.width - density,
+                    0f,
+                    size.width - density,
+                    size.height,
+                    android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                        color = ForecastGraphics.palette(dark).separator
+                        strokeWidth = 1.25f * density
+                    },
+                )
+            }
+            selectedSegmentIndex?.let { index ->
+                points.getOrNull(index)?.let { point ->
+                    TimelineSegmentCard(
+                        point = point,
+                        groupHours = groupHours,
+                        temperatureUnit = temperatureUnit,
+                        onExpand = {
+                            expandedSegmentIndex = index
+                            selectedSegmentIndex = null
+                        },
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp).widthIn(min = 210.dp, max = 290.dp).zIndex(3f),
+                    )
                 }
             }
         }
     }
-        focusedDate?.let { date ->
-            ForecastDayBrief(
-                date = date,
-                points = hourly.filter { it.timestamp.take(10) == date },
-                daily = forecast.daily.firstOrNull { it.date == date },
-                latitude = forecast.location.latitude,
+        Box(Modifier.bringIntoViewRequester(detailsRequester)) {
+            focusedDate?.let { date ->
+                ForecastDayBrief(
+                    date = date,
+                    points = hourly.filter { it.timestamp.take(10) == date },
+                    daily = forecast.daily.firstOrNull { it.date == date },
+                    latitude = forecast.location.latitude,
+                    temperatureUnit = temperatureUnit,
+                    compact = landscape,
+                )
+            }
+        }
+    }
+    legendHelp?.let { kind ->
+        Dialog(
+            onDismissRequest = { legendHelp = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().pointerInput(Unit) {
+                    detectTapGestures { legendHelp = null }
+                },
+                contentAlignment = Alignment.Center,
+            ) {
+                TimelineLegendHelp(
+                    kind = kind,
+                    points = points,
+                    dark = dark,
+                    temperatureThresholds = settings.temperatureThresholds,
+                    pressureHighLabel = pressureHighLabel,
+                    pressureLowLabel = pressureLowLabel,
+                    onClose = { legendHelp = null },
+                    modifier = Modifier.padding(horizontal = 16.dp).widthIn(max = 360.dp),
+                )
+            }
+        }
+    }
+    expandedSegmentIndex?.let { index ->
+        points.getOrNull(index)?.let { point ->
+            TimelineSegmentDialog(
+                point = point,
+                groupHours = groupHours,
                 temperatureUnit = temperatureUnit,
-                compact = landscape,
+                onClose = { expandedSegmentIndex = null },
             )
         }
     }
@@ -809,7 +1136,414 @@ private data class TimelineMetric(
     val values: List<Double?>,
     val minimum: Double?,
     val maximum: Double?,
+    val average: Double? = null,
+    val showValues: Boolean = false,
+    val showChart: Boolean = true,
 )
+
+private fun timelineValue(value: Double?, decimals: Int): String = value?.let {
+    String.format(Locale.getDefault(), if (decimals == 0) "%.0f" else "%.1f", it)
+} ?: "-"
+
+private fun timelineMetricValue(style: String, value: Double?): String = when (style) {
+    "uv", "pollen" -> timelineValue(value, 1)
+    else -> timelineValue(value, 0)
+}
+
+private fun metricValueUnit(style: String): String = when (style) {
+    "uv" -> "UV"
+    "humidity" -> "%"
+    "pressure" -> "hPa"
+    "airQuality" -> "AQI"
+    "pollen" -> "#/m³"
+    else -> ""
+}
+
+private fun String.toTimelineHelpKind(): TimelineHelpKind? = when (this) {
+    "uv" -> TimelineHelpKind.UV
+    "humidity" -> TimelineHelpKind.HUMIDITY
+    "pressure" -> TimelineHelpKind.PRESSURE
+    "airQuality" -> TimelineHelpKind.AIR_QUALITY
+    "pollen" -> TimelineHelpKind.POLLEN
+    else -> null
+}
+
+@Composable
+private fun TimelineLegendHelp(
+    kind: TimelineHelpKind,
+    points: List<HourlyWeather>,
+    dark: Boolean,
+    temperatureThresholds: TemperatureThresholds,
+    pressureHighLabel: String,
+    pressureLowLabel: String,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val title = stringResource(kind.titleResource())
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = .98f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = .55f)),
+        shadowElevation = 12.dp,
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(title, modifier = Modifier.weight(1f), fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                Text("×", modifier = Modifier.size(32.dp).clickable(onClick = onClose).wrapContentSize(), fontSize = 24.sp, color = Muted)
+            }
+            Text(stringResource(kind.descriptionResource()), color = Muted, fontSize = 12.sp, lineHeight = 17.sp)
+            Text(
+                stringResource(R.string.timeline_help_example),
+                modifier = Modifier.padding(top = 10.dp, bottom = 5.dp),
+                color = MaterialTheme.colorScheme.primary,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Black,
+            )
+            TimelineLegendGraphic(kind, points, dark, temperatureThresholds, pressureHighLabel, pressureLowLabel)
+            TimelineLegendScale(kind, pressureHighLabel, pressureLowLabel)
+        }
+    }
+}
+
+private fun TimelineHelpKind.titleResource(): Int = when (this) {
+    TimelineHelpKind.SKY -> R.string.timeline_help_sky_title
+    TimelineHelpKind.TEMPERATURE -> R.string.timeline_help_temperature_title
+    TimelineHelpKind.WIND -> R.string.timeline_help_wind_title
+    TimelineHelpKind.UV -> R.string.timeline_help_uv_title
+    TimelineHelpKind.HUMIDITY -> R.string.timeline_help_humidity_title
+    TimelineHelpKind.PRESSURE -> R.string.timeline_help_pressure_title
+    TimelineHelpKind.AIR_QUALITY -> R.string.timeline_help_air_quality_title
+    TimelineHelpKind.POLLEN -> R.string.timeline_help_pollen_title
+    TimelineHelpKind.MUSHROOMS -> R.string.timeline_help_mushrooms_title
+}
+
+private fun TimelineHelpKind.descriptionResource(): Int = when (this) {
+    TimelineHelpKind.SKY -> R.string.timeline_help_sky
+    TimelineHelpKind.TEMPERATURE -> R.string.timeline_help_temperature
+    TimelineHelpKind.WIND -> R.string.timeline_help_wind
+    TimelineHelpKind.UV -> R.string.timeline_help_uv
+    TimelineHelpKind.HUMIDITY -> R.string.timeline_help_humidity
+    TimelineHelpKind.PRESSURE -> R.string.timeline_help_pressure
+    TimelineHelpKind.AIR_QUALITY -> R.string.timeline_help_air_quality
+    TimelineHelpKind.POLLEN -> R.string.timeline_help_pollen
+    TimelineHelpKind.MUSHROOMS -> R.string.timeline_help_mushrooms
+}
+
+@Composable
+private fun TimelineLegendGraphic(
+    kind: TimelineHelpKind,
+    sourcePoints: List<HourlyWeather>,
+    dark: Boolean,
+    temperatureThresholds: TemperatureThresholds,
+    pressureHighLabel: String,
+    pressureLowLabel: String,
+) {
+    val surface = MaterialTheme.colorScheme.surfaceVariant
+    val examplePoints = remember(kind, sourcePoints.firstOrNull()) { legendExamplePoints(sourcePoints.firstOrNull(), kind) }
+    val exampleDays = remember(kind) { legendExampleDays(kind) }
+    Canvas(Modifier.fillMaxWidth().height(if (kind == TimelineHelpKind.SKY) 82.dp else 64.dp).background(surface, RoundedCornerShape(9.dp))) {
+        val nativeBounds = android.graphics.RectF(0f, 0f, size.width, size.height)
+        val values = legendExampleValues(kind)
+        when (kind) {
+            TimelineHelpKind.SKY, TimelineHelpKind.TEMPERATURE, TimelineHelpKind.MUSHROOMS -> {
+                val skyHeight = if (kind == TimelineHelpKind.SKY) size.height else 0f
+                val mushroomHeight = if (kind == TimelineHelpKind.MUSHROOMS) size.height else 0f
+                ForecastGraphics.drawTimeline(
+                    canvas = drawContext.canvas.nativeCanvas,
+                    bounds = nativeBounds,
+                    points = examplePoints,
+                    days = exampleDays,
+                    dark = dark,
+                    todayLabel = "",
+                    labelHeight = 0f,
+                    skyHeight = skyHeight,
+                    windHeight = 0f,
+                    mushroomHeight = mushroomHeight,
+                    pixelScale = density,
+                    showHours = false,
+                    showTemperatureValues = false,
+                    showApparentTemperature = true,
+                    showPrecipitation = kind == TimelineHelpKind.SKY,
+                    showWind = false,
+                    temperatureThresholds = temperatureThresholds,
+                    showMushrooms = kind == TimelineHelpKind.MUSHROOMS,
+                    showTemperatureChart = kind == TimelineHelpKind.TEMPERATURE,
+                    temperatureMinimum = -8.0,
+                    temperatureMaximum = 32.0,
+                    drawAnnotations = false,
+                )
+            }
+            TimelineHelpKind.WIND -> ForecastGraphics.drawWindLayer(
+                drawContext.canvas.nativeCanvas, nativeBounds, examplePoints, dark, density, 1.22f, false,
+            )
+            else -> ForecastGraphics.drawMetricLayer(
+                canvas = drawContext.canvas.nativeCanvas,
+                bounds = nativeBounds,
+                points = examplePoints,
+                values = values,
+                dark = dark,
+                color = when (kind) {
+                    TimelineHelpKind.HUMIDITY -> android.graphics.Color.rgb(74, 163, 255)
+                    TimelineHelpKind.AIR_QUALITY -> android.graphics.Color.rgb(150, 158, 170)
+                    TimelineHelpKind.POLLEN -> android.graphics.Color.rgb(255, 200, 61)
+                    TimelineHelpKind.UV, TimelineHelpKind.PRESSURE -> android.graphics.Color.rgb(177, 145, 255)
+                },
+                metricStyle = when (kind) {
+                    TimelineHelpKind.UV -> "uv"
+                    TimelineHelpKind.HUMIDITY -> "humidity"
+                    TimelineHelpKind.PRESSURE -> "pressure"
+                    TimelineHelpKind.AIR_QUALITY -> "airQuality"
+                    TimelineHelpKind.POLLEN -> "pollen"
+                },
+                pixelScale = density,
+                pressureHighLabel = pressureHighLabel,
+                pressureLowLabel = pressureLowLabel,
+                fixedMinimum = if (kind == TimelineHelpKind.PRESSURE) 985.0 else 0.0,
+                fixedMaximum = when (kind) {
+                    TimelineHelpKind.UV -> 11.0
+                    TimelineHelpKind.HUMIDITY, TimelineHelpKind.AIR_QUALITY -> 100.0
+                    TimelineHelpKind.PRESSURE -> 1040.0
+                    TimelineHelpKind.POLLEN -> 80.0
+                },
+                fixedAverage = if (kind == TimelineHelpKind.PRESSURE) 1013.0 else null,
+            )
+        }
+    }
+}
+
+@Composable
+private fun TimelineLegendScale(kind: TimelineHelpKind, pressureHighLabel: String, pressureLowLabel: String) {
+    val labels = when (kind) {
+        TimelineHelpKind.SKY -> listOf(
+            stringResource(R.string.sky_night), stringResource(R.string.sky_clear), stringResource(R.string.sky_cloudy),
+            stringResource(R.string.sky_rain), stringResource(R.string.sky_snow), stringResource(R.string.sky_hail),
+        )
+        TimelineHelpKind.PRESSURE -> listOf("$pressureLowLabel 988 hPa", "$pressureHighLabel 1021 hPa", "$pressureLowLabel 1005 hPa")
+        TimelineHelpKind.AIR_QUALITY -> listOf("AQI 8", "AQI 84", "AQI 10")
+        TimelineHelpKind.HUMIDITY -> listOf("20%", "71%", "25%")
+        TimelineHelpKind.POLLEN -> listOf("2", "69", "3")
+        TimelineHelpKind.UV -> listOf("UV 0", "UV 9.5", "UV 0")
+        TimelineHelpKind.WIND -> listOf("5 km/h", "47 km/h", "6 km/h")
+        TimelineHelpKind.TEMPERATURE -> listOf("-5°", "21°", "5°")
+        TimelineHelpKind.MUSHROOMS -> listOf("0/100", "54/100", "99/100")
+    }
+    Row(Modifier.fillMaxWidth().padding(top = 5.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+        labels.forEach { Text(it, color = Muted, fontSize = if (labels.size > 3) 8.sp else 9.sp, maxLines = 1) }
+    }
+}
+
+private fun legendExampleValues(kind: TimelineHelpKind): List<Double?> = when (kind) {
+    TimelineHelpKind.UV -> listOf(0.0, .5, 1.5, 3.0, 5.0, 8.0, 11.0, 8.0, 5.0, 3.0, 1.0, 0.0)
+    TimelineHelpKind.HUMIDITY -> listOf(20.0, 25.0, 32.0, 42.0, 52.0, 64.0, 78.0, 95.0, 82.0, 66.0, 45.0, 25.0)
+    TimelineHelpKind.PRESSURE -> listOf(988.0, 993.0, 1001.0, 1008.0, 1013.0, 1017.0, 1024.0, 1036.0, 1027.0, 1018.0, 1013.0, 1005.0)
+    TimelineHelpKind.AIR_QUALITY -> listOf(8.0, 12.0, 20.0, 32.0, 48.0, 68.0, 100.0, 84.0, 62.0, 42.0, 24.0, 10.0)
+    TimelineHelpKind.POLLEN -> listOf(2.0, 4.0, 9.0, 18.0, 34.0, 58.0, 80.0, 66.0, 45.0, 25.0, 10.0, 3.0)
+    else -> emptyList()
+}
+
+private fun legendExamplePoints(basePoint: HourlyWeather?, kind: TimelineHelpKind): List<HourlyWeather> {
+    val base = basePoint ?: HourlyWeather("2026-06-21T06:00", 10.0, 8.0, 0.0, 0.0, 0.0, 0.0, 0, 0.0, 5.0, 0.0, 8.0)
+    val start = LocalDateTime.of(2026, 6, 21, 6, 0)
+    val temperatures = listOf(-5.0, -2.0, 2.0, 7.0, 12.0, 18.0, 24.0, 30.0, 27.0, 20.0, 12.0, 5.0)
+    val wind = listOf(5.0, 7.0, 10.0, 15.0, 22.0, 34.0, 60.0, 48.0, 30.0, 20.0, 12.0, 6.0)
+    return List(12) { index ->
+        val skyCodes = listOf(0, 0, 2, 3, 61, 61, 71, 71, 96, 3, 1, 0)
+        val code = skyCodes[index]
+        base.copy(
+            timestamp = if (kind == TimelineHelpKind.MUSHROOMS) {
+                LocalDate.of(2026, 6, 21).plusDays(index.toLong()).atTime(12, 0).toString()
+            } else {
+                start.plusHours(index.toLong() * 2).toString()
+            },
+            temperature = temperatures[index],
+            apparentTemperature = temperatures[index] + if (index < 5) -3.0 else 2.0,
+            windSpeed = wind[index],
+            windGusts = wind[index] * 1.45,
+            cloudCover = listOf(0.0, 8.0, 35.0, 82.0, 92.0, 75.0, 70.0, 55.0, 88.0, 78.0, 25.0, 0.0)[index],
+            weatherCode = if (kind == TimelineHelpKind.SKY) code else 0,
+            precipitationProbability = if (code in listOf(61, 71, 96)) 85.0 else 0.0,
+            precipitation = if (code in listOf(61, 96)) 2.0 else if (code == 71) 1.0 else 0.0,
+            snowfall = if (code == 71) 2.0 else 0.0,
+        )
+    }
+}
+
+private fun legendExampleDays(kind: TimelineHelpKind): List<DailyWeather> = if (kind == TimelineHelpKind.MUSHROOMS) {
+    (0 until 12).map { index ->
+        DailyWeather(LocalDate.of(2026, 6, 21).plusDays(index.toLong()).toString(), null, null, mushroom = eu.vespy.weather.data.MushroomCondition(index * 9, null, null, null, null))
+    }
+} else {
+    listOf(DailyWeather("2026-06-21", "2026-06-21T07:00", "2026-06-21T19:00"), DailyWeather("2026-06-22", "2026-06-22T07:00", "2026-06-22T19:00"))
+}
+
+@Composable
+private fun TimelineSegmentCard(
+    point: HourlyWeather,
+    groupHours: Int,
+    temperatureUnit: String,
+    onExpand: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val locale = LocalContext.current.resources.configuration.locales[0]
+    Surface(
+        modifier = modifier.clickable(onClick = onExpand),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = .97f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = .6f)),
+        shadowElevation = 10.dp,
+    ) {
+        Column(Modifier.padding(11.dp)) {
+            Text(segmentDateLabel(point.timestamp, locale), fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(segmentTimeLabel(point.timestamp, groupHours), color = MaterialTheme.colorScheme.primary, fontFamily = FontFamily.Monospace, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(7.dp))
+            SegmentValueRow(
+                stringResource(R.string.temperature), temperatureText(point.temperature, temperatureUnit),
+                stringResource(R.string.wind), point.windSpeed.number("%.0f km/h"),
+            )
+            SegmentValueRow(
+                stringResource(R.string.rain_chance), point.precipitationProbability.number("%.0f%%"),
+                stringResource(R.string.humidity), point.relativeHumidity.number("%.0f%%"),
+            )
+            SegmentValueRow(
+                stringResource(R.string.air_quality_short), point.airQuality?.europeanAqi.number("%.0f AQI"),
+                stringResource(R.string.pollen_total), point.pollen.total().number("%.1f"),
+            )
+            Text(stringResource(R.string.tap_for_details), modifier = Modifier.padding(top = 5.dp), color = Muted, fontSize = 9.sp)
+        }
+    }
+}
+
+@Composable
+private fun SegmentValueRow(leftLabel: String, leftValue: String, rightLabel: String, rightValue: String) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        SegmentValue(leftLabel, leftValue, Modifier.weight(1f))
+        SegmentValue(rightLabel, rightValue, Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun SegmentValue(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(modifier.padding(vertical = 2.dp)) {
+        Text(label, color = Muted, fontSize = 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(value, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun TimelineSegmentDialog(point: HourlyWeather, groupHours: Int, temperatureUnit: String, onClose: () -> Unit) {
+    val locale = LocalContext.current.resources.configuration.locales[0]
+    val sections = listOf(
+        stringResource(R.string.day_brief_temperature) to listOf(
+            stringResource(R.string.temperature) to temperatureText(point.temperature, temperatureUnit),
+            stringResource(R.string.feels_like) to temperatureText(point.apparentTemperature, temperatureUnit),
+            stringResource(R.string.weather_condition) to (point.weatherCode?.toString() ?: "-"),
+            stringResource(R.string.cloud_cover) to point.cloudCover.number("%.0f%%"),
+        ),
+        stringResource(R.string.day_brief_rain) to listOf(
+            stringResource(R.string.rain_chance) to point.precipitationProbability.number("%.0f%%"),
+            stringResource(R.string.precipitation) to point.precipitation.number("%.1f mm"),
+            stringResource(R.string.rain_total) to point.rain.number("%.1f mm"),
+            stringResource(R.string.snowfall) to point.snowfall.number("%.1f cm"),
+        ),
+        stringResource(R.string.day_brief_air) to listOf(
+            stringResource(R.string.wind) to point.windSpeed.number("%.0f km/h"),
+            stringResource(R.string.wind_gusts) to point.windGusts.number("%.0f km/h"),
+            stringResource(R.string.wind_direction) to (point.windDirection?.let(::windDirectionText) ?: "-"),
+            stringResource(R.string.humidity) to point.relativeHumidity.number("%.0f%%"),
+            stringResource(R.string.pressure) to point.surfacePressure.number("%.0f hPa"),
+            stringResource(R.string.visibility) to point.visibility?.div(1000.0).number("%.1f km"),
+            stringResource(R.string.uv_max) to point.uvIndex.number("%.1f"),
+            stringResource(R.string.air_quality_short) to point.airQuality?.europeanAqi.number("%.0f AQI"),
+        ),
+        stringResource(R.string.day_brief_air_quality) to listOf(
+            "PM2.5" to point.airQuality?.pm25.number("%.1f µg/m³"),
+            "PM10" to point.airQuality?.pm10.number("%.1f µg/m³"),
+            "NO₂" to point.airQuality?.nitrogenDioxide.number("%.1f µg/m³"),
+            "O₃" to point.airQuality?.ozone.number("%.1f µg/m³"),
+            "SO₂" to point.airQuality?.sulphurDioxide.number("%.1f µg/m³"),
+            "CO" to point.airQuality?.carbonMonoxide.number("%.1f µg/m³"),
+        ),
+        stringResource(R.string.day_brief_pollen) to listOf(
+            stringResource(R.string.pollen_alder) to point.pollen?.alder.number("%.1f"),
+            stringResource(R.string.pollen_birch) to point.pollen?.birch.number("%.1f"),
+            stringResource(R.string.pollen_grass) to point.pollen?.grass.number("%.1f"),
+            stringResource(R.string.pollen_mugwort) to point.pollen?.mugwort.number("%.1f"),
+            stringResource(R.string.pollen_olive) to point.pollen?.olive.number("%.1f"),
+            stringResource(R.string.pollen_ragweed) to point.pollen?.ragweed.number("%.1f"),
+        ),
+    )
+    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.segment_details), color = MaterialTheme.colorScheme.primary, fontFamily = FontFamily.Monospace, fontSize = 10.sp, fontWeight = FontWeight.Black)
+                        Text(segmentDateLabel(point.timestamp, locale), fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                        Text(segmentTimeLabel(point.timestamp, groupHours), color = Muted, fontSize = 13.sp)
+                    }
+                    Text("×", modifier = Modifier.size(44.dp).clickable(onClick = onClose).wrapContentSize(), fontSize = 30.sp)
+                }
+                Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 4.dp)) {
+                    sections.forEach { (title, values) -> SegmentDetailsSection(title, values) }
+                    Spacer(Modifier.height(18.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SegmentDetailsSection(title: String, values: List<Pair<String, String>>) {
+    Text(title, modifier = Modifier.padding(start = 3.dp, top = 14.dp, bottom = 6.dp), color = MaterialTheme.colorScheme.primary, fontFamily = FontFamily.Monospace, fontSize = 11.sp, fontWeight = FontWeight.Black)
+    values.chunked(2).forEach { rowValues ->
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            rowValues.forEach { (label, value) ->
+                DayBriefMetric(label, value, Modifier.weight(1f))
+            }
+            if (rowValues.size == 1) Spacer(Modifier.weight(1f))
+        }
+        Spacer(Modifier.height(7.dp))
+    }
+}
+
+private fun segmentDateLabel(timestamp: String, locale: Locale): String = runCatching {
+    val value = LocalDateTime.parse(timestamp).format(DateTimeFormatter.ofPattern("EEEE, d MMMM yyyy", locale))
+    value.replaceFirstChar { if (it.isLowerCase()) it.titlecase(locale) else it.toString() }
+}.getOrDefault(timestamp.take(10))
+
+private fun segmentTimeLabel(timestamp: String, groupHours: Int): String = runCatching {
+    val start = LocalDateTime.parse(timestamp)
+    val formatter = DateTimeFormatter.ofPattern("HH:mm")
+    if (groupHours <= 1) start.format(formatter) else "${start.format(formatter)} - ${start.plusHours(groupHours.toLong()).format(formatter)}"
+}.getOrDefault(timestamp.takeLast(5))
+
+private fun Double?.number(pattern: String): String = this?.let { String.format(Locale.getDefault(), pattern, it) } ?: "-"
+
+private fun eu.vespy.weather.data.PollenForecast?.total(): Double? = this?.let { pollen ->
+    listOf(pollen.alder, pollen.birch, pollen.grass, pollen.mugwort, pollen.olive, pollen.ragweed).filterNotNull().takeIf { it.isNotEmpty() }?.sum()
+}
+
+private class TimelineTileCache(private val maximumSize: Int) {
+    private val tiles = LinkedHashMap<Int, Bitmap>(maximumSize, .75f, true)
+
+    @Synchronized
+    fun contains(index: Int): Boolean = tiles.containsKey(index)
+
+    fun getOrCreate(index: Int, create: () -> Bitmap): Bitmap {
+        synchronized(this) { tiles[index] }?.let { return it }
+        val created = create()
+        synchronized(this) {
+            tiles[index]?.let { return it }
+            tiles[index] = created
+            while (tiles.size > maximumSize) {
+                tiles.remove(tiles.entries.first().key)
+            }
+            return created
+        }
+    }
+}
 
 internal data class NowBoundaryResult(val position: Float, val stopped: Boolean)
 
@@ -1680,6 +2414,7 @@ private fun remoteBitmap(url: String?) = produceState<Bitmap?>(initialValue = nu
 @Composable
 private fun SettingsDialog(
     state: WeatherUiState,
+    initiallyOpenLocations: Boolean,
     onDismiss: () -> Unit,
     onSelectLocation: (eu.vespy.weather.data.WeatherLocation) -> Unit,
     onAddLocation: (eu.vespy.weather.data.WeatherLocation) -> Unit,
@@ -1732,6 +2467,7 @@ private fun SettingsDialog(
                         onSearchResult = onAddLocation,
                         onShareLocation = { shareLocation(context, it, state.displaySettings.language) },
                         onRemoveLocation = onRemoveLocation,
+                        initiallyExpanded = initiallyOpenLocations,
                     )
                     Button(
                         onClick = {
@@ -1787,16 +2523,38 @@ private fun SettingsDialog(
                     SettingSwitch(stringResource(R.string.show_hourly_temperatures), state.displaySettings.showHourlyTemperatures) { onDisplaySettings(state.displaySettings.copy(showHourlyTemperatures = it)) }
                     SettingSwitch(stringResource(R.string.show_apparent_temperature), state.displaySettings.showApparentTemperature) { onDisplaySettings(state.displaySettings.copy(showApparentTemperature = it)) }
                     SettingSwitch(stringResource(R.string.show_precipitation), state.displaySettings.showPrecipitation) { onDisplaySettings(state.displaySettings.copy(showPrecipitation = it)) }
-                    SettingSwitch(stringResource(R.string.show_wind), state.displaySettings.showWind) { onDisplaySettings(state.displaySettings.copy(showWind = it)) }
+                    WeatherSupportingText(stringResource(R.string.forecast_layers_description))
+                    ForecastLayerOption(
+                        label = stringResource(R.string.timeline_help_sky_title),
+                        chartEnabled = null,
+                        valuesEnabled = state.displaySettings.showSkyValues,
+                        onChartChange = {},
+                        onValuesChange = { onDisplaySettings(state.displaySettings.copy(showSkyValues = it)) },
+                    )
+                    ForecastLayerOption(stringResource(R.string.show_wind), state.displaySettings.showWind, state.displaySettings.showWindValues,
+                        { onDisplaySettings(state.displaySettings.copy(showWind = it)) },
+                        { onDisplaySettings(state.displaySettings.copy(showWindValues = it)) })
+                    ForecastLayerOption(stringResource(R.string.show_uv_index), state.displaySettings.showUvIndex, state.displaySettings.showUvValues,
+                        { onDisplaySettings(state.displaySettings.copy(showUvIndex = it)) },
+                        { onDisplaySettings(state.displaySettings.copy(showUvValues = it)) })
+                    ForecastLayerOption(stringResource(R.string.show_humidity), state.displaySettings.showHumidity, state.displaySettings.showHumidityValues,
+                        { onDisplaySettings(state.displaySettings.copy(showHumidity = it)) },
+                        { onDisplaySettings(state.displaySettings.copy(showHumidityValues = it)) })
+                    ForecastLayerOption(stringResource(R.string.show_pressure), state.displaySettings.showPressure, state.displaySettings.showPressureValues,
+                        { onDisplaySettings(state.displaySettings.copy(showPressure = it)) },
+                        { onDisplaySettings(state.displaySettings.copy(showPressureValues = it)) })
+                    ForecastLayerOption(stringResource(R.string.show_pollen), state.displaySettings.showPollen, state.displaySettings.showPollenValues,
+                        { onDisplaySettings(state.displaySettings.copy(showPollen = it)) },
+                        { onDisplaySettings(state.displaySettings.copy(showPollenValues = it)) })
+                    ForecastLayerOption(stringResource(R.string.show_air_quality), state.displaySettings.showAirQuality, state.displaySettings.showAirQualityValues,
+                        { onDisplaySettings(state.displaySettings.copy(showAirQuality = it)) },
+                        { onDisplaySettings(state.displaySettings.copy(showAirQualityValues = it)) })
+                    ForecastLayerOption(stringResource(R.string.show_mushrooms), state.displaySettings.showMushrooms, state.displaySettings.showMushroomValues,
+                        { onDisplaySettings(state.displaySettings.copy(showMushrooms = it)) },
+                        { onDisplaySettings(state.displaySettings.copy(showMushroomValues = it)) })
                     SettingSwitch(stringResource(R.string.show_wind_arrows), state.displaySettings.showWindArrows) { onDisplaySettings(state.displaySettings.copy(showWindArrows = it, showWind = if (it) true else state.displaySettings.showWind)) }
-                    SettingSwitch(stringResource(R.string.show_uv_index), state.displaySettings.showUvIndex) { onDisplaySettings(state.displaySettings.copy(showUvIndex = it)) }
-                    SettingSwitch(stringResource(R.string.show_humidity), state.displaySettings.showHumidity) { onDisplaySettings(state.displaySettings.copy(showHumidity = it)) }
-                    SettingSwitch(stringResource(R.string.show_pressure), state.displaySettings.showPressure) { onDisplaySettings(state.displaySettings.copy(showPressure = it)) }
-                    SettingSwitch(stringResource(R.string.show_pollen), state.displaySettings.showPollen) { onDisplaySettings(state.displaySettings.copy(showPollen = it)) }
-                    SettingSwitch(stringResource(R.string.show_air_quality), state.displaySettings.showAirQuality) { onDisplaySettings(state.displaySettings.copy(showAirQuality = it)) }
                     SettingSwitch(stringResource(R.string.show_historical_data), state.displaySettings.showHistoricalData) { onDisplaySettings(state.displaySettings.copy(showHistoricalData = it)) }
                     SettingSwitch(stringResource(R.string.show_dates), state.displaySettings.showDates) { onDisplaySettings(state.displaySettings.copy(showDates = it)) }
-                    SettingSwitch(stringResource(R.string.show_mushrooms), state.displaySettings.showMushrooms) { onDisplaySettings(state.displaySettings.copy(showMushrooms = it)) }
                     SettingSwitch(stringResource(R.string.show_widget_location), state.displaySettings.showWidgetLocation) { onDisplaySettings(state.displaySettings.copy(showWidgetLocation = it)) }
                     WeatherSupportingText(stringResource(R.string.default_zoom))
                     ZoomControls(state.displaySettings, onDisplaySettings, large = true)
@@ -1948,6 +2706,44 @@ private fun SettingSwitch(label: String, checked: Boolean, onCheckedChange: (Boo
         Text(label, modifier = Modifier.weight(1f), fontSize = 15.sp)
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
+}
+
+@Composable
+private fun ForecastLayerOption(
+    label: String,
+    chartEnabled: Boolean?,
+    valuesEnabled: Boolean,
+    onChartChange: (Boolean) -> Unit,
+    onValuesChange: (Boolean) -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = WeatherFieldShape,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .28f)),
+    ) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(label, Modifier.weight(1f), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            chartEnabled?.let {
+                LayerChoice(stringResource(R.string.chart), it) { onChartChange(!it) }
+                Spacer(Modifier.width(6.dp))
+            }
+            LayerChoice(stringResource(R.string.values), valuesEnabled) { onValuesChange(!valuesEnabled) }
+        }
+    }
+}
+
+@Composable
+private fun LayerChoice(label: String, selected: Boolean, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+            contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+        ),
+        shape = RoundedCornerShape(8.dp),
+    ) { Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
 }
 
 @Composable

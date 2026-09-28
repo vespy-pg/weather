@@ -48,8 +48,9 @@ fun LocationControls(
     onShareLocation: ((WeatherLocation) -> Unit)? = null,
     onRemoveLocation: ((WeatherLocation) -> Unit)? = null,
     enabled: Boolean = true,
+    initiallyExpanded: Boolean = false,
 ) {
-    var locationMenuExpanded by remember { mutableStateOf(false) }
+    var locationMenuExpanded by remember(initiallyExpanded) { mutableStateOf(initiallyExpanded) }
     var query by remember { mutableStateOf("") }
     var results by remember { mutableStateOf(emptyList<WeatherLocation>()) }
     var hasMoreResults by remember { mutableStateOf(false) }

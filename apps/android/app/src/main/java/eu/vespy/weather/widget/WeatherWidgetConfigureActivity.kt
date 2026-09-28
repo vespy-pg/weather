@@ -88,7 +88,10 @@ class WeatherWidgetConfigureActivity : ComponentActivity() {
         }
         val preferences = WeatherPreferences(this)
         val locations = preferences.migrateLegacyDefaultLocations(DEFAULT_LOCATIONS, LEGACY_DEFAULT_LOCATIONS)
-        val initialLocation = preferences.widgetLocation(widgetId, locations.firstOrNull() ?: DEFAULT_LOCATIONS.first())
+        val locationFallback = locations.firstOrNull() ?: DEFAULT_LOCATIONS.first()
+        // The system opens this activity for a newly allocated widget ID. Always start from the
+        // location currently selected in the app, even if Android has reused an old widget ID.
+        val initialLocation = preferences.activeLocation(locationFallback)
         val compactStrip = AppWidgetManager.getInstance(this).getAppWidgetInfo(widgetId)?.provider?.className ==
             WeatherStripWidgetProvider::class.java.name
         setContent {
@@ -279,6 +282,7 @@ private fun WidgetLocationPicker(
                         WidgetSwitch(stringResource(R.string.show_precipitation), widgetSettings.showPrecipitation) { widgetSettings = widgetSettings.copy(showPrecipitation = it) }
                         WidgetSwitch(stringResource(R.string.show_wind_arrows), widgetSettings.showWindArrows) { widgetSettings = widgetSettings.copy(showWindArrows = it) }
                         if (!compactStrip) WidgetSwitch(stringResource(R.string.show_mushrooms), widgetSettings.showMushrooms) { widgetSettings = widgetSettings.copy(showMushrooms = it) }
+                        WidgetSwitch(stringResource(R.string.show_widget_alerts), widgetSettings.showAlerts) { widgetSettings = widgetSettings.copy(showAlerts = it) }
                         WidgetDefaultOrOn(stringResource(R.string.show_widget_location), widgetSettings.forceLocationName) { widgetSettings = widgetSettings.copy(forceLocationName = it) }
                         WidgetSwitch(stringResource(R.string.demo_weather), widgetSettings.demo) { widgetSettings = widgetSettings.copy(demo = it) }
                     }

@@ -108,7 +108,7 @@ object ForecastGraphics {
         val sunY = bounds.top + skySectionHeight * .18f
         val sunPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.rgb(255, 211, 61)
-            style = Paint.Style.STROKE
+            this.style = Paint.Style.STROKE
             strokeWidth = iconStroke
             strokeCap = Paint.Cap.ROUND
         }
@@ -209,6 +209,7 @@ object ForecastGraphics {
         labelHeight: Float,
         skyHeight: Float,
         windHeight: Float,
+        skyValuesHeight: Float = 0f,
         environmentHeight: Float = 0f,
         mushroomHeight: Float = 0f,
         temperatureUnit: String = "C",
@@ -243,13 +244,14 @@ object ForecastGraphics {
         lightningScale: Float = 1f,
         inlineCompactHeader: Boolean = false,
         separateHeaderRows: Boolean = false,
+        drawAnnotations: Boolean = true,
     ) {
         if (points.isEmpty() || bounds.width() <= 0f || bounds.height() <= 0f) return
         val palette = palette(dark)
         val sky = RectF(bounds.left, bounds.top, bounds.right, bounds.top + labelHeight + skyHeight)
         val temperature = RectF(
             sky.left,
-            sky.bottom,
+            sky.bottom + skyValuesHeight,
             sky.right,
             if (showTemperatureChart) bounds.bottom - windHeight - environmentHeight - mushroomHeight else sky.bottom,
         )
@@ -272,16 +274,33 @@ object ForecastGraphics {
             if (showWindArrows) drawWindAnnotations(canvas, wind, points, palette, pixelScale)
         }
         if (showMushrooms && mushroomHeight > 0f) drawMushrooms(canvas, mushrooms, points, days, palette, pixelScale)
-        if (showHistory && currentTimestamp != null) {
-            drawHistoryOverlay(canvas, bounds, points, currentTimestamp, historyLabel, pixelScale)
+        if (drawAnnotations) {
+            drawTimelineAnnotations(canvas, bounds, points, dark, currentTimestamp, showHistory, historyLabel, pixelScale)
         }
-        drawDaySeparators(canvas, bounds, points, palette, pixelScale)
         val border = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = palette.grid; strokeWidth = pixelScale; style = Paint.Style.STROKE }
         canvas.drawLine(bounds.left, sky.bottom, bounds.right, sky.bottom, border)
+        if (skyValuesHeight > 0f) canvas.drawLine(bounds.left, temperature.top, bounds.right, temperature.top, border)
         if (showTemperatureChart) canvas.drawLine(bounds.left, temperature.bottom, bounds.right, temperature.bottom, border)
         if (environmentHeight > 0f) canvas.drawLine(bounds.left, wind.bottom, bounds.right, wind.bottom, border)
         if (showMushrooms && mushroomHeight > 0f) canvas.drawLine(bounds.left, mushrooms.top, bounds.right, mushrooms.top, border)
         canvas.drawLine(bounds.left, bounds.bottom - 1f, bounds.right, bounds.bottom - 1f, border)
+    }
+
+    fun drawTimelineAnnotations(
+        canvas: Canvas,
+        bounds: RectF,
+        points: List<HourlyWeather>,
+        dark: Boolean,
+        currentTimestamp: String?,
+        showHistory: Boolean,
+        historyLabel: String,
+        pixelScale: Float,
+    ) {
+        if (points.isEmpty()) return
+        if (showHistory && currentTimestamp != null) {
+            drawHistoryOverlay(canvas, bounds, points, currentTimestamp, historyLabel, pixelScale, palette(dark))
+        }
+        drawDaySeparators(canvas, bounds, points, palette(dark), pixelScale)
     }
 
     private fun drawMushrooms(
@@ -657,9 +676,9 @@ object ForecastGraphics {
         }
     }
 
-    fun drawWindLayer(canvas: Canvas, bounds: RectF, points: List<HourlyWeather>, dark: Boolean, pixelScale: Float, windScale: Float, showAnnotations: Boolean) {
+    fun drawWindLayer(canvas: Canvas, bounds: RectF, points: List<HourlyWeather>, dark: Boolean, pixelScale: Float, windScale: Float, showAnnotations: Boolean, pointOffset: Int = 0) {
         val palette = palette(dark)
-        drawWind(canvas, bounds, points, palette, pixelScale, windScale, 0)
+        drawWind(canvas, bounds, points, palette, pixelScale, windScale, pointOffset)
         if (showAnnotations) drawWindAnnotations(canvas, bounds, points, palette, pixelScale)
         canvas.drawLine(bounds.left, bounds.top, bounds.right, bounds.top, Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = palette.separator
@@ -679,9 +698,9 @@ object ForecastGraphics {
         pixelScale: Float,
         pressureHighLabel: String = "H",
         pressureLowLabel: String = "L",
-        noDataLabel: String = "NO DATA",
         fixedMinimum: Double? = null,
         fixedMaximum: Double? = null,
+        fixedAverage: Double? = null,
     ) {
         if (points.isEmpty() || bounds.height() <= 0f) return
         val palette = palette(dark)
@@ -694,7 +713,7 @@ object ForecastGraphics {
         when (metricStyle) {
             "uv" -> drawUvIntensityBand(canvas, bounds, values, maximum, cell, dark, pixelScale)
             "humidity" -> drawHumidityDots(canvas, bounds, values, cell, color, pixelScale)
-            "pressure" -> drawPressureBand(canvas, bounds, values, minimum, maximum, cell, dark, pressureHighLabel, pressureLowLabel, pixelScale)
+            "pressure" -> drawPressureBand(canvas, bounds, values, minimum, maximum, fixedAverage, cell, dark, pressureHighLabel, pressureLowLabel, pixelScale)
             "airQuality" -> drawAirQualityDots(canvas, bounds, values, maximum, cell, color, pixelScale)
             "pollen" -> drawPollenCloud(canvas, bounds, values, maximum, cell, pixelScale)
             else -> {
@@ -712,12 +731,147 @@ object ForecastGraphics {
                 })
             }
         }
-        drawMissingDataSegments(canvas, bounds, values, cell, palette, noDataLabel, pixelScale)
+        drawMissingDataSegments(canvas, bounds, values, cell, palette, pixelScale)
         canvas.drawLine(bounds.left, bounds.top, bounds.right, bounds.top, Paint(Paint.ANTI_ALIAS_FLAG).apply {
             this.color = palette.separator
             strokeWidth = 1.25f * pixelScale
         })
         drawDaySeparators(canvas, bounds, points, palette, pixelScale)
+    }
+
+    fun drawValueTable(
+        canvas: Canvas,
+        bounds: RectF,
+        rows: List<List<String>>,
+        dark: Boolean,
+        pixelScale: Float,
+    ) {
+        if (rows.isEmpty() || bounds.height() <= 0f) return
+        val palette = palette(dark)
+        canvas.drawRect(bounds, Paint().apply { color = palette.background })
+        val rowHeight = bounds.height() / rows.size
+        val columns = rows.maxOfOrNull(List<String>::size)?.coerceAtLeast(1) ?: 1
+        val cellWidth = bounds.width() / columns
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = palette.muted
+            textAlign = Paint.Align.CENTER
+            textSize = (rowHeight * .62f).coerceIn(11f * pixelScale, 16f * pixelScale)
+            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+        }
+        val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = palette.grid
+            strokeWidth = pixelScale
+        }
+        rows.forEachIndexed { rowIndex, values ->
+            val baseline = bounds.top + rowHeight * (rowIndex + .5f) - (textPaint.ascent() + textPaint.descent()) / 2f
+            values.forEachIndexed { columnIndex, value ->
+                canvas.drawText(value, bounds.left + cellWidth * (columnIndex + .5f), baseline, textPaint)
+            }
+            canvas.drawLine(bounds.left, bounds.top + rowHeight * rowIndex, bounds.right, bounds.top + rowHeight * rowIndex, gridPaint)
+        }
+        canvas.drawLine(bounds.left, bounds.bottom - pixelScale, bounds.right, bounds.bottom - pixelScale, gridPaint)
+    }
+
+    fun drawValueTableLegend(
+        canvas: Canvas,
+        bounds: RectF,
+        labels: List<String>,
+        dark: Boolean,
+        pixelScale: Float,
+    ) {
+        if (labels.isEmpty() || bounds.height() <= 0f) return
+        val palette = palette(dark)
+        canvas.drawRect(bounds, Paint().apply { color = palette.background })
+        val rowHeight = bounds.height() / labels.size
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = palette.muted
+            textAlign = Paint.Align.CENTER
+            textSize = (rowHeight * .48f).coerceIn(9f * pixelScale, 12f * pixelScale)
+            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+        }
+        labels.forEachIndexed { index, label ->
+            val baseline = bounds.top + rowHeight * (index + .5f) - (paint.ascent() + paint.descent()) / 2f
+            canvas.drawText(label, bounds.centerX(), baseline, paint)
+        }
+    }
+
+    fun drawCompactValueLegend(
+        canvas: Canvas,
+        bounds: RectF,
+        style: String,
+        unit: String,
+        dark: Boolean,
+        pixelScale: Float,
+        color: Int,
+    ) {
+        val palette = palette(dark)
+        canvas.drawRect(bounds, Paint().apply { this.color = palette.background })
+        val iconX = bounds.left + 12f * pixelScale
+        val centerY = bounds.centerY()
+        val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = color
+            this.style = Paint.Style.STROKE
+            strokeWidth = 1.7f * pixelScale
+            strokeCap = Paint.Cap.ROUND
+        }
+        when (style) {
+            "wind" -> repeat(3) { index ->
+                val y = centerY + (index - 1) * 3f * pixelScale
+                canvas.drawLine(iconX - 7f * pixelScale, y, iconX + (if (index == 1) 7f else 4f) * pixelScale, y, iconPaint)
+            }
+            "humidity" -> {
+                val size = 6f * pixelScale
+                val drop = Path().apply {
+                    moveTo(iconX, centerY - size)
+                    cubicTo(iconX - size * .7f, centerY, iconX - size * .55f, centerY + size * .8f, iconX, centerY + size)
+                    cubicTo(iconX + size * .55f, centerY + size * .8f, iconX + size * .7f, centerY, iconX, centerY - size)
+                    close()
+                }
+                canvas.drawPath(drop, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color })
+            }
+            "uv" -> {
+                canvas.drawCircle(iconX, centerY, 5f * pixelScale, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = Color.rgb(121, 20, 245) })
+                repeat(8) { index ->
+                    val angle = index * PI.toFloat() / 4f
+                    canvas.drawLine(
+                        iconX + cos(angle) * 7f * pixelScale, centerY + sin(angle) * 7f * pixelScale,
+                        iconX + cos(angle) * 9f * pixelScale, centerY + sin(angle) * 9f * pixelScale,
+                        iconPaint,
+                    )
+                }
+            }
+            "pressure" -> {
+                canvas.drawCircle(iconX, centerY, 7f * pixelScale, iconPaint)
+                canvas.drawLine(iconX, centerY, iconX + 4f * pixelScale, centerY - 4f * pixelScale, iconPaint)
+            }
+            "airQuality" -> {
+                listOf(-5f to 2f, 0f to -3f, 5f to 1f).forEach { (dx, dy) ->
+                    canvas.drawCircle(iconX + dx * pixelScale, centerY + dy * pixelScale, 2.8f * pixelScale, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color })
+                }
+            }
+            "pollen" -> {
+                repeat(5) { index ->
+                    val angle = -PI.toFloat() / 2f + index * PI.toFloat() * 2f / 5f
+                    canvas.drawCircle(iconX + cos(angle) * 5f * pixelScale, centerY + sin(angle) * 5f * pixelScale, 3.2f * pixelScale, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = Color.rgb(241, 84, 91) })
+                }
+                canvas.drawCircle(iconX, centerY, 2.8f * pixelScale, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = Color.rgb(255, 199, 45) })
+            }
+            "mushrooms" -> {
+                canvas.drawOval(RectF(iconX - 7f * pixelScale, centerY - 5f * pixelScale, iconX + 7f * pixelScale, centerY + 2f * pixelScale), Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color })
+                canvas.drawRect(iconX - 2f * pixelScale, centerY, iconX + 2f * pixelScale, centerY + 7f * pixelScale, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = Color.rgb(226, 211, 174) })
+            }
+        }
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = palette.muted
+            textAlign = Paint.Align.LEFT
+            textSize = 7.5f * pixelScale
+            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+        }
+        canvas.drawText(unit, bounds.left + 23f * pixelScale, centerY - (textPaint.ascent() + textPaint.descent()) / 2f, textPaint)
+        canvas.drawLine(bounds.right - pixelScale, bounds.top, bounds.right - pixelScale, bounds.bottom, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = palette.separator
+            strokeWidth = 1.25f * pixelScale
+        })
     }
 
     private fun drawMissingDataSegments(
@@ -726,7 +880,6 @@ object ForecastGraphics {
         values: List<Double?>,
         cell: Float,
         palette: ForecastPalette,
-        label: String,
         pixelScale: Float,
     ) {
         if (values.isEmpty() || values.none { it == null }) return
@@ -736,12 +889,6 @@ object ForecastGraphics {
         val hatch = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = if (Color.red(palette.background) < 80) Color.argb(78, 190, 200, 214) else Color.argb(62, 58, 72, 92)
             strokeWidth = 1f * pixelScale
-        }
-        val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = palette.muted
-            textAlign = Paint.Align.CENTER
-            textSize = 8f * pixelScale
-            typeface = Typeface.create("monospace", Typeface.BOLD)
         }
         var start = 0
         while (start < values.size) {
@@ -763,15 +910,6 @@ object ForecastGraphics {
                 x += step
             }
             canvas.restore()
-            val segmentWidth = right - left
-            val labelStep = max(110f * pixelScale, cell * 6f)
-            if (segmentWidth >= 34f * pixelScale) {
-                var labelX = left + min(labelStep / 2f, segmentWidth / 2f)
-                while (labelX < right) {
-                    canvas.drawText(label, labelX, bounds.centerY() - (text.ascent() + text.descent()) / 2f, text)
-                    labelX += labelStep
-                }
-            }
             start = end
         }
     }
@@ -797,6 +935,38 @@ object ForecastGraphics {
             canvas.drawText(text, x, bounds.centerY() - (paint.ascent() + paint.descent()) / 2f, paint)
         }
         when (metricStyle) {
+        "wind" -> {
+            val centerY = bounds.centerY()
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                this.color = palette.wind
+                style = Paint.Style.STROKE
+                strokeWidth = 1.8f * pixelScale
+                strokeCap = Paint.Cap.ROUND
+            }
+            repeat(3) { index ->
+                val y = centerY + (index - 1) * 4.5f * pixelScale
+                val path = Path().apply {
+                    moveTo(bounds.left + 5f * pixelScale, y)
+                    cubicTo(bounds.centerX() - 7f * pixelScale, y - 3f * pixelScale, bounds.centerX(), y + 3f * pixelScale, bounds.centerX() + 5f * pixelScale, y)
+                }
+                canvas.drawPath(path, paint)
+            }
+            drawLabel(label, bounds.right - 12f * pixelScale, 7.5f, palette.muted)
+        }
+        "mushrooms" -> {
+            val centerX = bounds.centerX() - 5f * pixelScale
+            val centerY = bounds.centerY()
+            canvas.drawOval(
+                RectF(centerX - 9f * pixelScale, centerY - 7f * pixelScale, centerX + 9f * pixelScale, centerY + 3f * pixelScale),
+                Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = Color.rgb(224, 83, 66) },
+            )
+            canvas.drawRoundRect(
+                centerX - 2.5f * pixelScale, centerY, centerX + 2.5f * pixelScale, centerY + 10f * pixelScale,
+                2f * pixelScale, 2f * pixelScale,
+                Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = Color.rgb(226, 211, 174) },
+            )
+            drawLabel(label, bounds.right - 12f * pixelScale, 8f, palette.muted)
+        }
         "humidity" -> {
             val x = bounds.centerX() - 9f * pixelScale
             val y = bounds.centerY()
@@ -888,7 +1058,66 @@ object ForecastGraphics {
             canvas.drawCircle(centerX, centerY, 10.5f * pixelScale, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = purple })
             drawLabel(label, centerX, 10.5f, Color.WHITE)
         }
-        "pressure" -> drawLabel(label, bounds.centerX(), 13f)
+        "pressure" -> {
+            val centerX = bounds.centerX()
+            val centerY = bounds.centerY() - 1.5f * pixelScale
+            val radius = 13.5f * pixelScale
+            val stroke = 3.2f * pixelScale
+            val dialBounds = RectF(centerX - radius, centerY - radius, centerX + radius, centerY + radius)
+            canvas.drawArc(dialBounds, 130f, 140f, false, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                this.color = Color.rgb(44, 139, 245)
+                style = Paint.Style.STROKE
+                strokeWidth = stroke
+                strokeCap = Paint.Cap.ROUND
+            })
+            canvas.drawArc(dialBounds, 270f, 140f, false, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                this.color = Color.rgb(240, 72, 86)
+                style = Paint.Style.STROKE
+                strokeWidth = stroke
+                strokeCap = Paint.Cap.ROUND
+            })
+            repeat(5) { index ->
+                val angle = Math.toRadians((140.0 + index * 35.0))
+                canvas.drawLine(
+                    centerX + cos(angle).toFloat() * radius * .62f,
+                    centerY + sin(angle).toFloat() * radius * .62f,
+                    centerX + cos(angle).toFloat() * radius * .82f,
+                    centerY + sin(angle).toFloat() * radius * .82f,
+                    Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        this.color = palette.text
+                        strokeWidth = 1.5f * pixelScale
+                        strokeCap = Paint.Cap.ROUND
+                    },
+                )
+            }
+            val needleAngle = Math.toRadians(318.0)
+            canvas.drawLine(
+                centerX,
+                centerY,
+                centerX + cos(needleAngle).toFloat() * radius * .7f,
+                centerY + sin(needleAngle).toFloat() * radius * .7f,
+                Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    this.color = palette.text
+                    strokeWidth = 2.6f * pixelScale
+                    strokeCap = Paint.Cap.ROUND
+                },
+            )
+            canvas.drawCircle(centerX, centerY, 3f * pixelScale, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = palette.text })
+            val cloudColor = if (dark) Color.rgb(218, 230, 247) else Color.rgb(225, 236, 250)
+            val cloudY = bounds.bottom - 5f * pixelScale
+            canvas.drawCircle(centerX - 5.5f * pixelScale, cloudY, 4.6f * pixelScale, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = cloudColor })
+            canvas.drawCircle(centerX, cloudY - 2.5f * pixelScale, 6f * pixelScale, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = cloudColor })
+            canvas.drawCircle(centerX + 6f * pixelScale, cloudY, 4.8f * pixelScale, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = cloudColor })
+            canvas.drawRoundRect(
+                centerX - 10f * pixelScale,
+                cloudY,
+                centerX + 10f * pixelScale,
+                cloudY + 4f * pixelScale,
+                2f * pixelScale,
+                2f * pixelScale,
+                Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = cloudColor },
+            )
+        }
         else -> drawLabel(label, bounds.centerX(), 12f)
         }
     }
@@ -997,10 +1226,10 @@ object ForecastGraphics {
         }
     }
 
-    private fun drawPressureBand(canvas: Canvas, bounds: RectF, values: List<Double?>, minimum: Double, maximum: Double, cell: Float, dark: Boolean, highLabel: String, lowLabel: String, pixelScale: Float) {
+    private fun drawPressureBand(canvas: Canvas, bounds: RectF, values: List<Double?>, minimum: Double, maximum: Double, fixedAverage: Double?, cell: Float, dark: Boolean, highLabel: String, lowLabel: String, pixelScale: Float) {
         val centerY = bounds.centerY()
         val available = values.filterNotNull()
-        val average = available.average().takeIf { !it.isNaN() } ?: (minimum + maximum) / 2.0
+        val average = fixedAverage ?: available.average().takeIf { !it.isNaN() } ?: (minimum + maximum) / 2.0
         val maximumDeviation = max(kotlin.math.abs(maximum - average), kotlin.math.abs(minimum - average)).coerceAtLeast(.1)
         val baseColor = if (dark) Color.rgb(47, 55, 69) else Color.rgb(220, 228, 240)
         canvas.drawLine(bounds.left, centerY, bounds.right, centerY, Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1285,7 +1514,7 @@ object ForecastGraphics {
         }
     }
 
-    private fun drawHistoryOverlay(canvas: Canvas, bounds: RectF, points: List<HourlyWeather>, currentTimestamp: String, historyLabel: String, pixelScale: Float) {
+    private fun drawHistoryOverlay(canvas: Canvas, bounds: RectF, points: List<HourlyWeather>, currentTimestamp: String, historyLabel: String, pixelScale: Float, palette: ForecastPalette) {
         val currentIndex = points.indexOfLast { it.timestamp.take(13) <= currentTimestamp.take(13) }
         if (currentIndex < 0) return
         val cell = bounds.width() / points.size
@@ -1296,8 +1525,8 @@ object ForecastGraphics {
             strokeWidth = 2f * pixelScale
         })
         canvas.drawLine(markerX, bounds.top, markerX, bounds.bottom, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.rgb(244, 123, 50)
-            strokeWidth = 1.5f * pixelScale
+            color = palette.separator
+            strokeWidth = 1.25f * pixelScale
         })
         if (historyLabel.isNotBlank()) {
             canvas.drawText(historyLabel.uppercase(), markerX - 5f * pixelScale, bounds.top + 13f * pixelScale, Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1315,8 +1544,13 @@ object ForecastGraphics {
     }
 
     private fun drawSnow(canvas: Canvas, x: Float, y: Float, size: Float, alpha: Float, palette: ForecastPalette, pixelScale: Float) {
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = withAlpha(palette.snow, (alpha * 255).toInt()); strokeWidth = 1.5f * pixelScale; strokeCap = Paint.Cap.ROUND }
-        repeat(3) { line -> val angle = line * PI.toFloat() / 3f; val dx = cos(angle) * size; val dy = sin(angle) * size; canvas.drawLine(x - dx, y - dy, x + dx, y + dy, paint) }
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = withAlpha(palette.snow, (alpha * 255).toInt())
+            textAlign = Paint.Align.CENTER
+            textSize = size * 2.15f
+            typeface = Typeface.DEFAULT
+        }
+        canvas.drawText("❄", x, y - (paint.ascent() + paint.descent()) / 2f, paint)
     }
 
     private fun drawHail(canvas: Canvas, x: Float, y: Float, size: Float, alpha: Float, palette: ForecastPalette, pixelScale: Float) {

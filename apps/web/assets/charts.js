@@ -51,7 +51,7 @@ function interpolateHexColor(start, end, progress) {
   return `rgb(${channels.join(', ')})`;
 }
 
-function temperatureColor(value) {
+export function temperatureColor(value) {
   const stops = activeTemperatureColorStops();
   const source = numericValue(value);
   const numeric = source === null ? null : roundedTemperatureCelsius(source);
@@ -63,6 +63,151 @@ function temperatureColor(value) {
   const upper = stops[upperIndex];
   const progress = (numeric - lower.temperature) / (upper.temperature - lower.temperature);
   return interpolateHexColor(lower.color, upper.color, progress);
+}
+
+function drawMissingMetric(context, x, width, height) {
+  context.save();
+  context.beginPath();
+  context.rect(x, 0, width, height);
+  context.clip();
+  context.strokeStyle = chartColor('--chart-grid', 'rgba(154, 164, 178, .16)');
+  context.lineWidth = 1;
+  for (let offset = -height; offset < width + height; offset += 9) {
+    context.beginPath();
+    context.moveTo(x + offset, height);
+    context.lineTo(x + offset + height, 0);
+    context.stroke();
+  }
+  context.restore();
+}
+
+function metricValue(point, type) {
+  if (type === 'humidity') return numericValue(point.relativeHumidity);
+  if (type === 'pressure') return numericValue(point.surfacePressure);
+  if (type === 'uv') return numericValue(point.uvIndex);
+  if (type === 'airQuality') return numericValue(point.airQuality?.europeanAqi);
+  if (type === 'pollen') {
+    const values = Object.values(point.pollen || {}).map(numericValue).filter(value => value !== null);
+    return values.length ? Math.max(...values) : null;
+  }
+  return null;
+}
+
+function smoothMetricValues(points, type) {
+  const raw = points.map(point => metricValue(point, type));
+  return raw.map((value, index) => {
+    if (value === null) return null;
+    const neighbors = raw.slice(Math.max(0, index - 1), index + 2).filter(item => item !== null);
+    return neighbors.reduce((sum, item) => sum + item, 0) / neighbors.length;
+  });
+}
+
+export function drawTimelineMetric(canvas, points, type, options = {}) {
+  const rect = canvas.getBoundingClientRect();
+  if (!points.length || rect.width < 1) return;
+  const ratio = canvasPixelRatio(rect);
+  canvas.width = Math.max(1, Math.round(rect.width * ratio));
+  canvas.height = Math.max(1, Math.round(rect.height * ratio));
+  const context = canvas.getContext('2d');
+  context.scale(ratio, ratio);
+  const width = rect.width;
+  const height = rect.height;
+  const rightPadding = 34;
+  const plotWidth = width - rightPadding;
+  const cell = plotWidth / points.length;
+  const values = smoothMetricValues(points, type);
+  const valid = values.filter(value => value !== null);
+  const maximum = Math.max(1, ...(valid.length ? valid : [1]));
+  const minimum = Math.min(...(valid.length ? valid : [0]));
+  context.clearRect(0, 0, width, height);
+  context.fillStyle = chartColor('--chart-wind', '#0d141d');
+  context.fillRect(0, 0, width, height);
+
+  if (type === 'uv') {
+    const gradient = context.createLinearGradient(0, 0, plotWidth, 0);
+    values.forEach((value, index) => {
+      const strength = value === null ? 0 : Math.max(0, Math.min(1, value / 11));
+      gradient.addColorStop(index / Math.max(1, values.length - 1), `rgba(${105 + Math.round(strength * 72)}, ${70 - Math.round(strength * 34)}, 255, ${value === null ? .08 : .18 + strength * .82})`);
+    });
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, plotWidth, height);
+  } else if (type === 'pressure') {
+    const average = valid.length ? valid.reduce((sum, value) => sum + value, 0) / valid.length : 1013;
+    const range = Math.max(3, maximum - minimum);
+    const center = height / 2;
+    for (let index = 0; index < values.length - 1; index += 1) {
+      const value = values[index];
+      const next = values[index + 1];
+      if (value === null || next === null) continue;
+      const deviation = (value - average) / range;
+      const nextDeviation = (next - average) / range;
+      context.beginPath();
+      context.moveTo(index * cell, center - deviation * height * .52);
+      context.lineTo((index + 1) * cell, center - nextDeviation * height * .52);
+      context.strokeStyle = value >= average ? '#ff5568' : '#48a8ff';
+      context.lineWidth = 5 + Math.abs(deviation) * 16;
+      context.lineCap = 'round';
+      context.stroke();
+    }
+    const highLabel = options.highLabel || 'H';
+    const lowLabel = options.lowLabel || 'L';
+    const threshold = range * .34;
+    let lastMarker = -20;
+    values.forEach((value, index) => {
+      if (value === null || index - lastMarker < 8 || Math.abs(value - average) < threshold) return;
+      const y = center - (value - average) / range * height * .52;
+      context.fillStyle = value >= average ? '#ff8794' : '#7fc2ff';
+      context.font = '900 9px ui-monospace, monospace';
+      context.textAlign = 'center';
+      context.fillText(value >= average ? highLabel : lowLabel, (index + .5) * cell, Math.max(10, Math.min(height - 3, y + 3)));
+      lastMarker = index;
+    });
+  } else {
+    const isHumidity = type === 'humidity';
+    const isAir = type === 'airQuality';
+    const colors = type === 'pollen' ? ['#55cf8a', '#ffc83d', '#ff8a3d'] : [isAir ? '#9aa3af' : '#339dff'];
+    const rows = 7;
+    const columnStep = 6;
+    const interpolate = position => {
+      const leftIndex = Math.max(0, Math.min(values.length - 1, Math.floor(position)));
+      const rightIndex = Math.min(values.length - 1, leftIndex + 1);
+      const left = values[leftIndex];
+      const right = values[rightIndex];
+      if (left === null || right === null) return left ?? right;
+      return left + (right - left) * (position - leftIndex);
+    };
+    const random = (column, row, salt = 0) => {
+      const value = Math.sin((column + 1) * 127.1 + (row + 1) * 311.7 + salt * 74.7) * 43758.5453;
+      return value - Math.floor(value);
+    };
+    const columnCount = Math.max(1, Math.floor(plotWidth / columnStep));
+    for (let column = 0; column <= columnCount; column += 1) {
+      const x = column / columnCount * plotWidth;
+      const position = x / plotWidth * Math.max(0, values.length - 1);
+      const value = interpolate(position);
+      if (value === null) continue;
+      const normalized = isHumidity
+        ? Math.max(0, Math.min(1, (value - 25) / 70))
+        : Math.max(0, Math.min(1, value / maximum));
+      const density = .04 + normalized * .92;
+      for (let row = 0; row < rows; row += 1) {
+        const edgeFactor = .88 + (1 - Math.abs(row - (rows - 1) / 2) / ((rows + 1) / 2)) * .12;
+        if (random(column, row) > density * edgeFactor) continue;
+        const y = (row + .5) * height / rows + (random(column, row, 1) - .5) * 2.2;
+        const radius = .9 + normalized * 1.55 + random(column, row, 2) * .28;
+        context.beginPath();
+        context.arc(x, y, radius, 0, Math.PI * 2);
+        context.fillStyle = colors[Math.floor(random(column, row, 3) * colors.length) % colors.length];
+        context.globalAlpha = .28 + normalized * .72;
+        context.fill();
+      }
+    }
+    context.globalAlpha = 1;
+  }
+
+  values.forEach((value, index) => {
+    if (value === null) drawMissingMetric(context, index * cell, cell + .5, height);
+  });
 }
 
 function paintDayNightBands(context, nightSegments, padding, plotWidth, plotHeight) {

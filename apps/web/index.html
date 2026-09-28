@@ -33,7 +33,7 @@
       if (query.get('share') !== '1' && localStorage.getItem('weather.share-prompt.v1') === 'collapsed') document.documentElement.dataset.sharePrompt = 'collapsed';
     } catch { document.documentElement.dataset.theme = 'dark'; }
   </script>
-  <link rel="stylesheet" href="/assets/app.css?v=61">
+  <link rel="stylesheet" href="/assets/app.css?v=63">
 </head>
 <body>
   <main class="shell">
@@ -178,6 +178,26 @@
               <div class="forecast-wind-strip" id="forecastWindStrip" aria-label="Hourly wind direction and speed"></div>
             </div>
           </div>
+          <div class="forecast-track forecast-track-metric" id="forecastUvTrack">
+            <div class="forecast-track-title forecast-metric-title forecast-uv-title" title="UV index"><span class="forecast-uv-symbol" aria-hidden="true">UV</span><b class="visually-hidden" data-i18n="chart.uvLabel">UV index</b></div>
+            <canvas class="forecast-metric-canvas" id="forecastUvCanvas" height="42" aria-label="Hourly UV index"></canvas>
+          </div>
+          <div class="forecast-track forecast-track-metric" id="forecastHumidityTrack">
+            <div class="forecast-track-title forecast-metric-title forecast-humidity-title" title="Humidity"><span class="forecast-drop-symbol" aria-hidden="true"></span><b class="visually-hidden" data-i18n="chart.humidityLabel">Humidity</b></div>
+            <canvas class="forecast-metric-canvas" id="forecastHumidityCanvas" height="52" aria-label="Hourly humidity"></canvas>
+          </div>
+          <div class="forecast-track forecast-track-metric" id="forecastPressureTrack">
+            <div class="forecast-track-title forecast-metric-title forecast-pressure-title" title="Atmospheric pressure"><span class="forecast-pressure-symbol" aria-hidden="true">↙◉↗</span><b class="visually-hidden" data-i18n="chart.pressureLabel">Atmospheric pressure</b></div>
+            <canvas class="forecast-metric-canvas" id="forecastPressureCanvas" height="58" aria-label="Hourly atmospheric pressure"></canvas>
+          </div>
+          <div class="forecast-track forecast-track-metric" id="forecastAirQualityTrack">
+            <div class="forecast-track-title forecast-metric-title forecast-air-title" title="Air quality"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M9 35V15h10v20M7 35h18M11 20h6M11 25h6M11 30h6"></path><path d="M20 12c4 1 4-3 8-2 3 1 2-3 7-2"></path><circle cx="29" cy="7" r="2"></circle><circle cx="35" cy="4" r="1"></circle></svg><b class="visually-hidden" data-i18n="chart.airQualityLabel">Air quality</b></div>
+            <canvas class="forecast-metric-canvas" id="forecastAirQualityCanvas" height="52" aria-label="Hourly air quality"></canvas>
+          </div>
+          <div class="forecast-track forecast-track-metric" id="forecastPollenTrack">
+            <div class="forecast-track-title forecast-metric-title forecast-pollen-title" title="Pollen"><span class="forecast-flower-symbol" aria-hidden="true">✿</span><b class="visually-hidden" data-i18n="chart.pollenLabel">Pollen</b></div>
+            <canvas class="forecast-metric-canvas" id="forecastPollenCanvas" height="52" aria-label="Hourly pollen concentration"></canvas>
+          </div>
           <div class="forecast-track forecast-track-mushrooms" id="forecastMushroomTrack" hidden>
             <div class="forecast-track-title forecast-mushroom-title" id="forecastMushroomObservations">
               <svg class="forecast-mushroom-symbol" viewBox="0 0 40 40" aria-hidden="true">
@@ -198,6 +218,10 @@
           <div class="forecast-now-marker" id="forecastNowMarker" aria-hidden="true" hidden><span data-i18n="forecast.history">HISTORY</span></div>
         </div>
       </div>
+    </section>
+
+    <section class="panel forecast-day-brief" id="forecastDayBrief" aria-live="polite" aria-labelledby="forecastDayBriefTitle">
+      <div class="day-brief-loading" aria-hidden="true"></div>
     </section>
 
     <aside class="web-promotion" id="webPromotion" aria-label="Promotion" hidden></aside>
@@ -260,14 +284,6 @@
           </ul>
         </article>
       </div>
-    </section>
-
-    <section class="current-grid" id="currentWeather" aria-live="polite"></section>
-
-    <section class="panel daily-panel">
-      <p class="eyebrow" data-i18n="daily.eyebrow">DAILY OUTLOOK - 10 DAYS</p>
-      <h2 data-i18n="daily.title">Daily forecast</h2>
-      <div class="daily-grid" id="dailyForecast"></div>
     </section>
 
     <footer class="data-attribution"><span data-i18n="app.dataSources">Data sources:</span> <a href="https://open-meteo.com/" rel="external">Open-Meteo</a> · <a href="https://meteoalarm.org/" rel="external">MeteoAlarm</a> · <a href="https://www.openstreetmap.org/copyright" rel="external">OpenStreetMap contributors</a><span id="mushroomAttribution" hidden> · <a href="https://www.inaturalist.org/" rel="external" data-i18n="mushroom.source">iNaturalist observations</a></span></footer>
@@ -438,6 +454,11 @@
         <label class="setting-row"><span data-i18n="settings.precipitation">Precipitation symbols</span><input id="showPrecipitation" type="checkbox"></label>
         <label class="setting-row"><span data-i18n="settings.wind">Wind timeline</span><input id="showWind" type="checkbox"></label>
         <label class="setting-row"><span data-i18n="settings.windArrows">Wind direction arrows and speed</span><input id="showWindArrows" type="checkbox"></label>
+        <label class="setting-row"><span data-i18n="settings.uv">UV index timeline</span><input id="showUv" type="checkbox"></label>
+        <label class="setting-row"><span data-i18n="settings.humidity">Humidity timeline</span><input id="showHumidity" type="checkbox"></label>
+        <label class="setting-row"><span data-i18n="settings.pressure">Atmospheric pressure timeline</span><input id="showPressure" type="checkbox"></label>
+        <label class="setting-row"><span data-i18n="settings.airQuality">Air quality timeline</span><input id="showAirQuality" type="checkbox"></label>
+        <label class="setting-row"><span data-i18n="settings.pollen">Pollen timeline</span><input id="showPollen" type="checkbox"></label>
         <label class="setting-row"><span data-i18n="settings.mushrooms">Mushroom conditions and nearby observations</span><input id="showMushrooms" type="checkbox"></label>
         <p class="settings-help" data-i18n="settings.mushroomsHelp">Uses the selected coordinates to retrieve recent research-grade iNaturalist observations. The suitability score does not identify edible mushrooms.</p>
       </fieldset>
@@ -464,6 +485,6 @@
     </form>
   </dialog>
 
-  <script src="/assets/app.js?v=56" type="module"></script>
+  <script src="/assets/app.js?v=58" type="module"></script>
 </body>
 </html>

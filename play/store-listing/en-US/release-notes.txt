@@ -1,1 +1,1 @@
-Adds daily details, hourly air quality and pollen, Sun and Moon paths, 30-day lunar phases and visual UV, humidity and pressure timelines. Improves zooming, widgets and reports.
+Adds optional numeric rows for weather layers, improved timeline guides and interactive forecast details. Widgets now inherit the selected app location, while location management, warnings, history and rendering are more reliable.

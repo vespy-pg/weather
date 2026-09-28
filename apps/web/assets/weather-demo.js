@@ -204,6 +204,9 @@ export function createWeatherDemo(now = new Date()) {
       precipitation: scenario.precipitation,
       hour: date.getHours()
     });
+    const daylight = Math.max(0, Math.sin((date.getHours() - 6) / 13 * Math.PI));
+    const pollenStrength = Math.max(0, daylight * (1 - scenario.cloudCover / 130));
+    const pollutionPulse = 24 + Math.max(0, Math.cos((date.getHours() - 8) / 12 * Math.PI)) * 26 + scenario.cloudCover * .12;
     return {
       timestamp: localTimestamp(date),
       temperature: Number(temperature.toFixed(1)),
@@ -221,7 +224,24 @@ export function createWeatherDemo(now = new Date()) {
       tornado: scenario.tornado === true,
       visibility: scenario.visibility ?? 24000,
       surfacePressure: 1007 + Math.sin(index / 18) * 9,
-      uvIndex: scenario.cloudCover < 50 ? 4 : 1
+      uvIndex: Number((daylight * (scenario.cloudCover < 50 ? 6 : 2)).toFixed(1)),
+      pollen: {
+        alder: Number((pollenStrength * 7).toFixed(1)),
+        birch: Number((pollenStrength * 18).toFixed(1)),
+        grass: Number((pollenStrength * 28).toFixed(1)),
+        mugwort: Number((pollenStrength * 4).toFixed(1)),
+        olive: Number((pollenStrength * 1.5).toFixed(1)),
+        ragweed: Number((pollenStrength * 3).toFixed(1))
+      },
+      airQuality: {
+        europeanAqi: Number(pollutionPulse.toFixed(1)),
+        pm25: Number((pollutionPulse * .34).toFixed(1)),
+        pm10: Number((pollutionPulse * .58).toFixed(1)),
+        nitrogenDioxide: Number((pollutionPulse * .42).toFixed(1)),
+        ozone: Number((30 + daylight * 45).toFixed(1)),
+        sulphurDioxide: Number((pollutionPulse * .08).toFixed(1)),
+        carbonMonoxide: Number((170 + pollutionPulse * 7).toFixed(1))
+      }
     };
   });
 
@@ -239,6 +259,8 @@ export function createWeatherDemo(now = new Date()) {
       weatherCode: scenario.code,
       temperatureMaximum: temperatureRange?.maximum ?? scenario.temperature ?? 16,
       temperatureMinimum: temperatureRange?.minimum ?? (scenario.temperature === undefined ? 6 : scenario.temperature - 3),
+      apparentTemperatureMaximum: (temperatureRange?.maximum ?? scenario.temperature ?? 16) + 1,
+      apparentTemperatureMinimum: (temperatureRange?.minimum ?? (scenario.temperature === undefined ? 6 : scenario.temperature - 3)) - 2,
       sunrise: localTimestamp(sunrise),
       sunset: localTimestamp(sunset),
       daylightDuration: (sunset - sunrise) / 1000,
@@ -249,6 +271,8 @@ export function createWeatherDemo(now = new Date()) {
       windGustsMaximum: 18 + Math.max(0, dayIndex) * 2,
       windDirection: (dayIndex + HISTORY_DAYS) * 31 % 360,
       uvIndexMaximum: scenario.cloudCover < 50 ? 5 : 1,
+      pollen: {alder: 7, birch: 18, grass: 28, mugwort: 4, olive: 1.5, ragweed: 3},
+      airQuality: {europeanAqi: 42, pm25: 14.3, pm10: 25.2, nitrogenDioxide: 19.1, ozone: 64, sulphurDioxide: 3.5, carbonMonoxide: 420},
       mushroom: {
         score: mushroomScore,
         level: mushroomLevel,

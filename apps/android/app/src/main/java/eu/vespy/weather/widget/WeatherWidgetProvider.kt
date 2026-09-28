@@ -26,6 +26,7 @@ import eu.vespy.weather.withSavedAppLocale
 import eu.vespy.weather.data.WeatherApi
 import eu.vespy.weather.data.WeatherPreferences
 import eu.vespy.weather.data.forWidgetForecast
+import eu.vespy.weather.data.visibleAlerts
 import eu.vespy.weather.diagnostics.WidgetFrameCache
 import eu.vespy.weather.ui.DEFAULT_LOCATIONS
 import eu.vespy.weather.ui.ForecastGraphics
@@ -49,7 +50,7 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
             try {
                 val preferences = WeatherPreferences(context)
                 val savedLocations = preferences.locations(DEFAULT_LOCATIONS)
-                val fallbackLocation = savedLocations.first()
+                val fallbackLocation = preferences.activeLocation(savedLocations.first())
                 val widgetLocations = appWidgetIds.associateWith { preferences.widgetLocation(it, fallbackLocation) }
                 val temperatureUnit = preferences.temperatureUnit()
                 val displaySettings = preferences.displaySettings()
@@ -63,6 +64,11 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
                     val locationKey = location.latitude to location.longitude
                     val forecast = if (widgetSettings.demo) widgetDemoForecast() else forecasts[locationKey]
                         ?: WeatherApi().forecast(location, language = language).also { forecasts[locationKey] = it }
+                    // Read dismissals after the network request. A render started before the user
+                    // dismissed an alert must not overwrite a newer widget frame with stale state.
+                    val dismissedAlertKeys = preferences.dismissedAlertKeys()
+                    val visibleAlerts = forecast.visibleAlerts(location, dismissedAlertKeys)
+                    val visibleAlert = visibleAlerts.firstOrNull().takeIf { widgetSettings.showAlerts }
                     val options = manager.getAppWidgetOptions(widgetId)
                     val density = context.resources.displayMetrics.density.coerceAtMost(2f)
                     val forecastHours = preferences.widgetForecastHours(widgetId)
@@ -96,11 +102,12 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
                             locationLabel = location.name.takeIf { !widgetSettings.demo && (displaySettings.showWidgetLocation || widgetSettings.forceLocationName) },
                             widgetSettings = widgetSettings,
                             advisoryText = if (advisoryFooter) {
-                                forecast.alerts.firstOrNull()?.let { localizedContext.getString(R.string.widget_alert_prefix, it.headline) }
+                                visibleAlert?.let { localizedContext.getString(R.string.widget_alert_prefix, it.headline) }
                                     ?: forecastSummaryText(localizedContext, forecast)
                             } else null,
                             advisoryLabel = localizedContext.getString(R.string.forecast_summary_label),
-                            advisoryIsAlert = advisoryFooter && forecast.alerts.isNotEmpty(),
+                            advisoryIsAlert = advisoryFooter && visibleAlert != null,
+                            showAlertIndicator = visibleAlert != null,
                             compactStrip = compactStrip,
                         )
                         val manifest = JSONObject()
@@ -125,6 +132,10 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
                                 .put("temperatureUnit", temperatureUnit)
                                 .put("resolvedTheme", if (dark) "dark" else "light"))
                             .put("settings", widgetSettings.toDiagnosticJson())
+                            .put("alerts", JSONObject()
+                                .put("forecastIds", JSONArray(forecast.alerts.map { it.id }))
+                                .put("visibleIds", JSONArray(visibleAlerts.map { it.id }))
+                                .put("displayEnabled", widgetSettings.showAlerts))
                             .put("forecast", JSONObject()
                                 .put("currentTimestamp", forecast.current.timestamp)
                                 .put("hourly", renderedPoints.hourlyDiagnosticJson())
@@ -228,6 +239,7 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
         advisoryText: String?,
         advisoryLabel: String,
         advisoryIsAlert: Boolean,
+        showAlertIndicator: Boolean,
         compactStrip: Boolean,
     ): Bitmap {
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
@@ -315,9 +327,25 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
             }
             canvas.drawText(displayedLabel, width - 7f * density, chartHeight - windHeight - mushroomHeight - 7f * density, labelPaint)
         }
+        if (showAlertIndicator) drawAlertIndicator(canvas, width, height, dark, density, compactStrip)
         canvas.restore()
         if (advisoryText != null) drawAdvisoryFooter(canvas, width, height, footerHeight, advisoryLabel, advisoryText, advisoryIsAlert, dark, density, rows)
         return bitmap
+    }
+
+    private fun drawAlertIndicator(canvas: Canvas, width: Int, height: Int, dark: Boolean, density: Float, compact: Boolean) {
+        val radius = min(if (compact) 10f else 12f, height / density * .18f) * density
+        val centerX = width - radius - 5f * density
+        val centerY = radius + 5f * density
+        val accent = Color.rgb(230, 182, 47)
+        canvas.drawCircle(centerX, centerY, radius, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = accent })
+        val symbolPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (dark) Color.rgb(17, 24, 32) else Color.rgb(23, 34, 52)
+            textAlign = Paint.Align.CENTER
+            textSize = radius * 1.35f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        }
+        canvas.drawText("!", centerX, centerY - (symbolPaint.ascent() + symbolPaint.descent()) / 2f, symbolPaint)
     }
 
     private fun drawAdvisoryFooter(
@@ -390,6 +418,12 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
                 val widgetIds = manager.getAppWidgetIds(component)
                 if (widgetIds.isNotEmpty()) context.sendBroadcast(Intent(context, providerClass).apply {
                     action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+                    data = Uri.Builder()
+                        .scheme("vespy-weather")
+                        .authority("widgets-refresh")
+                        .appendPath(providerClass.simpleName)
+                        .appendQueryParameter("request", System.currentTimeMillis().toString())
+                        .build()
                     putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, widgetIds)
                 })
             }
@@ -423,6 +457,7 @@ private fun eu.vespy.weather.data.WidgetDisplaySettings.toDiagnosticJson() = JSO
     .put("showPrecipitation", showPrecipitation)
     .put("showWindArrows", showWindArrows)
     .put("showMushrooms", showMushrooms)
+    .put("showAlerts", showAlerts)
     .put("demo", demo)
 
 private fun List<eu.vespy.weather.data.HourlyWeather>.hourlyDiagnosticJson() = JSONArray().apply {

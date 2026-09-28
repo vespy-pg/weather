@@ -178,6 +178,7 @@ object IssueDiagnostics {
         .put("showPrecipitation", showPrecipitation)
         .put("showWindArrows", showWindArrows)
         .put("showMushrooms", showMushrooms)
+        .put("showAlerts", showAlerts)
         .put("demo", demo)
 
     private fun Bitmap.toAttachment(name: String, maximumDimension: Int, quality: Int): JSONObject {

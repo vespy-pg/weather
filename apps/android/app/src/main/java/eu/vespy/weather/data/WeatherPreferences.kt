@@ -32,6 +32,22 @@ class WeatherPreferences(context: Context) {
         null
     }
 
+    fun dismissedAlertKeys(): Set<String> = preferences.getStringSet(KEY_DISMISSED_ALERT_KEYS, emptySet()).orEmpty().toSet()
+
+    fun dismissAlert(location: WeatherLocation, alertId: String) {
+        if (alertId.isBlank()) return
+        val updated = (dismissedAlertKeys() + location.alertDismissalKey(alertId)).toList().takeLast(MAX_DISMISSED_ALERT_KEYS).toSet()
+        preferences.edit().putStringSet(KEY_DISMISSED_ALERT_KEYS, updated).commit()
+    }
+
+    fun restoreAlerts(location: WeatherLocation, alertIds: Set<String>) {
+        if (alertIds.isEmpty()) return
+        val remainingKeys = dismissedAlertKeys().filterNot { key ->
+            alertIds.any { alertId -> location.isAlertDismissed(alertId, setOf(key)) }
+        }.toSet()
+        preferences.edit().putStringSet(KEY_DISMISSED_ALERT_KEYS, remainingKeys).commit()
+    }
+
     fun displaySettings() = ForecastDisplaySettings(
         zoom = preferences.getFloat(KEY_ZOOM, .5f).takeIf { it in ZOOM_LEVELS } ?: .5f,
         theme = preferences.getString(KEY_THEME, "dark").takeIf { it in THEMES } ?: "dark",
@@ -56,6 +72,14 @@ class WeatherPreferences(context: Context) {
         showDates = preferences.getBoolean(KEY_SHOW_DATES, false),
         showMushrooms = preferences.getBoolean(KEY_SHOW_MUSHROOMS, false),
         showWidgetLocation = preferences.getBoolean(KEY_SHOW_WIDGET_LOCATION, true),
+        showSkyValues = preferences.getBoolean(KEY_SHOW_SKY_VALUES, false),
+        showWindValues = preferences.getBoolean(KEY_SHOW_WIND_VALUES, false),
+        showUvValues = preferences.getBoolean(KEY_SHOW_UV_VALUES, false),
+        showHumidityValues = preferences.getBoolean(KEY_SHOW_HUMIDITY_VALUES, false),
+        showPressureValues = preferences.getBoolean(KEY_SHOW_PRESSURE_VALUES, false),
+        showPollenValues = preferences.getBoolean(KEY_SHOW_POLLEN_VALUES, false),
+        showAirQualityValues = preferences.getBoolean(KEY_SHOW_AIR_QUALITY_VALUES, false),
+        showMushroomValues = preferences.getBoolean(KEY_SHOW_MUSHROOM_VALUES, false),
         temperatureTextScale = preferences.getFloat(KEY_TEMPERATURE_TEXT_SCALE, .92f).takeIf { it in TEMPERATURE_TEXT_SCALES } ?: .92f,
     )
 
@@ -118,6 +142,14 @@ class WeatherPreferences(context: Context) {
             .putBoolean(KEY_SHOW_DATES, settings.showDates)
             .putBoolean(KEY_SHOW_MUSHROOMS, settings.showMushrooms)
             .putBoolean(KEY_SHOW_WIDGET_LOCATION, settings.showWidgetLocation)
+            .putBoolean(KEY_SHOW_SKY_VALUES, settings.showSkyValues)
+            .putBoolean(KEY_SHOW_WIND_VALUES, settings.showWindValues)
+            .putBoolean(KEY_SHOW_UV_VALUES, settings.showUvValues)
+            .putBoolean(KEY_SHOW_HUMIDITY_VALUES, settings.showHumidityValues)
+            .putBoolean(KEY_SHOW_PRESSURE_VALUES, settings.showPressureValues)
+            .putBoolean(KEY_SHOW_POLLEN_VALUES, settings.showPollenValues)
+            .putBoolean(KEY_SHOW_AIR_QUALITY_VALUES, settings.showAirQualityValues)
+            .putBoolean(KEY_SHOW_MUSHROOM_VALUES, settings.showMushroomValues)
             .putFloat(KEY_TEMPERATURE_TEXT_SCALE, settings.temperatureTextScale)
             .apply()
     }
@@ -159,6 +191,7 @@ class WeatherPreferences(context: Context) {
         showPrecipitation = preferences.getBoolean("${KEY_WIDGET_PREFIX}precipitation_$widgetId", defaults.showPrecipitation),
         showWindArrows = preferences.getBoolean("${KEY_WIDGET_PREFIX}wind_arrows_$widgetId", defaults.showWindArrows),
         showMushrooms = preferences.getBoolean("${KEY_WIDGET_PREFIX}mushrooms_$widgetId", defaults.showMushrooms),
+        showAlerts = preferences.getBoolean("${KEY_WIDGET_PREFIX}alerts_$widgetId", true),
         demo = preferences.getBoolean("${KEY_WIDGET_PREFIX}demo_$widgetId", false),
         temperatureTextScale = preferences.getFloat("${KEY_WIDGET_PREFIX}temperature_text_scale_$widgetId", 1f)
             .takeIf { it in TEMPERATURE_TEXT_SCALES } ?: 1f,
@@ -173,6 +206,7 @@ class WeatherPreferences(context: Context) {
             .putBoolean("${KEY_WIDGET_PREFIX}precipitation_$widgetId", settings.showPrecipitation)
             .putBoolean("${KEY_WIDGET_PREFIX}wind_arrows_$widgetId", settings.showWindArrows)
             .putBoolean("${KEY_WIDGET_PREFIX}mushrooms_$widgetId", settings.showMushrooms)
+            .putBoolean("${KEY_WIDGET_PREFIX}alerts_$widgetId", settings.showAlerts)
             .putBoolean("${KEY_WIDGET_PREFIX}demo_$widgetId", settings.demo)
             .putFloat("${KEY_WIDGET_PREFIX}temperature_text_scale_$widgetId", settings.temperatureTextScale)
             .apply()
@@ -189,6 +223,7 @@ class WeatherPreferences(context: Context) {
             .remove("${KEY_WIDGET_PREFIX}precipitation_$widgetId")
             .remove("${KEY_WIDGET_PREFIX}wind_arrows_$widgetId")
             .remove("${KEY_WIDGET_PREFIX}mushrooms_$widgetId")
+            .remove("${KEY_WIDGET_PREFIX}alerts_$widgetId")
             .remove("${KEY_WIDGET_PREFIX}demo_$widgetId")
             .remove("${KEY_WIDGET_PREFIX}temperature_text_scale_$widgetId")
             .apply()
@@ -234,6 +269,7 @@ class WeatherPreferences(context: Context) {
         const val KEY_ACTIVE_LOCATION = "active_location"
         const val KEY_TEMPERATURE_UNIT = "temperature_unit"
         const val KEY_ANALYTICS_CONSENT = "analytics_consent"
+        const val KEY_DISMISSED_ALERT_KEYS = "dismissed_alert_keys"
         const val KEY_ZOOM = "timeline_zoom"
         const val KEY_THEME = "color_theme"
         const val KEY_LANGUAGE = "language"
@@ -255,11 +291,20 @@ class WeatherPreferences(context: Context) {
         const val KEY_SHOW_DATES = "show_dates"
         const val KEY_SHOW_MUSHROOMS = "show_mushrooms"
         const val KEY_SHOW_WIDGET_LOCATION = "show_widget_location"
+        const val KEY_SHOW_SKY_VALUES = "show_sky_values"
+        const val KEY_SHOW_WIND_VALUES = "show_wind_values"
+        const val KEY_SHOW_UV_VALUES = "show_uv_values"
+        const val KEY_SHOW_HUMIDITY_VALUES = "show_humidity_values"
+        const val KEY_SHOW_PRESSURE_VALUES = "show_pressure_values"
+        const val KEY_SHOW_POLLEN_VALUES = "show_pollen_values"
+        const val KEY_SHOW_AIR_QUALITY_VALUES = "show_air_quality_values"
+        const val KEY_SHOW_MUSHROOM_VALUES = "show_mushroom_values"
         const val KEY_TEMPERATURE_TEXT_SCALE = "temperature_text_scale"
         const val KEY_WIDGET_LOCATION_PREFIX = "widget_location_"
         const val KEY_WIDGET_FORECAST_HOURS_PREFIX = "widget_forecast_hours_"
         const val KEY_WIDGET_PREFIX = "widget_setting_"
         const val DEFAULT_WIDGET_FORECAST_HOURS = 48
+        const val MAX_DISMISSED_ALERT_KEYS = 100
         val WIDGET_FORECAST_HOURS = (6..120 step 6).toSet()
         val ZOOM_LEVELS = setOf(.25f, .3f, .5f, .75f, 1f, 2f)
         val THEMES = setOf("system", "dark", "light")

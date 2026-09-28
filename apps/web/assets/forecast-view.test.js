@@ -21,8 +21,8 @@ test('keeps sunlight and clouds visible when a compact sky cannot fit a precipit
 
 test('groups forecast values without hiding severe weather', () => {
   const grouped = groupHourlyForecast([
-    {timestamp: '2026-09-12T00:00', temperature: 10, apparentTemperature: 8, precipitation: 1, precipitationProbability: 20, weatherCode: 3, windSpeed: 10, windDirection: 350, windGusts: 14},
-    {timestamp: '2026-09-12T01:00', temperature: 14, apparentTemperature: 12, precipitation: 2, precipitationProbability: 80, weatherCode: 95, windSpeed: 20, windDirection: 10, windGusts: 32, tornado: true}
+    {timestamp: '2026-09-12T00:00', temperature: 10, apparentTemperature: 8, precipitation: 1, precipitationProbability: 20, weatherCode: 3, windSpeed: 10, windDirection: 350, windGusts: 14, uvIndex: 2, pollen: {grass: 4}, airQuality: {europeanAqi: 20}},
+    {timestamp: '2026-09-12T01:00', temperature: 14, apparentTemperature: 12, precipitation: 2, precipitationProbability: 80, weatherCode: 95, windSpeed: 20, windDirection: 10, windGusts: 32, tornado: true, uvIndex: 6, pollen: {grass: 8}, airQuality: {europeanAqi: 40}}
   ], 2);
   assert.equal(grouped.length, 1);
   assert.equal(grouped[0].temperature, 12);
@@ -31,6 +31,9 @@ test('groups forecast values without hiding severe weather', () => {
   assert.equal(grouped[0].weatherCode, 95);
   assert.equal(grouped[0].windGusts, 32);
   assert.equal(grouped[0].tornado, true);
+  assert.equal(grouped[0].uvIndex, 4);
+  assert.equal(grouped[0].pollen.grass, 6);
+  assert.equal(grouped[0].airQuality.europeanAqi, 30);
   assert.ok(grouped[0].windDirection < 1 || grouped[0].windDirection > 359);
 });
 

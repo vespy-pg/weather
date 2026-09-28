@@ -119,6 +119,24 @@ data class WeatherAlert(
     val sourceUrl: String,
 )
 
+private val IMGW_ALERT_AREA_SUFFIX = Regex("""\.PL\d+$""")
+
+private fun String.stableAlertId(): String = replace(IMGW_ALERT_AREA_SUFFIX, "")
+
+fun WeatherLocation.alertDismissalKey(alertId: String): String =
+    "$latitude,$longitude|${alertId.stableAlertId()}"
+
+fun WeatherLocation.isAlertDismissed(alertId: String, dismissedAlertKeys: Set<String>): Boolean {
+    val locationPrefix = "$latitude,$longitude|"
+    val stableId = alertId.stableAlertId()
+    return dismissedAlertKeys.any { key ->
+        key.startsWith(locationPrefix) && key.removePrefix(locationPrefix).stableAlertId() == stableId
+    }
+}
+
+fun WeatherForecast.visibleAlerts(forLocation: WeatherLocation, dismissedAlertKeys: Set<String>): List<WeatherAlert> =
+    alerts.filterNot { forLocation.isAlertDismissed(it.id, dismissedAlertKeys) }
+
 enum class ForecastSummary {
     FREEZING_PRECIPITATION,
     THUNDERSTORMS,
@@ -230,6 +248,14 @@ data class ForecastDisplaySettings(
     val showDates: Boolean = false,
     val showMushrooms: Boolean = false,
     val showWidgetLocation: Boolean = true,
+    val showSkyValues: Boolean = false,
+    val showWindValues: Boolean = false,
+    val showUvValues: Boolean = false,
+    val showHumidityValues: Boolean = false,
+    val showPressureValues: Boolean = false,
+    val showPollenValues: Boolean = false,
+    val showAirQualityValues: Boolean = false,
+    val showMushroomValues: Boolean = false,
     val temperatureTextScale: Float = .92f,
 )
 
@@ -248,6 +274,7 @@ data class WidgetDisplaySettings(
     val showPrecipitation: Boolean = true,
     val showWindArrows: Boolean = false,
     val showMushrooms: Boolean = false,
+    val showAlerts: Boolean = true,
     val demo: Boolean = false,
     val temperatureTextScale: Float = 1f,
 )

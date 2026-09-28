@@ -51,6 +51,25 @@ function maximum(points, property) {
   return values.length ? Math.max(...values) : null;
 }
 
+function averageNested(points, parent, property) {
+  const values = points
+    .map(point => numericValue(point[parent]?.[property]))
+    .filter(value => value !== null);
+  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+}
+
+function groupedPollen(points) {
+  const pollen = Object.fromEntries(['alder', 'birch', 'grass', 'mugwort', 'olive', 'ragweed']
+    .map(property => [property, averageNested(points, 'pollen', property)]));
+  return Object.values(pollen).some(value => value !== null) ? pollen : null;
+}
+
+function groupedAirQuality(points) {
+  const airQuality = Object.fromEntries(['europeanAqi', 'pm25', 'pm10', 'nitrogenDioxide', 'ozone', 'sulphurDioxide', 'carbonMonoxide']
+    .map(property => [property, averageNested(points, 'airQuality', property)]));
+  return Object.values(airQuality).some(value => value !== null) ? airQuality : null;
+}
+
 function representativeWeatherCode(points) {
   return points.reduce((selected, point) => {
     const code = numericValue(point.weatherCode);
@@ -90,6 +109,9 @@ export function groupHourlyForecast(hourly, size) {
       apparentTemperature: average(points, 'apparentTemperature'),
       relativeHumidity: average(points, 'relativeHumidity'),
       surfacePressure: average(points, 'surfacePressure'),
+      uvIndex: average(points, 'uvIndex'),
+      pollen: groupedPollen(points),
+      airQuality: groupedAirQuality(points),
       cloudCover: average(points, 'cloudCover'),
       precipitation: total(points, 'precipitation'),
       precipitationProbability: maximum(points, 'precipitationProbability'),

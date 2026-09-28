@@ -29,6 +29,7 @@ data class WeatherUiState(
     val temperatureUnit: String = "C",
     val displaySettings: ForecastDisplaySettings = ForecastDisplaySettings(),
     val analyticsConsent: Boolean? = null,
+    val dismissedAlertKeys: Set<String> = emptySet(),
     val demo: Boolean = false,
 )
 
@@ -57,6 +58,7 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
             temperatureUnit = preferences.temperatureUnit(),
             displaySettings = preferences.displaySettings(),
             analyticsConsent = preferences.analyticsConsent(),
+            dismissedAlertKeys = preferences.dismissedAlertKeys(),
         ),
     )
         private set
@@ -158,6 +160,20 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
         preferences.saveAnalyticsConsent(enabled)
         analytics.setConsent(enabled)
         state = state.copy(analyticsConsent = enabled)
+    }
+
+    fun dismissAlert(alertId: String) {
+        preferences.dismissAlert(state.location, alertId)
+        state = state.copy(dismissedAlertKeys = preferences.dismissedAlertKeys())
+        WeatherWidgetProvider.refreshAll(getApplication())
+    }
+
+    fun restoreCurrentAlerts() {
+        val currentIds = state.forecast?.alerts.orEmpty().mapTo(mutableSetOf()) { it.id }
+        if (currentIds.isEmpty()) return
+        preferences.restoreAlerts(state.location, currentIds)
+        state = state.copy(dismissedAlertKeys = preferences.dismissedAlertKeys())
+        WeatherWidgetProvider.refreshAll(getApplication())
     }
 
     fun recordPromotionImpression(campaignId: String) = analytics.promotionImpression(campaignId)

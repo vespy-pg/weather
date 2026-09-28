@@ -9,6 +9,11 @@ const DISPLAY_PARAMETERS = Object.freeze({
   precipitation: 'showPrecipitation',
   wind: 'showWind',
   windArrows: 'showWindArrows',
+  uv: 'showUv',
+  humidity: 'showHumidity',
+  pressure: 'showPressure',
+  airQuality: 'showAirQuality',
+  pollen: 'showPollen',
   mushrooms: 'showMushrooms',
   historicalData: 'showHistoricalData',
   dates: 'showDates'

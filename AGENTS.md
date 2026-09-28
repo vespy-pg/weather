@@ -27,7 +27,10 @@ Shared rules in `~/.ai/rules/` are the source of truth for machine-wide AI behav
 
 ## Android releases
 
+- Every newly prepared Google Play AAB must increment `versionCode` before the build, even when the previous AAB was not confirmed as uploaded. Reusing a `versionCode` is allowed only when the user explicitly requests it.
+- Increase `versionName` for every newly prepared Google Play AAB unless the user explicitly requests otherwise.
 - Every new Android version must include release notes for every supported Google Play locale.
 - The currently supported release-note locales are `en-US` and `pl-PL`.
 - Update both `play/store-listing/en-US/release-notes.txt` and `play/store-listing/pl-PL/release-notes.txt` whenever `versionCode` or `versionName` changes.
 - Treat adding another Google Play locale as automatically extending this requirement to that locale.
+- Every AAB handoff must state `versionCode` and `versionName`, link the generated AAB, and include ready-to-paste release notes for every supported locale using Google Play's `<locale>...</locale>` format.

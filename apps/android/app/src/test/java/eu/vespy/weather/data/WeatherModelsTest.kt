@@ -152,4 +152,53 @@ class WeatherModelsTest {
             forecast(points).nextDaysSummaries(),
         )
     }
+
+    @Test
+    fun dismissedWarningsAreScopedToTheirLocation() {
+        val location = WeatherLocation("Test", "Test", 50.1, 19.2, "Europe/Warsaw")
+        val otherLocation = location.copy(name = "Other", latitude = 50.2)
+        val alert = WeatherAlert(
+            id = "warning-1",
+            event = "Wind",
+            headline = "Strong wind",
+            description = null,
+            instruction = null,
+            area = null,
+            severity = "severe",
+            onset = null,
+            expires = null,
+            source = "Test",
+            sourceUrl = "https://example.com",
+        )
+        val source = forecast(summaryPoints()).copy(location = location, alerts = listOf(alert))
+        val other = source.copy(location = otherLocation)
+        val dismissed = setOf(location.alertDismissalKey(alert.id))
+
+        assertEquals(emptyList<WeatherAlert>(), source.visibleAlerts(location, dismissed))
+        assertEquals(listOf(alert), other.visibleAlerts(otherLocation, dismissed))
+    }
+
+    @Test
+    fun dismissedImgwWarningMatchesChangingAreaSuffix() {
+        val location = WeatherLocation("Test", "Test", 50.1, 19.2, "Europe/Warsaw")
+        val alert = WeatherAlert(
+            id = "2.49.0.0.616.0.PL.Sk20260920101303513.PL2464",
+            event = "Wind",
+            headline = "Strong wind",
+            description = null,
+            instruction = null,
+            area = null,
+            severity = "severe",
+            onset = null,
+            expires = null,
+            source = "IMGW",
+            sourceUrl = "https://example.com",
+        )
+        val source = forecast(summaryPoints()).copy(location = location, alerts = listOf(alert))
+        val legacyDismissal = setOf(
+            "${location.latitude},${location.longitude}|2.49.0.0.616.0.PL.Sk20260920101303513.PL2404",
+        )
+
+        assertEquals(emptyList<WeatherAlert>(), source.visibleAlerts(location, legacyDismissal))
+    }
 }
