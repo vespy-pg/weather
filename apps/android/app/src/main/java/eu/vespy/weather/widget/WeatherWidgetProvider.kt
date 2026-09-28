@@ -15,6 +15,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.util.SizeF
 import android.widget.RemoteViews
 import org.json.JSONArray
@@ -408,24 +409,33 @@ open class WeatherWidgetProvider : AppWidgetProvider() {
         private const val MAX_BITMAP_SIZE = 1600
 
         fun refreshAll(context: Context) {
-            val manager = AppWidgetManager.getInstance(context)
+            val manager = try {
+                AppWidgetManager.getInstance(context)
+            } catch (error: RuntimeException) {
+                Log.w("WeatherWidgetProvider", "Widget service is unavailable", error)
+                return
+            }
             listOf(
                 WeatherWidgetProvider::class.java,
                 WeatherAdvisoryWidgetProvider::class.java,
                 WeatherStripWidgetProvider::class.java,
             ).forEach { providerClass ->
-                val component = ComponentName(context, providerClass)
-                val widgetIds = manager.getAppWidgetIds(component)
-                if (widgetIds.isNotEmpty()) context.sendBroadcast(Intent(context, providerClass).apply {
-                    action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-                    data = Uri.Builder()
-                        .scheme("vespy-weather")
-                        .authority("widgets-refresh")
-                        .appendPath(providerClass.simpleName)
-                        .appendQueryParameter("request", System.currentTimeMillis().toString())
-                        .build()
-                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, widgetIds)
-                })
+                try {
+                    val component = ComponentName(context, providerClass)
+                    val widgetIds = manager.getAppWidgetIds(component)
+                    if (widgetIds.isNotEmpty()) context.sendBroadcast(Intent(context, providerClass).apply {
+                        action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+                        data = Uri.Builder()
+                            .scheme("vespy-weather")
+                            .authority("widgets-refresh")
+                            .appendPath(providerClass.simpleName)
+                            .appendQueryParameter("request", System.currentTimeMillis().toString())
+                            .build()
+                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, widgetIds)
+                    })
+                } catch (error: RuntimeException) {
+                    Log.w("WeatherWidgetProvider", "Could not refresh ${providerClass.simpleName}", error)
+                }
             }
         }
 
