@@ -31,6 +31,14 @@ export function shouldUseRouteLocation({hasActiveLocation = false, embedded = fa
   return !hasActiveLocation || embedded || shared;
 }
 
+export function persistentRouteQuery(parameters, embedded = false) {
+  const excluded = new Set(['ll', 'lat', 'lon', 'name', 'timezone']);
+  const preserved = embedded
+    ? [...parameters].filter(([key]) => !excluded.has(key))
+    : [...parameters].filter(([key]) => ['demo', 'guide', 'share'].includes(key));
+  return Object.fromEntries(preserved);
+}
+
 export function applicationRouteUrl(base, language) {
   const url = new URL('/', base);
   url.pathname = `/${encodeURIComponent(language)}`;

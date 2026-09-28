@@ -3,6 +3,23 @@
 export const ACTIVE_LOCATION_COOKIE = 'weather.active-location.v1';
 const ACTIVE_LOCATION_MAX_AGE_SECONDS = 365 * 24 * 60 * 60;
 
+export function readStoredSettings(windowObject, key) {
+  try {
+    const value = JSON.parse(windowObject.localStorage.getItem(key) || '{}');
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  } catch {
+    return {};
+  }
+}
+
+export function readActiveLocationCookie(documentObject) {
+  try {
+    return activeLocationFromCookies(documentObject.cookie);
+  } catch {
+    return null;
+  }
+}
+
 export function normalizeStoredLocation(item) {
   const latitude = Number(item?.latitude);
   const longitude = Number(item?.longitude);

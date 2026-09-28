@@ -8,6 +8,8 @@ import {
   isLegacyPlaceholderLocation,
   normalizeStoredLocation,
   preferredActiveLocation,
+  readActiveLocationCookie,
+  readStoredSettings,
   replacingLocation,
   sameLocation,
   uniqueLocations,
@@ -17,6 +19,13 @@ import {
 const warsaw = {id: 'warsaw', name: 'Warsaw'};
 const berlin = {id: 'berlin', name: 'Berlin'};
 const device = {id: 'device', name: 'Current location'};
+
+test('blocked third-party storage leaves URL location available', () => {
+  const blockedStorage = {get localStorage() { throw new Error('Storage access denied'); }};
+  const blockedCookies = {get cookie() { throw new Error('Cookie access denied'); }};
+  assert.deepEqual(readStoredSettings(blockedStorage, 'weather.settings.v1'), {});
+  assert.equal(readActiveLocationCookie(blockedCookies), null);
+});
 
 const warsawLocation = {
   id: 'warsaw',

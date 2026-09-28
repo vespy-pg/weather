@@ -12,12 +12,14 @@ import {
   isLegacyPlaceholderLocation,
   normalizeStoredLocation,
   preferredActiveLocation,
+  readActiveLocationCookie,
+  readStoredSettings,
   replacingLocation,
   sameLocation,
   uniqueLocations,
   withLocation
-} from './location-state.js';
-import {applicationRouteUrl, forecastRouteUrl, parseCoordinatePair, parseForecastRoute, shouldUseRouteLocation} from './route-state.js';
+} from './location-state.js?v=2';
+import {applicationRouteUrl, forecastRouteUrl, parseCoordinatePair, parseForecastRoute, persistentRouteQuery, shouldUseRouteLocation} from './route-state.js?v=2';
 import {weatherRefreshIsDue} from './weather-refresh.js';
 import {POLLEN_TYPES, POLLUTANTS, aggregate, airQualityColor, dateAtTimelinePosition, daylightComparison, moonPhase, moonPhaseIndex, pointsForDate, pollenPeak, uvColor, windColor as dayWindColor} from './day-brief.js';
 import {
@@ -303,7 +305,7 @@ function locationLabel(item) {
 
 function loadSettings() {
   try {
-    const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+    const saved = readStoredSettings(window, SETTINGS_KEY);
     let stored = {...DEFAULT_SETTINGS, ...saved};
     if (saved.layoutVersion !== LAYOUT_VERSION) {
       stored.zoom = DEFAULT_ZOOM;
@@ -319,7 +321,7 @@ function loadSettings() {
       .map(normalizeStoredLocation)
       .filter(Boolean));
     const activeLocation = preferredActiveLocation({
-      cookieLocation: legacyPlaceholder ? null : activeLocationFromCookies(document.cookie),
+      cookieLocation: legacyPlaceholder ? null : readActiveLocationCookie(document),
       savedLocation: saved.location,
       savedConfigured: !legacyPlaceholder && saved.configured
     });
@@ -381,7 +383,7 @@ function loadSettings() {
     stored.zoom = ZOOM_LEVELS.reduce((closest, zoom) => Math.abs(zoom - Number(stored.zoom)) < Math.abs(closest - Number(stored.zoom)) ? zoom : closest, DEFAULT_ZOOM);
     return stored;
   } catch {
-    const activeLocation = activeLocationFromCookies(document.cookie);
+    const activeLocation = readActiveLocationCookie(document);
     return {
       ...DEFAULT_SETTINGS,
       location: activeLocation || {...DEFAULT_LOCATION},
@@ -492,10 +494,7 @@ function updateSeoMetadata(locationOverride = settings.location) {
 
 function updateBrowserRoute() {
   if (IS_GITHUB_PAGES || !Number.isFinite(Number(settings.location?.latitude)) || !Number.isFinite(Number(settings.location?.longitude))) return;
-  const query = {};
-  ['demo', 'guide', 'share'].forEach(key => {
-    if (QUERY.has(key)) query[key] = QUERY.get(key);
-  });
+  const query = persistentRouteQuery(QUERY, IS_EMBEDDED);
   const url = forecastRouteUrl(location.origin, {language: settings.language, location: settings.location, query});
   history.replaceState(null, '', `${url.pathname}${url.search}`);
   updateSeoMetadata();

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'weather-shell-v56';
+const CACHE_NAME = 'weather-shell-v57';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -13,8 +13,8 @@ const APP_SHELL = [
   '/assets/forecast-summary.js',
   '/assets/i18n.js',
   '/assets/generated/i18n.js',
-  '/assets/location-state.js',
-  '/assets/route-state.js',
+  '/assets/location-state.js?v=2',
+  '/assets/route-state.js?v=2',
   '/assets/temperature-scale.js',
   '/assets/weather-refresh.js',
   '/assets/weather-demo.js',
