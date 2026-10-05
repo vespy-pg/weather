@@ -1,1 +1,1 @@
-Improves location switching on devices where widget services are unavailable.
+Shows fog in the forecast timeline and weather widgets.

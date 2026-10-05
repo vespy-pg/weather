@@ -34,8 +34,8 @@ android {
         applicationId = "eu.vespy.weather"
         minSdk = 26
         targetSdk = 37
-        versionCode = 13
-        versionName = "0.1.10"
+        versionCode = 14
+        versionName = "0.1.11"
 
         buildConfigField("String", "API_BASE_URL", "\"${weatherApiBaseUrl.get()}\"")
         manifestPlaceholders["usesCleartextTraffic"] = weatherAllowCleartext.get()

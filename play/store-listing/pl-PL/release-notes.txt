@@ -1,1 +1,1 @@
-Usprawniono zmianę lokalizacji na urządzeniach, na których usługi widżetów są niedostępne.
+Dodano wizualizację mgły na osi prognozy i w widżetach pogodowych.
