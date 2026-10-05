@@ -419,6 +419,29 @@ object ForecastGraphics {
 
         drawWeatherArea(canvas, bounds, smoothedClouds, weatherLine, weatherDepth, false, palette)
         val precipitationY = bounds.bottom - max(9f, (bounds.bottom - weatherLine) * .18f)
+        val fogBottom = weatherLine + (precipitationY - weatherLine) * .8f
+        val fogRowSpacing = min(6f * pixelScale, (fogBottom - weatherLine) / 4f)
+        val fogPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 2f * pixelScale
+            strokeCap = Paint.Cap.ROUND
+        }
+        points.forEachIndexed { index, point ->
+            if (point.weatherCode != 45 && point.weatherCode != 48) return@forEachIndexed
+            fogPaint.color = withAlpha(palette.cloud, if (point.weatherCode == 48) 184 else 128)
+            val left = bounds.left + index * cell
+            val inset = min(3f * pixelScale, cell * .25f)
+            repeat(3) { row ->
+                val y = fogBottom - (2 - row) * fogRowSpacing
+                canvas.drawLine(
+                    left + if (row % 2 == 0) 0f else inset,
+                    y,
+                    left + cell - if (row % 2 == 0) inset else 0f,
+                    y,
+                    fogPaint,
+                )
+            }
+        }
         if (showPrecipitation) points.forEachIndexed { index, point ->
             val probability = (point.precipitationProbability ?: 0.0).toFloat().coerceIn(0f, 100f)
             if (probability <= 0f) return@forEachIndexed
