@@ -1,10 +1,10 @@
-const CACHE_NAME = 'weather-shell-v57';
+const CACHE_NAME = 'weather-shell-v58';
 const APP_SHELL = [
   '/',
   '/index.html',
   '/manifest.webmanifest',
-  '/assets/app.css?v=63',
-  '/assets/app.js?v=58',
+  '/assets/app.css?v=64',
+  '/assets/app.js?v=59',
   '/assets/analytics.js',
   '/assets/charts.js',
   '/assets/components.js',

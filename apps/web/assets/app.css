@@ -140,7 +140,8 @@ html[lang="pl-PL"] .google-play-badge-pl { display: block; }
 .weather-symbol { margin-right: 8px; font-family: sans-serif; }
 .error-card .metric-value { color: var(--orange); }
 
-.web-promotion { min-height: 86px; margin-top: 10px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--promotion-accent, var(--line)) 72%, var(--line)); border-radius: 10px; background: radial-gradient(circle at 80% 0, color-mix(in srgb, var(--promotion-accent, var(--orange)) 16%, transparent), transparent 38%), var(--promotion-background, var(--panel)); }
+.web-promotion { position: fixed; z-index: 40; right: 0; bottom: 0; left: 0; min-height: 86px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--promotion-accent, var(--line)) 72%, var(--line)); border-radius: 10px 10px 0 0; background: radial-gradient(circle at 80% 0, color-mix(in srgb, var(--promotion-accent, var(--orange)) 16%, transparent), transparent 38%), var(--promotion-background, var(--panel)); box-shadow: 0 -8px 30px rgba(0, 0, 0, .28); }
+body.has-web-promotion .shell { padding-bottom: calc(var(--web-promotion-height, 86px) + 16px); }
 .web-promotion-link { display: grid; grid-template-columns: minmax(126px, 160px) minmax(0, 1fr) 132px auto; align-items: center; gap: 16px; min-height: 86px; padding: 8px 12px 8px 16px; color: var(--text); text-decoration: none; }
 .web-promotion-logo { display: block; width: 100%; height: auto; filter: drop-shadow(0 5px 10px rgba(0, 0, 0, .2)); }
 .web-promotion-copy { display: grid; gap: 4px; min-width: 0; }
@@ -227,10 +228,9 @@ html[data-share-prompt="collapsed"] .share-forecast { display: none; }
 .day-brief-navigation button { width: 38px; height: 38px; border: 1px solid var(--line); border-radius: 7px; background: var(--card); color: var(--text); font-size: 28px; line-height: 1; cursor: pointer; }
 .day-brief-navigation button:disabled { opacity: .35; cursor: default; }
 .day-brief-condition { color: var(--muted); font-weight: 800; }
-.day-brief-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.day-brief-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
 .day-brief-section { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--card); }
-.day-brief-section.wide { grid-column: 1 / -1; }
-.day-brief-section.full { grid-column: 1 / -1; }
+.day-brief-section.moon-phases { grid-column: 1 / -1; }
 .day-brief-section h3 { margin: 0 0 12px; color: var(--muted); font: 900 11px/1 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; }
 .day-brief-values { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .day-brief-value { min-width: 0; padding: 10px; border-radius: 7px; background: color-mix(in srgb, var(--surface) 72%, transparent); }
@@ -255,6 +255,16 @@ html[data-share-prompt="collapsed"] .share-forecast { display: none; }
 .moon-day { flex: 0 0 42px; text-align: center; }
 .moon-icon { display: block; width: 30px; height: 30px; margin: auto; font: 25px/30px sans-serif; filter: drop-shadow(0 0 5px rgba(194,210,255,.25)); }
 .moon-day small { display: block; margin-top: 4px; color: var(--muted); font-size: 9px; }
+@media (min-width: 900px) {
+  .day-brief-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .day-brief-section.wind { grid-column: 1 / -1; }
+}
+@media (min-width: 1500px) {
+  .day-brief-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .day-brief-section.temperature, .day-brief-section.precipitation, .day-brief-section.wind { grid-column: span 2; }
+  .day-brief-section.air-quality, .day-brief-section.pollen, .day-brief-section.sun, .day-brief-section.moon { grid-column: span 3; }
+  .day-brief-section.moon-phases { grid-column: 1 / -1; }
+}
 .day-brief-empty { display: grid; min-height: 110px; place-items: center; background: repeating-linear-gradient(135deg, transparent 0 11px, color-mix(in srgb, var(--muted) 10%, transparent) 11px 12px); color: var(--muted); }
 .day-brief-loading { height: 220px; border-radius: 8px; background: linear-gradient(100deg, var(--card) 20%, color-mix(in srgb, var(--card) 72%, var(--muted)) 35%, var(--card) 50%) 0 0 / 240% 100%; animation: skeleton 1.25s linear infinite; }
 .forecast-track-mushrooms[hidden] { display: none; }
@@ -490,8 +500,6 @@ body.embedded .data-attribution { display: none; }
   .current-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .forecast-timeline { --forecast-slot-width: 33px; }
   .legend-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .day-brief-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .day-brief-section.wide { grid-column: span 2; }
 }
 
 @media (max-width: 700px) {
@@ -598,8 +606,6 @@ body.embedded .data-attribution { display: none; }
   .web-promotion-preview { display: none; }
   .web-promotion-description { font-size: 10px; }
   .web-promotion-action { grid-column: 2; justify-self: start; padding: 0; border: 0; }
-  .day-brief-grid { grid-template-columns: 1fr; }
-  .day-brief-section.wide, .day-brief-section.full { grid-column: 1; }
   .day-brief-bar-row { grid-template-columns: 58px minmax(0, 1fr) 76px; }
 }
 

@@ -185,6 +185,12 @@ let notificationTimer = 0;
 let mushroomObservationRequest = 0;
 let mushroomObservations = null;
 const promotionImpressions = new Set();
+const promotionSlot = document.getElementById('webPromotion');
+if ('ResizeObserver' in window) {
+  new ResizeObserver(([entry]) => {
+    document.documentElement.style.setProperty('--web-promotion-height', `${entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height}px`);
+  }).observe(promotionSlot);
+}
 let forecastWelcomeDisplayed = false;
 let displayedTimelineHourly = [];
 let selectedForecastDate = null;
@@ -203,10 +209,11 @@ function safePromotionColor(value, fallback) {
 }
 
 function renderPromotion(campaign) {
-  const slot = document.getElementById('webPromotion');
+  const slot = promotionSlot;
   const targetUrl = safePromotionUrl(campaign?.targetUrl);
   if (!targetUrl || !['native-card', 'image-banner'].includes(campaign?.type)) {
     slot.hidden = true;
+    document.body.classList.remove('has-web-promotion');
     slot.replaceChildren();
     return;
   }
@@ -269,6 +276,7 @@ function renderPromotion(campaign) {
 
   slot.replaceChildren(link);
   slot.hidden = false;
+  document.body.classList.add('has-web-promotion');
   const campaignId = String(campaign.id || 'unknown');
   if (!promotionImpressions.has(campaignId)) {
     promotionImpressions.add(campaignId);
@@ -861,15 +869,18 @@ function moonHtml(date, sunrise) {
   const set = (rise + 720) % 1440;
   const transit = (rise + 360) % 1440;
   const x = transit / 1440 * 1000;
-  const days = Array.from({length: 30}, (_, offset) => {
+  return `<div class="day-brief-values">${dayMetric(t(`dayBrief.${phaseKeys[moonPhaseIndex(phase)]}`), `${Math.round((1 - Math.cos(2 * Math.PI * phase)) / 2 * 100)}%`, '#c2d2ff')}${dayMetric(t('dayBrief.moon'), `~${clockFromMinutes(rise)} - ~${clockFromMinutes(set)}`, '#c2d2ff')}</div>
+    <svg class="moon-path" viewBox="0 0 1000 100" preserveAspectRatio="none"><rect x="0" y="90" width="1000" height="10" fill="#18232d"/><line x1="0" y1="90" x2="1000" y2="90" stroke="#8d98aa" stroke-opacity=".52" stroke-width="2"/>${moonPathData(rise)}<circle cx="${x.toFixed(2)}" cy="22" r="18" fill="#c2d2ff" fill-opacity=".13"/><circle cx="${x.toFixed(2)}" cy="22" r="9" fill="#c2d2ff"/></svg>
+    <small class="muted">${escapeHtml(t('dayBrief.moonApproximate'))}</small>`;
+}
+
+function moonPhasesHtml(date) {
+  return `<div class="moon-calendar">${Array.from({length: 30}, (_, offset) => {
     const next = new Date(`${date}T12:00:00`);
     next.setDate(next.getDate() + offset);
     const nextDate = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`;
     return `<div class="moon-day">${moonIconHtml(moonPhase(nextDate))}<small>${next.getDate()}.${next.getMonth() + 1}</small></div>`;
-  }).join('');
-  return `<div class="day-brief-values">${dayMetric(t(`dayBrief.${phaseKeys[moonPhaseIndex(phase)]}`), `${Math.round((1 - Math.cos(2 * Math.PI * phase)) / 2 * 100)}%`, '#c2d2ff')}${dayMetric(t('dayBrief.moon'), `~${clockFromMinutes(rise)} - ~${clockFromMinutes(set)}`, '#c2d2ff')}</div>
-    <svg class="moon-path" viewBox="0 0 1000 100" preserveAspectRatio="none"><rect x="0" y="90" width="1000" height="10" fill="#18232d"/><line x1="0" y1="90" x2="1000" y2="90" stroke="#8d98aa" stroke-opacity=".52" stroke-width="2"/>${moonPathData(rise)}<circle cx="${x.toFixed(2)}" cy="22" r="18" fill="#c2d2ff" fill-opacity=".13"/><circle cx="${x.toFixed(2)}" cy="22" r="9" fill="#c2d2ff"/></svg>
-    <small class="muted">${escapeHtml(t('dayBrief.moonApproximate'))}</small><h3>${escapeHtml(t('dayBrief.nextMoonPhases'))}</h3><div class="moon-calendar">${days}</div>`;
+  }).join('')}</div>`;
 }
 
 function renderSelectedDay(date, {scrollIntoView = false} = {}) {
@@ -902,13 +913,14 @@ function renderSelectedDay(date, {scrollIntoView = false} = {}) {
   const nextDate = adjacentForecastDate(availableDates, selectedDate, 1);
   container.innerHTML = `<div class="day-brief-heading"><div><p class="eyebrow">${escapeHtml(t('dayBrief.eyebrow'))}</p><h2 id="forecastDayBriefTitle">${escapeHtml(formatForecastDate(selectedDate, {weekday: 'long', day: 'numeric', month: 'long'}))}</h2></div><div class="day-brief-heading-actions"><div class="day-brief-condition">${condition[0]} ${escapeHtml(condition[1])}</div><nav class="day-brief-navigation" aria-label="${escapeHtml(t('dayBrief.navigate'))}"><button type="button" data-day-direction="-1" aria-label="${escapeHtml(t('dayBrief.previous'))}" ${previousDate ? '' : 'disabled'}>‹</button><button type="button" data-day-direction="1" aria-label="${escapeHtml(t('dayBrief.next'))}" ${nextDate ? '' : 'disabled'}>›</button></nav></div></div>
     <div class="day-brief-grid">
-      ${daySection(t('dayBrief.temperature'), `<div class="day-brief-values">${dayMetric(t('dayBrief.minimum'), temperature(minimum), temperatureColor(minimum))}${dayMetric(t('dayBrief.maximum'), temperature(maximum), temperatureColor(maximum))}${dayMetric(t('dayBrief.feelsMinimum'), temperature(apparentMinimum), temperatureColor(apparentMinimum))}${dayMetric(t('dayBrief.feelsMaximum'), temperature(apparentMaximum), temperatureColor(apparentMaximum))}</div>`)}
-      ${daySection(t('dayBrief.precipitation'), `<div class="day-brief-values">${dayMetric(t('dayBrief.rainTotal'), measurement(precipitation, ' mm', 1), '#4aa3ff')}${dayMetric(t('dayBrief.rainChance'), measurement(rainChance, '%'), '#4aa3ff')}${dayMetric(t('dayBrief.wetHours'), `${wetHours} h`, '#4aa3ff')}${dayMetric(t('dayBrief.cloudCover'), measurement(cloud, '%'), '#94a4b8')}</div>`)}
-      ${daySection(t('dayBrief.wind'), `<div class="day-brief-values">${dayMetric(t('dayBrief.windPeak'), measurement(peakWind, ' km/h'), dayWindColor(peakWind))}${dayMetric(t('dayBrief.windGust'), measurement(peakGust, ' km/h'), dayWindColor(peakGust))}${dayMetric(t('dayBrief.humidity'), measurement(humidity, '%'), '#4aa3ff')}${dayMetric(t('dayBrief.pressure'), measurement(pressure, ' hPa'), '#b1c6da')}${dayMetric(t('dayBrief.visibility'), visibility === null ? '-' : measurement(visibility / 1000, ' km', 1), '#64d5c2')}${dayMetric(t('dayBrief.direction'), numericValue(day.windDirection) === null ? '-' : windDirection(day.windDirection), '#9bc7d7')}</div>`, 'full')}
-      ${daySection(t('dayBrief.airQuality'), aqi ? `${dayMetric(t('dayBrief.europeanAqi'), numericValue(aqi.europeanAqi) === null ? '-' : `${Math.round(aqi.europeanAqi)} - ${airQualityLabel(numericValue(aqi.europeanAqi))}`, airQualityColor(aqi.europeanAqi))}${chartRows(POLLUTANTS.map(([key, label, scale]) => [label, aqi[key], scale]), 1, (value, scale) => airQualityColor(value === null ? null : value / scale * 100), value => value === null ? '-' : `${value.toFixed(1)} µg/m3`)}` : `<div class="day-brief-empty">${escapeHtml(t('dayBrief.noData'))}</div>`, 'full')}
-      ${daySection(t('dayBrief.pollen'), pollen ? chartRows(POLLEN_TYPES.map(type => [t(`dayBrief.${type}`), pollen[type]]), Math.max(1, pollenPeak(pollen)), value => value === null ? '#8d98aa' : value < 1 ? '#55cf8a' : value < 10 ? '#ffc83d' : value < 50 ? '#ff8a3d' : '#ff4055', value => value === null ? '-' : `${value.toFixed(1)} ${t('dayBrief.pollenUnit')}`) : `<div class="day-brief-empty">${escapeHtml(t('dayBrief.noData'))}</div>`, 'full')}
-      ${daySection(t('dayBrief.sun'), `${sunComparisonHtml(day, comparison, weather.location?.timezone || settings.location.timezone)}<div class="day-brief-values">${dayMetric(t('dayBrief.selectedDay'), durationText(comparison.current), '#ffc83d')}${dayMetric(t('dayBrief.sunshine'), durationText(day.sunshineDuration), '#ffa928')}${dayMetric(t('dayBrief.uvMaximum'), numericValue(day.uvIndexMaximum)?.toFixed(1) || '-', uvColor(day.uvIndexMaximum))}${dayMetric(`${t('dayBrief.sunrise')} - ${t('dayBrief.sunset')}`, `${clockFromMinutes(clockMinutes(day.sunrise) ?? 0)} - ${clockFromMinutes(clockMinutes(day.sunset) ?? 0)}`, '#ffc83d')}</div>`, 'full')}
-      ${daySection(t('dayBrief.moon'), moonHtml(selectedDate, day.sunrise), 'full')}
+      ${daySection(t('dayBrief.temperature'), `<div class="day-brief-values">${dayMetric(t('dayBrief.minimum'), temperature(minimum), temperatureColor(minimum))}${dayMetric(t('dayBrief.maximum'), temperature(maximum), temperatureColor(maximum))}${dayMetric(t('dayBrief.feelsMinimum'), temperature(apparentMinimum), temperatureColor(apparentMinimum))}${dayMetric(t('dayBrief.feelsMaximum'), temperature(apparentMaximum), temperatureColor(apparentMaximum))}</div>`, 'temperature')}
+      ${daySection(t('dayBrief.precipitation'), `<div class="day-brief-values">${dayMetric(t('dayBrief.rainTotal'), measurement(precipitation, ' mm', 1), '#4aa3ff')}${dayMetric(t('dayBrief.rainChance'), measurement(rainChance, '%'), '#4aa3ff')}${dayMetric(t('dayBrief.wetHours'), `${wetHours} h`, '#4aa3ff')}${dayMetric(t('dayBrief.cloudCover'), measurement(cloud, '%'), '#94a4b8')}</div>`, 'precipitation')}
+      ${daySection(t('dayBrief.wind'), `<div class="day-brief-values">${dayMetric(t('dayBrief.windPeak'), measurement(peakWind, ' km/h'), dayWindColor(peakWind))}${dayMetric(t('dayBrief.windGust'), measurement(peakGust, ' km/h'), dayWindColor(peakGust))}${dayMetric(t('dayBrief.humidity'), measurement(humidity, '%'), '#4aa3ff')}${dayMetric(t('dayBrief.pressure'), measurement(pressure, ' hPa'), '#b1c6da')}${dayMetric(t('dayBrief.visibility'), visibility === null ? '-' : measurement(visibility / 1000, ' km', 1), '#64d5c2')}${dayMetric(t('dayBrief.direction'), numericValue(day.windDirection) === null ? '-' : windDirection(day.windDirection), '#9bc7d7')}</div>`, 'wind')}
+      ${daySection(t('dayBrief.airQuality'), aqi ? `${dayMetric(t('dayBrief.europeanAqi'), numericValue(aqi.europeanAqi) === null ? '-' : `${Math.round(aqi.europeanAqi)} - ${airQualityLabel(numericValue(aqi.europeanAqi))}`, airQualityColor(aqi.europeanAqi))}${chartRows(POLLUTANTS.map(([key, label, scale]) => [label, aqi[key], scale]), 1, (value, scale) => airQualityColor(value === null ? null : value / scale * 100), value => value === null ? '-' : `${value.toFixed(1)} µg/m3`)}` : `<div class="day-brief-empty">${escapeHtml(t('dayBrief.noData'))}</div>`, 'air-quality')}
+      ${daySection(t('dayBrief.pollen'), pollen ? chartRows(POLLEN_TYPES.map(type => [t(`dayBrief.${type}`), pollen[type]]), Math.max(1, pollenPeak(pollen)), value => value === null ? '#8d98aa' : value < 1 ? '#55cf8a' : value < 10 ? '#ffc83d' : value < 50 ? '#ff8a3d' : '#ff4055', value => value === null ? '-' : `${value.toFixed(1)} ${t('dayBrief.pollenUnit')}`) : `<div class="day-brief-empty">${escapeHtml(t('dayBrief.noData'))}</div>`, 'pollen')}
+      ${daySection(t('dayBrief.sun'), `${sunComparisonHtml(day, comparison, weather.location?.timezone || settings.location.timezone)}<div class="day-brief-values">${dayMetric(t('dayBrief.selectedDay'), durationText(comparison.current), '#ffc83d')}${dayMetric(t('dayBrief.sunshine'), durationText(day.sunshineDuration), '#ffa928')}${dayMetric(t('dayBrief.uvMaximum'), numericValue(day.uvIndexMaximum)?.toFixed(1) || '-', uvColor(day.uvIndexMaximum))}${dayMetric(`${t('dayBrief.sunrise')} - ${t('dayBrief.sunset')}`, `${clockFromMinutes(clockMinutes(day.sunrise) ?? 0)} - ${clockFromMinutes(clockMinutes(day.sunset) ?? 0)}`, '#ffc83d')}</div>`, 'sun')}
+      ${daySection(t('dayBrief.moon'), moonHtml(selectedDate, day.sunrise), 'moon')}
+      ${daySection(t('dayBrief.nextMoonPhases'), moonPhasesHtml(selectedDate), 'moon-phases')}
     </div>`;
   container.querySelectorAll('[data-day-direction]').forEach(button => button.addEventListener('click', () => {
     const next = adjacentForecastDate(availableDates, selectedDate, Number(button.dataset.dayDirection));
