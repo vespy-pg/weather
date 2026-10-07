@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {aggregate, dateAtTimelinePosition, daylightComparison, moonPhase, pointsForDate} from './day-brief.js';
+import {adjacentForecastDate, aggregate, dateAtTimelinePosition, daylightComparison, moonPhase, pointsForDate, sunMarkerMinutes} from './day-brief.js';
 
 test('selects the day represented by a settled timeline position', () => {
   const points = [
@@ -11,6 +11,21 @@ test('selects the day represented by a settled timeline position', () => {
   assert.equal(dateAtTimelinePosition(points, 1), '2026-09-20');
   assert.equal(dateAtTimelinePosition(points, 2), '2026-09-21');
   assert.equal(pointsForDate(points, '2026-09-20').length, 2);
+});
+
+test('moves between forecast days only within the available range', () => {
+  const dates = ['2026-09-20', '2026-09-21', '2026-09-22'];
+  assert.equal(adjacentForecastDate(dates, dates[1], -1), dates[0]);
+  assert.equal(adjacentForecastDate(dates, dates[1], 1), dates[2]);
+  assert.equal(adjacentForecastDate(dates, dates[0], -1), null);
+  assert.equal(adjacentForecastDate(dates, dates[2], 1), null);
+});
+
+test('sun marker follows local daylight time and disappears at night or on other days', () => {
+  const args = ['2026-06-21', '2026-06-21T04:30', '2026-06-21T21:00', 'Europe/Warsaw'];
+  assert.equal(sunMarkerMinutes(...args, new Date('2026-06-21T10:00:00Z')), 720);
+  assert.equal(sunMarkerMinutes(...args, new Date('2026-06-21T00:00:00Z')), null);
+  assert.equal(sunMarkerMinutes(...args, new Date('2026-06-22T10:00:00Z')), null);
 });
 
 test('aggregates only available numeric readings', () => {

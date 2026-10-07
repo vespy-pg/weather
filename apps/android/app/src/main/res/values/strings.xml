@@ -30,6 +30,8 @@
     <string name="open">Open</string>
     <string name="today">Today</string>
     <string name="day_brief">DAY BRIEF</string>
+    <string name="previous_day">Previous day</string>
+    <string name="next_day">Next day</string>
     <string name="day_brief_context">Shown for the selected forecast day</string>
     <string name="low_high">Low / high</string>
     <string name="peak_wind">Peak wind</string>

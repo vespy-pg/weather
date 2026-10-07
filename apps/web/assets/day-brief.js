@@ -20,6 +20,32 @@ export function dateAtTimelinePosition(points, position) {
   return String(points[index]?.timestamp || '').slice(0, 10) || null;
 }
 
+export function adjacentForecastDate(dates, selectedDate, direction) {
+  const index = dates.indexOf(selectedDate);
+  return index < 0 ? null : dates[index + direction] ?? null;
+}
+
+export function sunMarkerMinutes(date, sunrise, sunset, timezone, now = new Date()) {
+  const rise = Date.parse(`1970-01-01T${String(sunrise || '').slice(11, 16)}:00Z`);
+  const set = Date.parse(`1970-01-01T${String(sunset || '').slice(11, 16)}:00Z`);
+  if (!Number.isFinite(rise) || !Number.isFinite(set)) return null;
+  let parts;
+  try {
+    parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone && timezone !== 'auto' ? timezone : undefined,
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+    }).formatToParts(now);
+  } catch {
+    return null;
+  }
+  const value = type => parts.find(part => part.type === type)?.value;
+  if (`${value('year')}-${value('month')}-${value('day')}` !== date) return null;
+  const minute = Number(value('hour')) * 60 + Number(value('minute'));
+  const riseMinute = (rise / 60000) % 1440;
+  const setMinute = (set / 60000) % 1440;
+  return minute >= riseMinute && minute <= setMinute ? minute : null;
+}
+
 export function aggregate(values, mode = 'average') {
   const valid = values.map(numericValue).filter(value => value !== null);
   if (!valid.length) return null;

@@ -21,7 +21,7 @@ import {
 } from './location-state.js?v=2';
 import {applicationRouteUrl, forecastRouteUrl, parseCoordinatePair, parseForecastRoute, persistentRouteQuery, shouldUseRouteLocation} from './route-state.js?v=2';
 import {weatherRefreshIsDue} from './weather-refresh.js';
-import {POLLEN_TYPES, POLLUTANTS, aggregate, airQualityColor, dateAtTimelinePosition, daylightComparison, moonPhase, moonPhaseIndex, pointsForDate, pollenPeak, uvColor, windColor as dayWindColor} from './day-brief.js';
+import {POLLEN_TYPES, POLLUTANTS, adjacentForecastDate, aggregate, airQualityColor, dateAtTimelinePosition, daylightComparison, moonPhase, moonPhaseIndex, pointsForDate, pollenPeak, sunMarkerMinutes, uvColor, windColor as dayWindColor} from './day-brief.js';
 import {
   celsiusToDisplay,
   DEFAULT_THRESHOLDS,
@@ -801,7 +801,7 @@ function chartRows(values, maximum, colorForValue, formatter) {
   }).join('');
 }
 
-function sunComparisonHtml(day, comparison) {
+function sunComparisonHtml(day, comparison, timezone) {
   const rise = clockMinutes(day?.sunrise);
   const set = clockMinutes(day?.sunset);
   if (rise === null || set === null) return `<div class="day-brief-empty">${escapeHtml(t('dayBrief.noData'))}</div>`;
@@ -824,9 +824,13 @@ function sunComparisonHtml(day, comparison) {
     const middle = (start + end) / 2;
     return `<path d="M${start.toFixed(2)} 108 Q${middle.toFixed(2)} ${peakByIndex[index]} ${end.toFixed(2)} 108" fill="none" stroke="${row.color}" stroke-width="${index === 1 ? 3.4 : 2}"/>`;
   }).join('');
-  const sunX = x((rise + set) / 2);
+  const markerMinute = sunMarkerMinutes(day.date, day.sunrise, day.sunset, timezone);
+  const sunX = markerMinute === null ? null : x(markerMinute);
+  const progress = markerMinute === null ? 0 : (markerMinute - rise) / (set - rise);
+  const sunY = 108 - 2 * (108 - peakByIndex[1]) * progress * (1 - progress);
+  const sunMarker = sunX === null ? '' : `<circle cx="${sunX.toFixed(2)}" cy="${sunY.toFixed(2)}" r="18" fill="#ffc83d" fill-opacity=".12"/><circle cx="${sunX.toFixed(2)}" cy="${sunY.toFixed(2)}" r="11" fill="#ffc83d"/>`;
   const legend = rows.map(row => `<div class="sun-comparison-row"><i style="--sun-color:${row.color}"></i><span>${escapeHtml(row.label)}</span><b>${clockFromMinutes(row.rise)}</b><em>${clockFromMinutes(row.set)}</em></div>`).join('');
-  return `<div class="sun-comparison-legend">${legend}</div><div class="sun-comparison"><svg viewBox="0 0 1000 130" preserveAspectRatio="none" aria-label="${escapeHtml(t('dayBrief.sun'))}"><rect x="0" y="108" width="1000" height="22" fill="#18232d"/><line x1="0" y1="108" x2="1000" y2="108" stroke="#8d98aa" stroke-opacity=".62" stroke-width="2"/>${paths}<circle cx="${sunX.toFixed(2)}" cy="27" r="11" fill="#ffc83d"/><circle cx="${sunX.toFixed(2)}" cy="27" r="18" fill="#ffc83d" fill-opacity=".12"/></svg></div>
+  return `<div class="sun-comparison-legend">${legend}</div><div class="sun-comparison"><svg viewBox="0 0 1000 130" preserveAspectRatio="none" aria-label="${escapeHtml(t('dayBrief.sun'))}"><rect x="0" y="108" width="1000" height="22" fill="#18232d"/><line x1="0" y1="108" x2="1000" y2="108" stroke="#8d98aa" stroke-opacity=".62" stroke-width="2"/>${paths}${sunMarker}</svg></div>
     <div class="sun-comparison-meta"><span>${escapeHtml(t('dayBrief.sunrise'))}: <b>${clockFromMinutes(rise)}</b></span><span>${escapeHtml(t('dayBrief.sunset'))}: <b>${clockFromMinutes(set)}</b></span><span>${escapeHtml(t('dayBrief.aboveShortest'))}: <b>+${durationText(comparison.aboveShortest)}</b></span><span>${escapeHtml(t('dayBrief.belowLongest'))}: <b>${durationText(comparison.belowLongest)}</b></span></div>`;
 }
 
@@ -894,17 +898,36 @@ function renderSelectedDay(date, {scrollIntoView = false} = {}) {
   const pollen = day.pollen || null;
   const comparison = daylightComparison(selectedDate, weather.location?.latitude ?? settings.location.latitude, day.daylightDuration);
   const container = document.getElementById('forecastDayBrief');
-  container.innerHTML = `<div class="day-brief-heading"><div><p class="eyebrow">${escapeHtml(t('dayBrief.eyebrow'))}</p><h2 id="forecastDayBriefTitle">${escapeHtml(formatForecastDate(selectedDate, {weekday: 'long', day: 'numeric', month: 'long'}))}</h2></div><div class="day-brief-condition">${condition[0]} ${escapeHtml(condition[1])}</div></div>
+  const previousDate = adjacentForecastDate(availableDates, selectedDate, -1);
+  const nextDate = adjacentForecastDate(availableDates, selectedDate, 1);
+  container.innerHTML = `<div class="day-brief-heading"><div><p class="eyebrow">${escapeHtml(t('dayBrief.eyebrow'))}</p><h2 id="forecastDayBriefTitle">${escapeHtml(formatForecastDate(selectedDate, {weekday: 'long', day: 'numeric', month: 'long'}))}</h2></div><div class="day-brief-heading-actions"><div class="day-brief-condition">${condition[0]} ${escapeHtml(condition[1])}</div><nav class="day-brief-navigation" aria-label="${escapeHtml(t('dayBrief.navigate'))}"><button type="button" data-day-direction="-1" aria-label="${escapeHtml(t('dayBrief.previous'))}" ${previousDate ? '' : 'disabled'}>‹</button><button type="button" data-day-direction="1" aria-label="${escapeHtml(t('dayBrief.next'))}" ${nextDate ? '' : 'disabled'}>›</button></nav></div></div>
     <div class="day-brief-grid">
       ${daySection(t('dayBrief.temperature'), `<div class="day-brief-values">${dayMetric(t('dayBrief.minimum'), temperature(minimum), temperatureColor(minimum))}${dayMetric(t('dayBrief.maximum'), temperature(maximum), temperatureColor(maximum))}${dayMetric(t('dayBrief.feelsMinimum'), temperature(apparentMinimum), temperatureColor(apparentMinimum))}${dayMetric(t('dayBrief.feelsMaximum'), temperature(apparentMaximum), temperatureColor(apparentMaximum))}</div>`)}
       ${daySection(t('dayBrief.precipitation'), `<div class="day-brief-values">${dayMetric(t('dayBrief.rainTotal'), measurement(precipitation, ' mm', 1), '#4aa3ff')}${dayMetric(t('dayBrief.rainChance'), measurement(rainChance, '%'), '#4aa3ff')}${dayMetric(t('dayBrief.wetHours'), `${wetHours} h`, '#4aa3ff')}${dayMetric(t('dayBrief.cloudCover'), measurement(cloud, '%'), '#94a4b8')}</div>`)}
       ${daySection(t('dayBrief.wind'), `<div class="day-brief-values">${dayMetric(t('dayBrief.windPeak'), measurement(peakWind, ' km/h'), dayWindColor(peakWind))}${dayMetric(t('dayBrief.windGust'), measurement(peakGust, ' km/h'), dayWindColor(peakGust))}${dayMetric(t('dayBrief.humidity'), measurement(humidity, '%'), '#4aa3ff')}${dayMetric(t('dayBrief.pressure'), measurement(pressure, ' hPa'), '#b1c6da')}${dayMetric(t('dayBrief.visibility'), visibility === null ? '-' : measurement(visibility / 1000, ' km', 1), '#64d5c2')}${dayMetric(t('dayBrief.direction'), numericValue(day.windDirection) === null ? '-' : windDirection(day.windDirection), '#9bc7d7')}</div>`, 'full')}
-      ${daySection(t('dayBrief.airQuality'), aqi ? `${dayMetric(t('dayBrief.europeanAqi'), numericValue(aqi.europeanAqi) === null ? '-' : `${Math.round(aqi.europeanAqi)} - ${airQualityLabel(numericValue(aqi.europeanAqi))}`, airQualityColor(aqi.europeanAqi))}${chartRows(POLLUTANTS.map(([key, label, scale]) => [label, aqi[key], scale]), 1, (value, scale) => airQualityColor(value === null ? null : value / scale * 100), value => value === null ? '-' : `${value.toFixed(1)} µg/m3`)}` : `<div class="day-brief-empty">${escapeHtml(t('dayBrief.noData'))}</div>`)}
-      ${daySection(t('dayBrief.pollen'), pollen ? chartRows(POLLEN_TYPES.map(type => [t(`dayBrief.${type}`), pollen[type]]), Math.max(1, pollenPeak(pollen)), value => value === null ? '#8d98aa' : value < 1 ? '#55cf8a' : value < 10 ? '#ffc83d' : value < 50 ? '#ff8a3d' : '#ff4055', value => value === null ? '-' : `${value.toFixed(1)} ${t('dayBrief.pollenUnit')}`) : `<div class="day-brief-empty">${escapeHtml(t('dayBrief.noData'))}</div>`)}
-      ${daySection(t('dayBrief.sun'), `${sunComparisonHtml(day, comparison)}<div class="day-brief-values">${dayMetric(t('dayBrief.selectedDay'), durationText(comparison.current), '#ffc83d')}${dayMetric(t('dayBrief.sunshine'), durationText(day.sunshineDuration), '#ffa928')}${dayMetric(t('dayBrief.uvMaximum'), numericValue(day.uvIndexMaximum)?.toFixed(1) || '-', uvColor(day.uvIndexMaximum))}${dayMetric(`${t('dayBrief.sunrise')} - ${t('dayBrief.sunset')}`, `${clockFromMinutes(clockMinutes(day.sunrise) ?? 0)} - ${clockFromMinutes(clockMinutes(day.sunset) ?? 0)}`, '#ffc83d')}</div>`)}
-      ${daySection(t('dayBrief.moon'), moonHtml(selectedDate, day.sunrise))}
+      ${daySection(t('dayBrief.airQuality'), aqi ? `${dayMetric(t('dayBrief.europeanAqi'), numericValue(aqi.europeanAqi) === null ? '-' : `${Math.round(aqi.europeanAqi)} - ${airQualityLabel(numericValue(aqi.europeanAqi))}`, airQualityColor(aqi.europeanAqi))}${chartRows(POLLUTANTS.map(([key, label, scale]) => [label, aqi[key], scale]), 1, (value, scale) => airQualityColor(value === null ? null : value / scale * 100), value => value === null ? '-' : `${value.toFixed(1)} µg/m3`)}` : `<div class="day-brief-empty">${escapeHtml(t('dayBrief.noData'))}</div>`, 'full')}
+      ${daySection(t('dayBrief.pollen'), pollen ? chartRows(POLLEN_TYPES.map(type => [t(`dayBrief.${type}`), pollen[type]]), Math.max(1, pollenPeak(pollen)), value => value === null ? '#8d98aa' : value < 1 ? '#55cf8a' : value < 10 ? '#ffc83d' : value < 50 ? '#ff8a3d' : '#ff4055', value => value === null ? '-' : `${value.toFixed(1)} ${t('dayBrief.pollenUnit')}`) : `<div class="day-brief-empty">${escapeHtml(t('dayBrief.noData'))}</div>`, 'full')}
+      ${daySection(t('dayBrief.sun'), `${sunComparisonHtml(day, comparison, weather.location?.timezone || settings.location.timezone)}<div class="day-brief-values">${dayMetric(t('dayBrief.selectedDay'), durationText(comparison.current), '#ffc83d')}${dayMetric(t('dayBrief.sunshine'), durationText(day.sunshineDuration), '#ffa928')}${dayMetric(t('dayBrief.uvMaximum'), numericValue(day.uvIndexMaximum)?.toFixed(1) || '-', uvColor(day.uvIndexMaximum))}${dayMetric(`${t('dayBrief.sunrise')} - ${t('dayBrief.sunset')}`, `${clockFromMinutes(clockMinutes(day.sunrise) ?? 0)} - ${clockFromMinutes(clockMinutes(day.sunset) ?? 0)}`, '#ffc83d')}</div>`, 'full')}
+      ${daySection(t('dayBrief.moon'), moonHtml(selectedDate, day.sunrise), 'full')}
     </div>`;
+  container.querySelectorAll('[data-day-direction]').forEach(button => button.addEventListener('click', () => {
+    const next = adjacentForecastDate(availableDates, selectedDate, Number(button.dataset.dayDirection));
+    if (next) renderSelectedDay(next);
+  }));
   if (scrollIntoView) container.scrollIntoView({behavior: 'smooth', block: 'start'});
+}
+
+function refreshSunPosition() {
+  if (!weather?.available || !selectedForecastDate || IS_EMBEDDED) return;
+  const day = weather.daily.find(item => item.date === selectedForecastDate);
+  const chart = document.querySelector('.sun-comparison svg');
+  if (!day || !chart) return;
+  const latitude = weather.location?.latitude ?? settings.location.latitude;
+  const comparison = daylightComparison(selectedForecastDate, latitude, day.daylightDuration);
+  const template = document.createElement('div');
+  template.innerHTML = sunComparisonHtml(day, comparison, weather.location?.timezone || settings.location.timezone);
+  const updated = template.querySelector('.sun-comparison svg');
+  if (updated) chart.replaceWith(updated);
 }
 
 function updateTemperatureAxis(range) {
@@ -1269,7 +1292,7 @@ async function loadWeather() {
     document.getElementById('forecastRangeLabel').textContent = t(IS_DEMO ? 'forecast.demo' : 'forecast.next');
     if (requestId !== weatherRequest) return;
     if (sameLocation(settings.location, requestedLocation)) {
-      nextWeather.location = {...nextWeather.location, ...settings.location};
+      nextWeather.location = {...settings.location, ...nextWeather.location};
     }
     weather = nextWeather;
     weatherLoadedAt = weatherFetchTime(nextWeather);
@@ -2240,6 +2263,7 @@ initialize().finally(() => {
   loadPromotion();
   monitorGeolocationPermission();
   setInterval(refreshWeatherIfNeeded, WEATHER_REFRESH_INTERVAL_MS);
+  setInterval(refreshSunPosition, 60 * 1000);
   setInterval(updateWeatherFreshnessWarning, 60 * 1000);
 });
 

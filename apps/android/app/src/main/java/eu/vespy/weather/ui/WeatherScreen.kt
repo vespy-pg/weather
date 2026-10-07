@@ -140,6 +140,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.time.LocalDateTime
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -1084,9 +1085,12 @@ private fun ForecastTimeline(
             focusedDate?.let { date ->
                 ForecastDayBrief(
                     date = date,
+                    availableDates = forecast.daily.map { it.date },
+                    onSelectDate = { focusedDate = it },
                     points = hourly.filter { it.timestamp.take(10) == date },
                     daily = forecast.daily.firstOrNull { it.date == date },
                     latitude = forecast.location.latitude,
+                    timezone = forecast.location.timezone,
                     temperatureUnit = temperatureUnit,
                     compact = landscape,
                 )
@@ -1759,13 +1763,16 @@ private fun Metrics(forecast: WeatherForecast, temperatureUnit: String) {
 @Composable
 private fun ForecastDayBrief(
     date: String,
+    availableDates: List<String>,
+    onSelectDate: (String) -> Unit,
     points: List<HourlyWeather>,
     daily: DailyWeather?,
     latitude: Double,
+    timezone: String,
     temperatureUnit: String,
     compact: Boolean,
 ) {
-    if (points.isEmpty()) return
+    if (points.isEmpty() && daily == null) return
     val context = LocalContext.current
     val locale = context.resources.configuration.locales[0]
     val title = runCatching {
@@ -1804,7 +1811,12 @@ private fun ForecastDayBrief(
                 fontWeight = FontWeight.Black,
                 letterSpacing = .7.sp,
             )
-            Text(title, fontSize = if (compact) 16.sp else 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(title, modifier = Modifier.weight(1f), fontSize = if (compact) 16.sp else 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                val dayIndex = availableDates.indexOf(date)
+                TextButton(onClick = { onSelectDate(availableDates[dayIndex - 1]) }, enabled = dayIndex > 0, modifier = Modifier.semantics { contentDescription = context.getString(R.string.previous_day) }) { Text("‹", fontSize = 24.sp) }
+                TextButton(onClick = { onSelectDate(availableDates[dayIndex + 1]) }, enabled = dayIndex >= 0 && dayIndex < availableDates.lastIndex, modifier = Modifier.semantics { contentDescription = context.getString(R.string.next_day) }) { Text("›", fontSize = 24.sp) }
+            }
             Text(stringResource(R.string.day_brief_context), color = Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp))
             DayBriefSection(stringResource(R.string.day_brief_temperature)) {
                 DayBriefTemperatureRow(
@@ -1827,11 +1839,6 @@ private fun ForecastDayBrief(
                 if (airQuality == null) Text(stringResource(R.string.air_quality_unavailable), color = Muted, fontSize = 12.sp)
                 else AirQualityDetails(airQuality)
             }
-            DayBriefSection(stringResource(R.string.day_brief_sun)) {
-                SunlightComparison(date, daily?.sunrise, daily?.sunset, dayLength, shortest, longest)
-                DayBriefRow(stringResource(R.string.daylight), durationText(dayLength), stringResource(R.string.sunshine), durationText(daily?.sunshineDuration), Color(0xFFFFC83D), Color(0xFFFFA928))
-                DayBriefRow(stringResource(R.string.uv_max), daily?.uvIndexMaximum?.let { String.format(locale, "%.1f", it) } ?: "-", stringResource(R.string.sun_window), "$sunrise - $sunset", uvColor(daily?.uvIndexMaximum), Color(0xFFFFC83D))
-            }
             DayBriefSection(stringResource(R.string.day_brief_pollen)) {
                 val pollen = daily?.pollen
                 if (pollen == null) Text(stringResource(R.string.pollen_unavailable), color = Muted, fontSize = 12.sp)
@@ -1843,6 +1850,14 @@ private fun ForecastDayBrief(
                     stringResource(R.string.pollen_olive) to pollen.olive,
                     stringResource(R.string.pollen_ragweed) to pollen.ragweed,
                 ))
+            }
+            DayBriefSection(stringResource(R.string.day_brief_sun)) {
+                SunlightComparison(date, daily?.sunrise, daily?.sunset, dayLength, shortest, longest, timezone)
+                DayBriefRow(stringResource(R.string.daylight), durationText(dayLength), stringResource(R.string.sunshine), durationText(daily?.sunshineDuration), Color(0xFFFFC83D), Color(0xFFFFA928))
+                DayBriefRow(stringResource(R.string.uv_max), daily?.uvIndexMaximum?.let { String.format(locale, "%.1f", it) } ?: "-", stringResource(R.string.sun_window), "$sunrise - $sunset", uvColor(daily?.uvIndexMaximum), Color(0xFFFFC83D))
+            }
+            DayBriefSection(stringResource(R.string.moon_path)) {
+                MoonPanel(LocalDate.parse(date), clockMinutes(daily?.sunrise) ?: 360)
             }
         }
     }
@@ -1893,9 +1908,15 @@ private fun DayBriefTemperatureMetric(label: String, low: Double?, high: Double?
 }
 
 @Composable
-private fun SunlightComparison(date: String, sunrise: String?, sunset: String?, dayLength: Double, shortestDay: Double, longestDay: Double) {
+private fun SunlightComparison(date: String, sunrise: String?, sunset: String?, dayLength: Double, shortestDay: Double, longestDay: Double, timezone: String) {
     val sunriseMinutes = clockMinutes(sunrise) ?: return
     val sunsetMinutes = clockMinutes(sunset) ?: return
+    val localNow by produceState(initialValue = runCatching { LocalDateTime.now(ZoneId.of(timezone)) }.getOrElse { LocalDateTime.now() }, timezone) {
+        while (true) {
+            value = runCatching { LocalDateTime.now(ZoneId.of(timezone)) }.getOrElse { LocalDateTime.now() }
+            delay(60_000)
+        }
+    }
     val aboveShortest = (dayLength - shortestDay).coerceAtLeast(0.0)
     val belowLongest = (longestDay - dayLength).coerceAtLeast(0.0)
     val shortestDifference = (aboveShortest / 120).toInt()
@@ -1919,7 +1940,8 @@ private fun SunlightComparison(date: String, sunrise: String?, sunset: String?, 
                     Text("${formatClockMinutes(rise)} - ${formatClockMinutes(set)}", color = color, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
             }
-            SunPathChart(rows, domain.first, domain.last)
+            val markerMinute = if (localNow.toLocalDate().toString() == date) localNow.hour * 60 + localNow.minute else null
+            SunPathChart(rows, domain.first, domain.last, markerMinute)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 listOf(domain.first, (domain.first + domain.last) / 2, domain.last).forEach { Text(formatClockMinutes(it), color = Muted, fontSize = 8.sp) }
             }
@@ -1939,7 +1961,6 @@ private fun SunlightComparison(date: String, sunrise: String?, sunset: String?, 
                     modifier = Modifier.weight(1f),
                 )
             }
-            MoonPanel(LocalDate.parse(date), sunriseMinutes)
         }
         DayBriefRow(
             stringResource(R.string.above_shortest_day), "+${durationText(aboveShortest)}",
@@ -2049,7 +2070,7 @@ private fun moonPhaseName(phase: Double): String = stringResource(when ((phase *
 internal fun normalizeMinutes(minutes: Int): Int = ((minutes % 1440) + 1440) % 1440
 
 @Composable
-private fun SunPathChart(rows: List<Triple<String, Int, Int>>, domainStart: Int, domainEnd: Int) {
+private fun SunPathChart(rows: List<Triple<String, Int, Int>>, domainStart: Int, domainEnd: Int, markerMinute: Int?) {
     Canvas(Modifier.fillMaxWidth().height(132.dp)) {
         val horizonY = size.height - 14.dp.toPx()
         val edgePadding = 6.dp.toPx()
@@ -2085,9 +2106,10 @@ private fun SunPathChart(rows: List<Triple<String, Int, Int>>, domainStart: Int,
                 drawPath(glow, color.copy(alpha = .08f))
             }
             drawPath(path, color.copy(alpha = if (index == 1) 1f else .72f), style = Stroke(width = if (index == 1) 4.dp.toPx() else 2.dp.toPx(), cap = StrokeCap.Round))
-            if (index == 1) {
-                val sunY = (horizonY + apexY) / 2f
-                val sunX = midpoint
+            if (index == 1 && markerMinute != null && markerMinute in rise..set) {
+                val progress = (markerMinute - rise).toFloat() / (set - rise).coerceAtLeast(1)
+                val sunY = horizonY - 2f * (horizonY - apexY) * progress * (1f - progress)
+                val sunX = xForTime(markerMinute)
                 drawCircle(color.copy(alpha = .18f), radius = 12.dp.toPx(), center = Offset(sunX, sunY))
                 drawCircle(color, radius = 6.dp.toPx(), center = Offset(sunX, sunY))
             }

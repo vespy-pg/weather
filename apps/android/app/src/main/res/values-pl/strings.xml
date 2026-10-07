@@ -30,6 +30,8 @@
     <string name="open">Otwórz</string>
     <string name="today">Dzisiaj</string>
     <string name="day_brief">SZCZEGÓŁY DNIA</string>
+    <string name="previous_day">Poprzedni dzień</string>
+    <string name="next_day">Następny dzień</string>
     <string name="day_brief_context">Dotyczy wybranego dnia prognozy</string>
     <string name="low_high">Min. / maks.</string>
     <string name="peak_wind">Szczyt wiatru</string>

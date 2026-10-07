@@ -608,7 +608,7 @@ export function normalizeForecast(source, location, {pastDays = 0, pollenSource 
       mushroom: mushroomCondition(source, sourceIndex)
     };
     }),
-    location
+    location: {...location, timezone: source.timezone || location.timezone}
   };
 }
 

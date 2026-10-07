@@ -222,6 +222,10 @@ html[data-share-prompt="collapsed"] .share-forecast { display: none; }
 .forecast-day-brief { scroll-margin-top: 12px; }
 .day-brief-heading { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .day-brief-heading h2 { margin: 3px 0 0; font-size: clamp(24px, 3vw, 34px); }
+.day-brief-heading-actions { display: flex; align-items: center; gap: 12px; }
+.day-brief-navigation { display: flex; gap: 5px; }
+.day-brief-navigation button { width: 38px; height: 38px; border: 1px solid var(--line); border-radius: 7px; background: var(--card); color: var(--text); font-size: 28px; line-height: 1; cursor: pointer; }
+.day-brief-navigation button:disabled { opacity: .35; cursor: default; }
 .day-brief-condition { color: var(--muted); font-weight: 800; }
 .day-brief-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .day-brief-section { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--card); }
@@ -315,12 +319,6 @@ html[data-share-prompt="collapsed"] .share-forecast { display: none; }
 .legend-mark.wind.strong { height: 11px; box-shadow: 0 0 6px var(--chart-wind-flow); }
 .legend-mark.wind-change, .legend-mark.tornado, .legend-mark.direction { color: var(--chart-wind-flow); font-weight: 900; }
 
-.daily-grid { display: grid; grid-template-columns: repeat(10, minmax(150px, 1fr)); gap: 8px; margin-top: 12px; overflow-x: auto; padding-bottom: 4px; }
-.forecast-day { min-width: 150px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
-.forecast-day-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.forecast-day-symbol { font-size: 26px; }
-.forecast-day-temperature { margin-top: 10px; font: 800 17px/1 ui-monospace, monospace; }
-.forecast-day-detail { margin-top: 8px; color: var(--muted); font-size: 10px; line-height: 1.5; }
 .data-attribution { margin-top: 14px; color: var(--muted); font-size: 10px; text-align: center; }
 .data-attribution a { color: inherit; }
 .privacy-choices { border: 0; padding: 0; background: transparent; color: inherit; font-size: inherit; text-decoration: underline; cursor: pointer; }
@@ -385,7 +383,7 @@ html[data-share-prompt="collapsed"] .share-forecast { display: none; }
 .skeleton-line.medium { width: 68%; }
 .skeleton-line.large { width: 86%; height: 22px; }
 .skeleton-card::after { content: ""; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 25%, color-mix(in srgb, var(--blue) 9%, transparent) 45%, transparent 65%); background-size: 240% 100%; animation: weather-skeleton 1.8s ease-in-out infinite; pointer-events: none; }
-.metric-card.skeleton-card, .forecast-day.skeleton-card { position: relative; }
+.metric-card.skeleton-card { position: relative; }
 @keyframes weather-skeleton { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
 
 .app-notification { position: fixed; z-index: 80; top: 16px; right: 16px; display: grid; width: min(430px, calc(100% - 32px)); grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 14px 16px; border: 1px solid color-mix(in srgb, var(--orange) 55%, var(--line)); border-radius: 10px; background: var(--panel); color: var(--text); box-shadow: 0 16px 48px rgba(0, 0, 0, .35); }
