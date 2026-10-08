@@ -1,1 +1,1 @@
-Dodano wizualizację mgły na osi prognozy i w widżetach pogodowych.
+Dodano przełączanie dni w szczegółach prognozy. Wykres słońca pokazuje jego aktualne położenie, a informacje o Księżycu i pyłkach są łatwiejsze do znalezienia.

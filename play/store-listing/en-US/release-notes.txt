@@ -1,1 +1,1 @@
-Shows fog in the forecast timeline and weather widgets.
+Navigate between days in the detailed forecast. The sun chart now shows the current sun position, and moon and pollen details are easier to find.
