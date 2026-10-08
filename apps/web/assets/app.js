@@ -836,9 +836,9 @@ function sunComparisonHtml(day, comparison, timezone) {
   const sunX = markerMinute === null ? null : x(markerMinute);
   const progress = markerMinute === null ? 0 : (markerMinute - rise) / (set - rise);
   const sunY = 108 - 2 * (108 - peakByIndex[1]) * progress * (1 - progress);
-  const sunMarker = sunX === null ? '' : `<circle cx="${sunX.toFixed(2)}" cy="${sunY.toFixed(2)}" r="18" fill="#ffc83d" fill-opacity=".12"/><circle cx="${sunX.toFixed(2)}" cy="${sunY.toFixed(2)}" r="11" fill="#ffc83d"/>`;
+  const sunMarker = sunX === null ? '' : `<span class="sun-marker" aria-hidden="true" style="left:${(sunX / 10).toFixed(2)}%;top:${(sunY / 130 * 100).toFixed(2)}%"></span>`;
   const legend = rows.map(row => `<div class="sun-comparison-row"><i style="--sun-color:${row.color}"></i><span>${escapeHtml(row.label)}</span><b>${clockFromMinutes(row.rise)}</b><em>${clockFromMinutes(row.set)}</em></div>`).join('');
-  return `<div class="sun-comparison-legend">${legend}</div><div class="sun-comparison"><svg viewBox="0 0 1000 130" preserveAspectRatio="none" aria-label="${escapeHtml(t('dayBrief.sun'))}"><rect x="0" y="108" width="1000" height="22" fill="#18232d"/><line x1="0" y1="108" x2="1000" y2="108" stroke="#8d98aa" stroke-opacity=".62" stroke-width="2"/>${paths}${sunMarker}</svg></div>
+  return `<div class="sun-comparison-legend">${legend}</div><div class="sun-comparison"><svg viewBox="0 0 1000 130" preserveAspectRatio="none" aria-label="${escapeHtml(t('dayBrief.sun'))}"><rect x="0" y="108" width="1000" height="22" fill="#18232d"/><line x1="0" y1="108" x2="1000" y2="108" stroke="#8d98aa" stroke-opacity=".62" stroke-width="2"/>${paths}</svg>${sunMarker}</div>
     <div class="sun-comparison-meta"><span>${escapeHtml(t('dayBrief.sunrise'))}: <b>${clockFromMinutes(rise)}</b></span><span>${escapeHtml(t('dayBrief.sunset'))}: <b>${clockFromMinutes(set)}</b></span><span>${escapeHtml(t('dayBrief.aboveShortest'))}: <b>+${durationText(comparison.aboveShortest)}</b></span><span>${escapeHtml(t('dayBrief.belowLongest'))}: <b>${durationText(comparison.belowLongest)}</b></span></div>`;
 }
 
@@ -868,9 +868,9 @@ function moonHtml(date, sunrise) {
   const rise = ((clockMinutes(sunrise) ?? 360) + phase * 1440) % 1440;
   const set = (rise + 720) % 1440;
   const transit = (rise + 360) % 1440;
-  const x = transit / 1440 * 1000;
+  const markerLeft = transit / 1440 * 100;
   return `<div class="day-brief-values">${dayMetric(t(`dayBrief.${phaseKeys[moonPhaseIndex(phase)]}`), `${Math.round((1 - Math.cos(2 * Math.PI * phase)) / 2 * 100)}%`, '#c2d2ff')}${dayMetric(t('dayBrief.moon'), `~${clockFromMinutes(rise)} - ~${clockFromMinutes(set)}`, '#c2d2ff')}</div>
-    <svg class="moon-path" viewBox="0 0 1000 100" preserveAspectRatio="none"><rect x="0" y="90" width="1000" height="10" fill="#18232d"/><line x1="0" y1="90" x2="1000" y2="90" stroke="#8d98aa" stroke-opacity=".52" stroke-width="2"/>${moonPathData(rise)}<circle cx="${x.toFixed(2)}" cy="22" r="18" fill="#c2d2ff" fill-opacity=".13"/><circle cx="${x.toFixed(2)}" cy="22" r="9" fill="#c2d2ff"/></svg>
+    <div class="moon-chart"><svg class="moon-path" viewBox="0 0 1000 100" preserveAspectRatio="none"><rect x="0" y="90" width="1000" height="10" fill="#18232d"/><line x1="0" y1="90" x2="1000" y2="90" stroke="#8d98aa" stroke-opacity=".52" stroke-width="2"/>${moonPathData(rise)}</svg><span class="moon-marker" aria-hidden="true" style="left:${markerLeft.toFixed(2)}%;top:22%"></span></div>
     <small class="muted">${escapeHtml(t('dayBrief.moonApproximate'))}</small>`;
 }
 
@@ -932,13 +932,13 @@ function renderSelectedDay(date, {scrollIntoView = false} = {}) {
 function refreshSunPosition() {
   if (!weather?.available || !selectedForecastDate || IS_EMBEDDED) return;
   const day = weather.daily.find(item => item.date === selectedForecastDate);
-  const chart = document.querySelector('.sun-comparison svg');
+  const chart = document.querySelector('.sun-comparison');
   if (!day || !chart) return;
   const latitude = weather.location?.latitude ?? settings.location.latitude;
   const comparison = daylightComparison(selectedForecastDate, latitude, day.daylightDuration);
   const template = document.createElement('div');
   template.innerHTML = sunComparisonHtml(day, comparison, weather.location?.timezone || settings.location.timezone);
-  const updated = template.querySelector('.sun-comparison svg');
+  const updated = template.querySelector('.sun-comparison');
   if (updated) chart.replaceWith(updated);
 }
 
