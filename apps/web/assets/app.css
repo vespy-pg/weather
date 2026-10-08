@@ -236,10 +236,10 @@ html[data-share-prompt="collapsed"] .share-forecast { display: none; }
 .day-brief-value { min-width: 0; padding: 10px; border-radius: 7px; background: color-mix(in srgb, var(--surface) 72%, transparent); }
 .day-brief-value small { display: block; color: var(--muted); font-size: 10px; line-height: 1.2; }
 .day-brief-value strong { display: block; margin-top: 6px; font: 900 19px/1.05 ui-monospace, monospace; }
-.day-brief-bar-row { display: grid; grid-template-columns: 68px minmax(0, 1fr) 88px; align-items: center; gap: 8px; margin-top: 8px; color: var(--muted); font-size: 11px; }
-.day-brief-bar { height: 8px; overflow: hidden; border-radius: 5px; background: color-mix(in srgb, var(--muted) 17%, transparent); }
+.day-brief-bar-row { display: grid; grid-template-columns: 90px minmax(0, 1fr) 126px; align-items: center; gap: 12px; min-height: 25px; margin-top: 10px; color: var(--muted); font-size: 13px; }
+.day-brief-bar { height: 12px; overflow: hidden; border-radius: 6px; background: color-mix(in srgb, var(--muted) 17%, transparent); }
 .day-brief-bar i { display: block; width: var(--value); height: 100%; border-radius: inherit; background: var(--color); }
-.day-brief-bar-row b { overflow: hidden; color: var(--color); text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.day-brief-bar-row b { overflow: hidden; color: var(--color); font: 800 14px/1.1 ui-monospace, monospace; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
 .sun-comparison-legend { display: grid; gap: 5px; margin-bottom: 8px; }
 .sun-comparison-row { display: grid; grid-template-columns: 9px minmax(0, 1fr) auto auto; align-items: center; gap: 7px; color: var(--muted); font-size: 10px; }
 .sun-comparison-row i { width: 8px; height: 8px; border-radius: 50%; background: var(--sun-color); box-shadow: 0 0 5px color-mix(in srgb, var(--sun-color) 55%, transparent); }
@@ -610,7 +610,8 @@ body.embedded .data-attribution { display: none; }
   .web-promotion-preview { display: none; }
   .web-promotion-description { font-size: 10px; }
   .web-promotion-action { grid-column: 2; justify-self: start; padding: 0; border: 0; }
-  .day-brief-bar-row { grid-template-columns: 58px minmax(0, 1fr) 76px; }
+  .day-brief-bar-row { grid-template-columns: 70px minmax(0, 1fr) 110px; gap: 8px; font-size: 12px; }
+  .day-brief-bar-row b { font-size: 12px; }
 }
 
 body.embedded-roomy .forecast-panel { padding: 18px; }
