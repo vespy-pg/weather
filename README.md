@@ -91,7 +91,7 @@ GitHub Pages is a static demonstration, so it always shows the demo dataset. Loc
 
 ## Run your own live weather instance
 
-Node.js 20 or newer is required. There are no third-party runtime dependencies.
+Node.js 24 LTS is required for the API and local development.
 
 ```bash
 git clone https://github.com/vespy-pg/weather.git
